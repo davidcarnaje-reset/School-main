@@ -8,6 +8,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import cashierRoutes from './routes/cashierRoutes.js';
 import registrarRoutes from './routes/registrarRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
+import smokeTestRoutes from './routes/smokeTest.js';
 
 // I-load ang environment variables
 dotenv.config();
@@ -46,6 +47,9 @@ app.use('/api/registrar', registrarRoutes);
 
 // 7. Student Portal General Data
 app.use('/api/student', studentRoutes);
+
+// 8. Health & Utility Endpoints (for Vercel)
+app.use('/api/test', smokeTestRoutes);
 
 // Global Fallback Error Handler
 app.use((req, res) => {
