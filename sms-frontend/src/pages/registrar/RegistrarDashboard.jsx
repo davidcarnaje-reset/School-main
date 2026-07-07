@@ -29,7 +29,7 @@ const RegistrarDashboard = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/registrar/get_registrar_dashboard.php`);
+      const response = await axios.get(`${API_BASE_URL}/registrar/dashboard-stats`);
       
       if (response.data.success) {
         const data = response.data;

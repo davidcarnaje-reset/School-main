@@ -11,7 +11,7 @@ import ProfileModal from '../components/student/ProfileModal';
 import ReadNotificationModal from '../components/shared/ReadNotificationModal';
 
 const StudentLayout = () => {
-  const { user, logout, branding, API_BASE_URL } = useAuth();
+  const { user, logout, branding, API_BASE_URL, getLogoUrl } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -142,7 +142,7 @@ const StudentLayout = () => {
         {/* LOGO SECTION */}
         <div className={`h-20 px-4 border-b border-slate-800 flex items-center shrink-0 transition-all justify-between ${isCollapsed ? 'lg:justify-center' : 'lg:justify-between'}`}>
           <div className="flex items-center gap-3 overflow-hidden">
-            {branding?.school_logo && <img src={`${API_BASE_URL}/uploads/branding/${branding.school_logo}`} alt="Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg" />}
+            {branding?.school_logo && <img src={getLogoUrl(branding.school_logo)} alt="Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg" />}
             <span className={`text-[15px] leading-tight font-black text-white tracking-tight line-clamp-2 w-36 ${isCollapsed ? 'lg:w-0 lg:opacity-0 lg:hidden' : ''}`}>{branding?.school_name}</span>
           </div>
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-white/50 hover:text-white"><X size={20}/></button>

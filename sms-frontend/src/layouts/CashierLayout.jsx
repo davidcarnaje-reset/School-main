@@ -22,7 +22,7 @@ import CreateAnnouncementModal from "../components/shared/CreateAnnouncementModa
 import ReadNotificationModal from "../components/shared/ReadNotificationModal";
 
 const CashierLayout = () => {
-  const { logout, user, branding, API_BASE_URL } = useAuth();
+  const { logout, user, branding, API_BASE_URL, getLogoUrl } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCreateNotifModalOpen, setIsCreateNotifModalOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -115,7 +115,7 @@ const CashierLayout = () => {
             <div className="w-14 h-14 bg-white rounded-2xl p-2 shadow-xl mb-3 flex items-center justify-center overflow-hidden border-2 border-slate-800 shrink-0">
               {branding?.school_logo ? (
                 <img
-                  src={`${API_BASE_URL}/uploads/branding/${branding.school_logo}`}
+                  src={getLogoUrl(branding.school_logo)}
                   className="w-full h-full object-contain"
                   alt="Logo"
                 />

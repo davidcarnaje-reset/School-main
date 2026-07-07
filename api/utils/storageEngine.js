@@ -24,12 +24,8 @@ export const uploadFileToCloud = async (fileBuffer, uniqueFileName, mimeType) =>
   // Upload to Cloudflare R2
   await s3Client.send(command);
 
-  // Extract Account ID from the R2_ENDPOINT to construct public r2.dev subdomain
-  const endpoint = process.env.R2_ENDPOINT || '';
-  const accountId = endpoint.replace('https://', '').split('.')[0];
-
-  // Return the standard Cloudflare R2 public URL
-  return `https://pub-${accountId}.r2.dev/${uniqueFileName}`;
+  const publicUrl = process.env.R2_PUBLIC_URL || 'https://pub-5204e5f89d6c4f8ea9b7c2f2fd992041.r2.dev';
+  return `${publicUrl}/${uniqueFileName}`;
 };
 
 /**

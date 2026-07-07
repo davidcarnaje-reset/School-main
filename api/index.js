@@ -9,6 +9,10 @@ import cashierRoutes from './routes/cashierRoutes.js';
 import registrarRoutes from './routes/registrarRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import smokeTestRoutes from './routes/smokeTest.js';
+import adminRoutes from './routes/adminRoutes.js';
+import { getPublicPromotions } from './controllers/admin/promotion.js';
+
+
 
 // I-load ang environment variables
 dotenv.config();
@@ -29,6 +33,18 @@ app.use(express.json());
 
 // 1. Auth Branch (Na-convert na sa Yugto 4)
 app.use('/api/auth', authRoutes);
+
+// 1.5. Admin Branch (Branding Engine, etc.)
+app.use('/api/admin', adminRoutes);
+
+// 1.6. Static Asset Serving
+app.use('/api/uploads', express.static('uploads'));
+
+// 1.7. Public Landing Page Banners
+app.get('/api/public/promotions', getPublicPromotions);
+app.get('/api/public/get_promotions.php', getPublicPromotions);
+
+
 
 // 2. LMS Branch
 app.use('/api/lms', lmsRoutes);

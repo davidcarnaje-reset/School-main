@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 
 const StudentManagement = () => {
-  const { branding, API_BASE_URL } = useAuth();
+  const { branding, API_BASE_URL, getLogoUrl } = useAuth();
   const [students, setStudents] = useState([]);
   const [programs, setPrograms] = useState([]); // BAGONG STATE PARA SA COURSES/STRANDS
   const [loading, setLoading] = useState(true);
@@ -88,6 +88,7 @@ const fetchData = async () => {
   };
 
   const [formData, setFormData] = useState(initialFormState);
+  const [profileImage, setProfileImage] = useState(null);
 
   // --- DAGDAG: INPUT FORMATTERS ---
   const handlePhoneInput = (val, field) => {
@@ -144,15 +145,50 @@ const fetchData = async () => {
     if (!isStepValid()) return;
     setSaveLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/registrar/add_student.php`, formData);
+      const data = new FormData();
+      
+      // Append required backend operational keys explicitly
+      const requiredFields = [
+        'lrn', 'first_name', 'middle_name', 'last_name', 'suffix', 
+        'gender', 'dob', 'email', 'mobile_no', 'school_year', 
+        'grade_level', 'program_id', 'section_id', 'payment_plan'
+      ];
+      
+      requiredFields.forEach(field => {
+        data.append(field, formData[field] || '');
+      });
+
+      // Also append other fields from formData to preserve complete data payload
+      Object.keys(formData).forEach(key => {
+        if (!requiredFields.includes(key)) {
+          data.append(key, formData[key] || '');
+        }
+      });
+
+      if (profileImage) {
+        data.append('profile_image', profileImage);
+      }
+
+      const response = await axios.post('http://localhost:5000/api/registrar/register-student', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
       if (response.data.success) {
         setShowModal(false);
         setFormData(initialFormState);
+        setProfileImage(null);
         setCurrentStep(1);
         fetchData();
-        alert("Enrolled successfully! ID: " + response.data.student_id);
-      } else { alert(response.data.message); }
-    } catch (err) { alert("Server Error"); } finally { setSaveLoading(false); }
+        const studentId = response.data.student_id || (response.data.data && response.data.data.student_id);
+        alert("Enrolled successfully! ID: " + studentId);
+      } else { 
+        alert(response.data.message); 
+      }
+    } catch (err) { 
+      alert(err.response?.data?.message || "Server Error"); 
+    } finally { 
+      setSaveLoading(false); 
+    }
   };
 
   const filteredStudents = students.filter(student => {
@@ -348,6 +384,22 @@ const fetchData = async () => {
               {/* STEP 1: PERSONAL INFO */}
               {currentStep === 1 && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-right-4 duration-300">
+                  <div className="md:col-span-3 flex flex-col items-center gap-2 bg-slate-50 p-6 rounded-3xl border border-dashed border-slate-200">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Profile Image (Optional)</label>
+                    <div className="relative w-24 h-24 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center border-2 border-white shadow-md">
+                      {profileImage ? (
+                        <img src={URL.createObjectURL(profileImage)} className="w-full h-full object-cover" alt="Preview" />
+                      ) : (
+                        <Camera className="text-slate-400" size={32} />
+                      )}
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={(e) => setProfileImage(e.target.files[0] || null)}
+                      className="text-xs font-bold text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                    />
+                  </div>
                   <div className="md:col-span-1">
                     <Input label="LRN (12 Digits)" value={formData.lrn} onChange={v => handleNumberOnly(v, 'lrn', 12)} placeholder="12-digit LRN" maxLength="12"/>
                   </div>
@@ -511,7 +563,7 @@ const fetchData = async () => {
         
         {/* COMPACT LETTERHEAD (ONLY ON PRINT) */}
         <div className="hidden print:flex items-center justify-center gap-4 mb-6 border-b-2 border-slate-800 pb-4">
-          <img src={`${API_BASE_URL}/uploads/branding/${branding.school_logo}`} className="w-16 h-16 object-cover" alt="School Logo" />
+          <img src={getLogoUrl(branding.school_logo)} className="w-16 h-16 object-cover" alt="School Logo" />
           <div className="text-left">
             <h1 className="text-xl font-black text-slate-900 uppercase leading-tight">{branding.school_name}</h1>
             <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Office of the School Registrar</p>
@@ -573,7 +625,7 @@ const fetchData = async () => {
            </div>
            
            <div className="text-right print:hidden">
-              <img src={`${API_BASE_URL}/uploads/branding/${branding.school_logo}`} className="w-12 h-12 rounded-lg object-cover mb-1 ml-auto" alt="Logo" />
+              <img src={getLogoUrl(branding.school_logo)} className="w-12 h-12 rounded-lg object-cover mb-1 ml-auto" alt="Logo" />
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{branding.school_name}</p>
            </div>
         </div>

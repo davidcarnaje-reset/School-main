@@ -1,17 +1,18 @@
+import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user } = useAuth();
 
-  if (!user) {
-    // Kung hindi naka-login, balik sa Login page
-    return <Navigate to="/" />;
-  }
+  // Strict check: if user does not exist, or their role is not in the allowed list
+  const hasAccess = user && user.role && (
+    !allowedRoles || 
+    (Array.isArray(allowedRoles) ? allowedRoles.includes(user.role) : allowedRoles === user.role)
+  );
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Kung naka-login pero bawal siya sa page na ito (e.g. Student pilit pumasok sa Admin)
-    return <Navigate to="/unauthorized" />;
+  if (!hasAccess) {
+    return <Navigate to="/portal/admin-access" replace />;
   }
 
   return children;

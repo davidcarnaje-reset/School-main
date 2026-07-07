@@ -9,13 +9,15 @@ export default defineConfig({
   ],
   server: {
     allowedHosts: [
-      '.ngrok-free.dev' // Para hindi harangin ni Vite ang ngrok
+      '.ngrok-free.dev' // Ligtas pa rin ang ngrok tunnel mo
     ],
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1', // Nakaturo sa XAMPP
+        // 🚀 DYNAMIC PORT ALIGNMENT: Direkta nang nakaturo sa Node.js Engine mo!
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '/sms-api') 
+        // Alisin na natin ang rewrite para hindi na niya hanapin si /sms-api
+        rewrite: (path) => path
       }
     }
   }

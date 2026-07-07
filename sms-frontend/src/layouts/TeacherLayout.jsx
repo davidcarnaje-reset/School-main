@@ -28,7 +28,7 @@ const isUnread = (notif) => !notif.is_read || notif.is_read === 0 || notif.is_re
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 const TeacherLayout = () => {
-  const { logout, user, branding, API_BASE_URL } = useAuth();
+  const { logout, user, branding, API_BASE_URL, getLogoUrl } = useAuth();
   const location = useLocation();
   const dropdownRef = useRef(null);
   const optionsMenuRef = useRef(null);
@@ -253,7 +253,7 @@ const TeacherLayout = () => {
         <div className="h-24 px-6 border-b border-slate-200/50 flex items-center shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
             {branding?.school_logo ? (
-              <img src={`${API_BASE_URL}/uploads/branding/${branding.school_logo}`} alt="Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-sm border border-white" />
+              <img src={getLogoUrl(branding.school_logo)} alt="Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-sm border border-white" />
             ) : (
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shrink-0 border border-white shadow-sm" style={{ backgroundColor: themeColor }}>{branding?.school_name?.charAt(0) || 'S'}</div>
             )}

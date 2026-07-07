@@ -4,7 +4,7 @@ import { Palette, School, Save, RefreshCw, Upload, Image as ImageIcon } from 'lu
 import { useAuth } from '../../context/AuthContext';
 const BrandingSettings = () => {
   // ARCHITECT UPDATE 1: Idinagdag ang API_BASE_URL mula sa Context
-  const { branding, API_BASE_URL } = useAuth(); 
+  const { branding, API_BASE_URL, getLogoUrl } = useAuth(); 
   
   const [settings, setSettings] = useState({
     school_name: '',
@@ -22,14 +22,13 @@ const BrandingSettings = () => {
 
   const fetchBranding = async () => {
     try {
-      // ARCHITECT UPDATE 2: Gamitin ang dynamic URL
-      const res = await axios.get(`${API_BASE_URL}/admin/branding.php`);
-      if (res.data) {
+      const res = await axios.get(`${API_BASE_URL}/admin/branding`);
+      const brandingData = res.data?.data || res.data;
+      if (brandingData) {
         setSettings({
-          school_name: res.data.school_name || '',
-          theme_color: res.data.theme_color || '#2563eb',
-          // Siguraduhin na ang logo ay may tamang path
-          school_logo: res.data.school_logo ? `${API_BASE_URL}/uploads/branding/${res.data.school_logo}` : ''
+          school_name: brandingData.school_name || '',
+          theme_color: brandingData.theme_color || '#2563eb',
+          school_logo: brandingData.school_logo || ''
         });
       }
     } catch (err) {
@@ -53,20 +52,23 @@ const handleFileChange = (e) => {
     formData.append('school_name', settings.school_name);
     formData.append('theme_color', settings.theme_color);
     if (selectedFile) {
-      formData.append('logo', selectedFile);
+      formData.append('school_logo', selectedFile);
     }
 
     try {
-      const res = await axios.post(`${API_BASE_URL}/admin/branding.php`, formData, {
+      const res = await axios.post(`${API_BASE_URL}/admin/branding`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      if (res.data.success) {
+      if (res.data && (res.data.status === 'success' || res.data.success)) {
         alert("System Branding Updated!");
         window.location.reload(); 
+      } else {
+        alert(res.data.message || "Failed to update branding settings.");
       }
     } catch (err) {
-      alert("Error updating branding. Check your PHP connection.");
+      console.error(err);
+      alert(err.response?.data?.message || "Error updating branding. Please check integration settings.");
     } finally {
       setLoading(false);
     }
@@ -90,7 +92,7 @@ const handleFileChange = (e) => {
               <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden transition-all group-hover:border-blue-400">
                 {preview || settings.school_logo ? (
                   <img 
-                    src={preview || settings.school_logo} 
+                    src={preview || getLogoUrl(settings?.school_logo)} 
                     alt="School Logo" 
                     className="w-full h-full object-contain p-2"
                   />

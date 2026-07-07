@@ -48,29 +48,51 @@ const Login = ({ portal }) => {
     setLoading(true);
 
     try {
-      // ARCHITECT UPDATE 2: Hindi na hardcoded ang localhost! Nakaturo na rin sa /auth folder
-      const response = await axios.post(`${API_BASE_URL}/auth/login.php`, {
+      // 🚀 RESTful Node.js handshake execution block
+      const response = await axios.post(`${API_BASE_URL}/auth/login`, {
         username: identifier,
         password: password,
         portal: portal
       });
 
-      if (response.data.success) {
-        // ARCHITECT UPDATE 3: I-save natin ang SECURE TOKEN sa browser!
-        localStorage.setItem('sms_token', response.data.token);
+      // ALIGNMENT: Binabasa na natin ang '.status === 'success'' parameter galing sa Node
+      if (response.data && response.data.status === 'success') {
         
+        // 1. I-secure ang tokens at profile assets sa memory layer
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('sms_token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // 2. Pasabugin ang state trigger sa global context wrapper
         setUser(response.data.user); 
         
-        const role = response.data.user.role;
-        // Gawing lowercase ang role para saktong mag-match sa routes mo (e.g. /admin/dashboard)
-        navigate(`/${role.toLowerCase()}/dashboard`);
+        // 3. SECURE INTERNALS ROLE REDIRECTION ROUTER
+        const userRole = response.data.user.role;
+        if (userRole === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (userRole === 'registrar') {
+          navigate('/registrar/dashboard');
+        } else if (userRole === 'cashier') {
+          navigate('/cashier/dashboard');
+        } else if (userRole === 'teacher') {
+          navigate('/teacher/dashboard');
+        } else if (userRole === 'student') {
+          navigate('/student/dashboard');
+        } else {
+          setError("Access denied: Invalid application role mapping configuration.");
+          setUser(null);
+          localStorage.clear();
+        }
       } else {
-        setError(response.data.message); 
+        setError(response.data.message || "Invalid authentication check mapping payload."); 
+        setUser(null);
+        localStorage.clear();
       }
     } catch (err) {
-      console.error(err);
-      setError("Connection failed. Server might be down.");
+      console.error("🔑 [AUTH ENGINE SYSTEM EXCEPTION]:", err);
+      setError(err.response?.data?.message || "Connection failed. Server might be down.");
+      setUser(null);
+      localStorage.clear();
     } finally {
       setLoading(false);
     }
