@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const StudentAccounting = () => {
-  const { user, branding, API_BASE_URL } = useAuth();
+  const { user, branding, API_BASE_URL, getLogoUrl } = useAuth();
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
@@ -339,7 +339,7 @@ const StudentAccounting = () => {
                 <div className="flex items-center gap-6">
                   {branding.school_logo && (
                     <img 
-                      src={`${API_BASE_URL}/uploads/branding/${branding?.school_logo}`} 
+                      src={getLogoUrl(branding.school_logo)} 
                       className="w-24 h-24 object-contain" 
                       alt="Logo" 
                     />

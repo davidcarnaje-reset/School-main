@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 const LandingPage = () => {
   const navigate = useNavigate();
-  const { branding, API_BASE_URL } = useAuth();
+  const { branding, API_BASE_URL, getLogoUrl } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // ==========================================
@@ -20,12 +20,12 @@ const LandingPage = () => {
   // ==========================================
   const fetchPromotions = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/public/get_promotions.php`);
+      const res = await axios.get(`${API_BASE_URL}/public/promotions`);
       if (res.data.success) {
         // I-format ang data para madaling gamitin sa UI
         const formattedPromos = res.data.promotions.map(promo => ({
           id: promo.id,
-          image: `${API_BASE_URL}/uploads/promotions/${promo.image_file}`,
+          image: promo.image_file && promo.image_file.startsWith('http') ? promo.image_file : `${API_BASE_URL}/uploads/promotions/${promo.image_file}`,
           title: promo.title,
           subtitle: promo.subtitle,
           buttonText: promo.button_text,
@@ -68,7 +68,7 @@ const LandingPage = () => {
           <div className="flex items-center space-x-3">
             {branding.school_logo && (
               <img 
-                src={`${API_BASE_URL}/uploads/branding/${branding.school_logo}`} 
+                src={getLogoUrl(branding.school_logo)} 
                 className="h-9 w-9 object-contain" 
                 alt="Logo" 
               />

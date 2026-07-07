@@ -1,5 +1,8 @@
 import db from '../../config/db.js';
 import crypto from 'crypto';
+import s3Client from '../../config/s3Client.js';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { sendStudentWelcomeEmail } from '../../utils/emailEngine.js';
 
 /**
  * Registers a new student using a secure database transaction, calculating next sequential ID,
@@ -49,6 +52,25 @@ const registerStudent = async (req, res) => {
     }
     const student_id = `${idPrefix}${newNum}`;
 
+    // Conditional Cloudflare R2 Upload Block
+    let profile_image = null;
+    if (req.file) {
+      const fileExtension = req.file.originalname.split('.').pop() || 'png';
+      const cloudFileKey = `profiles/student_${student_id}_${Date.now()}.${fileExtension}`;
+
+      const uploadCommand = new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: cloudFileKey,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+      });
+
+      await s3Client.send(uploadCommand);
+
+      const publicUrl = process.env.R2_PUBLIC_URL || 'https://pub-5204e5f89d6c4f8ea9b7c2f2fd992041.r2.dev';
+      profile_image = `${publicUrl}/${cloudFileKey}`;
+    }
+
     // 2. Generate enrollment verification tracking token identifier (prefixed with ENR-26- + 4 random alphanumeric chars)
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let randomStr = '';
@@ -73,7 +95,7 @@ const registerStudent = async (req, res) => {
       INSERT INTO students (
         id, student_id, lrn, first_name, middle_name, last_name, suffix, 
         gender, dob, email, mobile_no, verification_token, role, is_verified, profile_image
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'student', 1, 'default.png')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'student', 1, ?)
     `;
 
     await connection.query(studentSql, [
@@ -88,10 +110,29 @@ const registerStudent = async (req, res) => {
       dob || null,
       email,
       mobile_no || null,
-      token
+      token,
+      profile_image
     ]);
 
     // 5. Insert into enrollments table (status='Pending')
+    // --- FK Safety: Validate program_id and section_id exist before inserting ---
+    let safeProgramId = program_id ? parseInt(program_id, 10) : null;
+    let safeSectionId = section_id ? parseInt(section_id, 10) : null;
+
+    if (safeProgramId) {
+      const [programCheck] = await connection.query(
+        'SELECT id FROM academic_programs WHERE id = ? LIMIT 1', [safeProgramId]
+      );
+      if (programCheck.length === 0) safeProgramId = null;
+    }
+
+    if (safeSectionId) {
+      const [sectionCheck] = await connection.query(
+        'SELECT id FROM sections WHERE id = ? LIMIT 1', [safeSectionId]
+      );
+      if (sectionCheck.length === 0) safeSectionId = null;
+    }
+
     const enrollSql = `
       INSERT INTO enrollments (
         id, enrollment_id, student_id, school_year, enrollment_type, grade_level, program_id, section_id, payment_plan, status
@@ -104,8 +145,8 @@ const registerStudent = async (req, res) => {
       student_id,
       school_year,
       grade_level,
-      program_id ? parseInt(program_id, 10) : null,
-      section_id ? parseInt(section_id, 10) : null,
+      safeProgramId,
+      safeSectionId,
       payment_plan
     ]);
 
@@ -125,6 +166,13 @@ const registerStudent = async (req, res) => {
 
     // Build the full name
     const full_name = `${first_name} ${middle_name ? middle_name + ' ' : ''}${last_name}${suffix ? ' ' + suffix : ''}`.trim();
+
+    // Isolated welcome email dispatch routine
+    try {
+      await sendStudentWelcomeEmail(email, full_name, student_id);
+    } catch (mailError) {
+      console.error(`⚠️ Welcome email dispatch failed for ${email}:`, mailError);
+    }
 
     return res.status(201).json({
       success: true,

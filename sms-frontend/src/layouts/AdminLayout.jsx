@@ -14,7 +14,7 @@ import CreateAnnouncementModal from '../components/shared/CreateAnnouncementModa
 import ReadNotificationModal from '../components/shared/ReadNotificationModal';
 
 const AdminLayout = () => {
-  const { logout, user, branding, API_BASE_URL } = useAuth();
+  const { logout, user, branding, API_BASE_URL, getLogoUrl } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const [isCollapsed, setIsCollapsed] = useState(false); 
   const location = useLocation();
@@ -114,6 +114,10 @@ const AdminLayout = () => {
 
   const currentMenu = menuConfig[user?.role] || [];
 
+  const getLogoSrc = () => {
+    return getLogoUrl(branding?.school_logo);
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 relative font-sans overflow-hidden">
       
@@ -145,7 +149,7 @@ const AdminLayout = () => {
           <div className={`h-20 px-4 border-b border-slate-800 flex items-center shrink-0 transition-all ${isCollapsed ? 'lg:justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-3 overflow-hidden">
               {branding.school_logo ? (
-                <img src={`${API_BASE_URL}/uploads/branding/${branding.school_logo}`} alt="Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg" />
+                <img src={getLogoSrc()} alt="School Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg" />
               ) : (
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg" style={{ backgroundColor: branding.theme_color || '#2563eb' }}>{branding.school_name?.charAt(0)}</div>
               )}

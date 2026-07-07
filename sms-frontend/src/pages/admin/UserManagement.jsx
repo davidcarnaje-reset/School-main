@@ -30,8 +30,7 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      // FIX: Ginawang dynamic at tinuro sa /admin/ folder
-      const response = await axios.get(`${API_BASE_URL}/admin/get_users.php`);
+      const response = await axios.get(`${API_BASE_URL}/admin/users`);
       if (Array.isArray(response.data)) {
         setUsers(response.data);
       }
@@ -49,8 +48,7 @@ const UserManagement = () => {
     const delayDebounceFn = setTimeout(async () => {
       if (formData.email && !isEditMode && showModal) { 
         try {
-          // FIX: Tinuro sa /auth/ folder kung nasaan na ang check_email.php
-          const res = await axios.get(`${API_BASE_URL}/auth/check_email.php?email=${formData.email}`);
+          const res = await axios.get(`${API_BASE_URL}/auth/check-email?email=${formData.email}`);
           if (res.data.exists) {
             setEmailError('This email is already registered to another account.');
           } else {
@@ -69,10 +67,12 @@ const UserManagement = () => {
 
     setSaveLoading(true); 
     try {
-      const payload = isEditMode ? { ...formData, id: selectedUserId } : formData;
-      // FIX: Tinuro sa /admin/ folder at dynamic URL
-      const endpoint = isEditMode ? 'update_user.php' : 'add_user.php';
-      const response = await axios.post(`${API_BASE_URL}/admin/${endpoint}`, payload);
+      let response;
+      if (isEditMode) {
+        response = await axios.put(`${API_BASE_URL}/admin/users/${selectedUserId}`, formData);
+      } else {
+        response = await axios.post(`${API_BASE_URL}/admin/users`, formData);
+      }
 
       if (response.data && response.data.success) {
         setShowModal(false);
@@ -88,7 +88,7 @@ const UserManagement = () => {
       }
     } catch (error) {
       console.error("Critical Error:", error);
-      alert("May problema sa pag-save. Check PHP connection.");
+      alert(error.response?.data?.message || "Failed to save user. Please check backend connection.");
     } finally {
       setSaveLoading(false);
     }
@@ -98,13 +98,14 @@ const UserManagement = () => {
 
   const executeDelete = async () => {
     try {
-      // FIX: Tinuro sa /admin/ folder at dynamic URL
-      const response = await axios.post(`${API_BASE_URL}/admin/delete_user.php`, { id: deleteModal.id });
+      const response = await axios.delete(`${API_BASE_URL}/admin/users/${deleteModal.id}`);
       if (response.data.success) {
         setDeleteModal({ show: false, id: null, name: '' });
         fetchUsers();
       }
-    } catch (error) { alert("Error deleting user"); }
+    } catch (error) { 
+      alert(error.response?.data?.message || "Error deleting user"); 
+    }
   };
 
   const openEditModal = (user) => {

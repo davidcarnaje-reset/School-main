@@ -23,7 +23,7 @@ const RoomManagement = () => {
 
   const fetchRooms = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/admin/get_rooms.php`);
+      const res = await axios.get(`${API_BASE_URL}/admin/rooms`);
       if (Array.isArray(res.data)) {
         setRooms(res.data);
       } else {
@@ -48,10 +48,13 @@ const RoomManagement = () => {
     e.preventDefault();
     setLoading(true);
 
-    const endpoint = isEditing ? 'update_room.php' : 'create_room.php';
-
     try {
-      const res = await axios.post(`${API_BASE_URL}/admin/${endpoint}`, roomData);
+      let res;
+      if (isEditing) {
+        res = await axios.put(`${API_BASE_URL}/admin/rooms/${roomData.id}`, roomData);
+      } else {
+        res = await axios.post(`${API_BASE_URL}/admin/rooms`, roomData);
+      }
 
       if (res.data.status === 'success') {
         showNotification(isEditing ? "Room updated successfully!" : "Room added successfully!", "success");
@@ -92,7 +95,7 @@ const RoomManagement = () => {
   // Ito yung mismong magbubura kapag pinindot ang "Yes, Delete" sa modal
   const executeDelete = async () => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/admin/delete_room.php`, { id: deleteModal.roomId });
+      const res = await axios.delete(`${API_BASE_URL}/admin/rooms/${deleteModal.roomId}`);
       if (res.data.status === 'success') {
         showNotification("Room deleted successfully.", "success");
         fetchRooms();

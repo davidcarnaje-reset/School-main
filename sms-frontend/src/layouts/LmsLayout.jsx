@@ -10,7 +10,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 const LmsLayout = () => {
-  const { user, branding, API_BASE_URL } = useAuth();
+  const { user, branding, API_BASE_URL, getLogoUrl } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -289,7 +289,7 @@ const LmsLayout = () => {
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
          <header className={`absolute top-0 left-0 right-0 h-20 px-6 flex justify-between items-center z-50 transition-all duration-500 ease-out ${isNavVisible ? 'translate-y-0' : '-translate-y-full'} ${isScrolled ? 'bg-white/80 dark:bg-slate-900/80 backdrop-blur-[20px] shadow-sm border-b border-slate-200 dark:border-slate-800' : 'bg-transparent'}`}>
             <div className="flex items-center gap-3">
-               {branding?.school_logo && <img src={`${API_BASE_URL}/uploads/branding/${branding.school_logo}`} className="w-10 h-10 object-contain" alt="Logo" />}
+               {branding?.school_logo && <img src={getLogoUrl(branding.school_logo)} className="w-10 h-10 object-contain" alt="Logo" />}
                <h2 className="font-black text-slate-800 dark:text-white tracking-tight hidden sm:block uppercase">LMS Hub</h2>
             </div>
             <div className="flex items-center gap-4">

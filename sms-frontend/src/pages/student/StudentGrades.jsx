@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const StudentGrades = () => {
-  const { user, branding, API_BASE_URL } = useAuth();
+  const { user, branding, API_BASE_URL, getLogoUrl } = useAuth();
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
@@ -196,7 +196,7 @@ const fetchData = async () => {
         <div className="hidden print:block p-8 border-b-4 border-slate-900 mb-8">
            <div className="flex items-center gap-6">
               {branding.school_logo && (
-                 <img src={`${API_BASE_URL}/uploads/branding/${branding?.school_logo}`} className="w-24 h-24 object-contain" alt="Logo" />
+                 <img src={getLogoUrl(branding.school_logo)} className="w-24 h-24 object-contain" alt="Logo" />
               )}
               <div>
                  <h1 className="text-2xl font-black text-slate-900 uppercase leading-tight">{branding.school_name}</h1>

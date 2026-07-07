@@ -17,8 +17,7 @@ const LandingPromotions = () => {
 
   const fetchPromotions = async () => {
     try {
-      // NOTE: Gamitin natin yung get_promotions.php na ginawa natin kanina
-      const res = await axios.get(`${API_BASE_URL}/public/get_promotions.php`);
+      const res = await axios.get(`${API_BASE_URL}/public/promotions`);
       if (res.data.success) {
         setPromotions(res.data.promotions);
       }
@@ -40,7 +39,7 @@ const LandingPromotions = () => {
     data.append('button_link', formData.button_link);
 
     try {
-      const res = await axios.post(`${API_BASE_URL}/admin/add_promotion.php`, data, {
+      const res = await axios.post(`${API_BASE_URL}/admin/promotions`, data, {
         headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
       });
       if (res.data.success) {
@@ -56,7 +55,7 @@ const LandingPromotions = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this banner?")) return;
     try {
-      const res = await axios.post(`${API_BASE_URL}/admin/delete_promotion.php`, { id }, {
+      const res = await axios.delete(`${API_BASE_URL}/admin/promotions/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.success) fetchPromotions();
@@ -85,7 +84,7 @@ const LandingPromotions = () => {
         ) : promotions.map(promo => (
           <div key={promo.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 group">
             <div className="h-48 w-full bg-slate-100 relative overflow-hidden">
-              <img src={`${API_BASE_URL}/uploads/promotions/${promo.image_file}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+              <img src={promo.image_file && promo.image_file.startsWith('http') ? promo.image_file : `${API_BASE_URL}/uploads/promotions/${promo.image_file}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
             </div>
             <div className="p-6">
               <h3 className="font-black text-slate-800 text-lg leading-tight mb-1">{promo.title}</h3>
