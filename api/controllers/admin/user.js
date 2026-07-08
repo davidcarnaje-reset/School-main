@@ -54,7 +54,7 @@ export const createUser = async (req, res) => {
 
     // Send verification / invitation email to the newly invited staff member
     try {
-      await sendStaffInvitationEmail(email, fullName, role, verificationToken);
+      await sendStaffInvitationEmail(email, fullName, role, verificationToken, username);
     } catch (emailErr) {
       console.error("[EMAIL ALERT] Failed to send staff invitation email:", emailErr.message);
     }
