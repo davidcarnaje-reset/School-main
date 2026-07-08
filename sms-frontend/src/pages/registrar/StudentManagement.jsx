@@ -169,7 +169,7 @@ const fetchData = async () => {
         data.append('profile_image', profileImage);
       }
 
-      const response = await axios.post('http://localhost:5000/api/registrar/register-student', data, {
+      const response = await axios.post(`${API_BASE_URL}/registrar/register-student`, data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
