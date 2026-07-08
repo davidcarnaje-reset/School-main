@@ -6,6 +6,6 @@
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "api/index.js" },
-    { "source": "/(.*)", "destination": "sms-frontend/$1" }
+    { "source": "/(.*)", "destination": "sms-frontend/index.html" }
   ]
 }
