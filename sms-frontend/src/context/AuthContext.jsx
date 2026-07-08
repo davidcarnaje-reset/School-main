@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
   // ARCHITECT'S CORE ROUTING LAYER
   // Bound strictly to port 5000 Node.js API environment gateway
   // ====================================================================
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
   const fetchBranding = async () => {
     try {
