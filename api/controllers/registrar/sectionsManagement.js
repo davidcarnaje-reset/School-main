@@ -160,3 +160,69 @@ export const getSectionsForEnrollment = async (req, res) => {
     return res.status(500).json({ success: false, message: "Database Error: " + error.message });
   }
 };
+
+export const updateSection = async (req, res) => {
+  const { id, section_name, grade_level, department, program_id, max_capacity } = req.body;
+
+  if (!id || !section_name || !grade_level || !department) {
+    return res.status(400).json({ status: "error", message: "Section ID, Name, Grade Level and Department are required." });
+  }
+
+  try {
+    let finalProgramId = null;
+    if (department !== 'K-10' && program_id && program_id !== '') {
+      finalProgramId = parseInt(program_id, 10);
+    }
+
+    const sql = `
+      UPDATE sections SET 
+        section_name = ?, 
+        grade_level = ?, 
+        department = ?, 
+        program_id = ?, 
+        max_capacity = ? 
+      WHERE id = ?
+    `;
+    await pool.query(sql, [
+      section_name.trim(),
+      grade_level.trim(),
+      department.trim(),
+      finalProgramId,
+      parseInt(max_capacity, 10) || 40,
+      parseInt(id, 10)
+    ]);
+
+    return res.status(200).json({ status: "success", message: "Section updated successfully!" });
+  } catch (error) {
+    console.error("updateSection error:", error);
+    return res.status(500).json({ status: "error", message: "DB Error: " + error.message });
+  }
+};
+
+export const deleteSection = async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) {
+    return res.status(400).json({ status: "error", message: "Section ID is missing." });
+  }
+
+  try {
+    const sql = "DELETE FROM sections WHERE id = ?";
+    const [result] = await pool.query(sql, [parseInt(id, 10)]);
+
+    if (result.affectedRows > 0) {
+      return res.status(200).json({ status: "success", message: "Section deleted successfully." });
+    } else {
+      return res.status(400).json({ status: "error", message: "Failed to delete section or section not found." });
+    }
+  } catch (error) {
+    console.error("deleteSection error:", error);
+    if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.errno === 1451) {
+      return res.status(400).json({
+        status: "error",
+        message: "Cannot delete: This section is currently linked to schedules or enrolled students."
+      });
+    }
+    return res.status(500).json({ status: "error", message: "DB Error: " + error.message });
+  }
+};

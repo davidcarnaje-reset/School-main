@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { LayoutGrid, Plus, Search, Layers, Users, BookOpen, GraduationCap, X } from 'lucide-react';
+import { LayoutGrid, Plus, Search, Layers, Users, BookOpen, GraduationCap, X, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import SectionDetailsModal from '../../components/registrar/SectionDetailsModal';
 
@@ -16,9 +16,85 @@ const SectionManagement = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedSection, setSelectedSection] = useState(null);
 
+  // 🛑 States para sa Edit at Delete Modals
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingSection, setEditingSection] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    id: '',
+    section_name: '',
+    grade_level: '',
+    department: 'K-10',
+    program_id: '',
+    max_capacity: 40
+  });
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingSection, setDeletingSection] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const handleCardClick = (section) => {
       setSelectedSection(section);
       setShowDetailsModal(true);
+  };
+
+  const handleEditClick = (e, section) => {
+    e.stopPropagation();
+    setEditingSection(section);
+    setEditFormData({
+      id: section.id,
+      section_name: section.section_name,
+      grade_level: section.grade_level,
+      department: section.department,
+      program_id: section.program_id || '',
+      max_capacity: section.max_capacity
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditLevelChange = (level) => {
+    let dept = 'K-10';
+    if (['Grade 11', 'Grade 12'].includes(level)) dept = 'SHS';
+    if (['1st Year', '2nd Year', '3rd Year', '4th Year'].includes(level)) dept = 'College';
+    
+    setEditFormData({ ...editFormData, grade_level: level, department: dept, program_id: '' });
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axios.post(`${API_BASE_URL}/registrar/update_section.php`, editFormData);
+      if (res.data.status === 'success') {
+        setShowEditModal(false);
+        fetchSectionsAndPrograms();
+      } else {
+        alert("Error: " + res.data.message);
+      }
+    } catch (err) {
+      alert("Error updating section: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleDeleteClick = (e, section) => {
+    e.stopPropagation();
+    setDeletingSection(section);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/registrar/delete_section.php`, { id: deletingSection.id });
+      if (res.data.status === 'success') {
+        setShowDeleteModal(false);
+        fetchSectionsAndPrograms();
+      } else {
+        alert("Error: " + res.data.message);
+      }
+    } catch (err) {
+      alert("Error deleting section: " + (err.response?.data?.message || err.message));
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Dropdown Options
@@ -114,7 +190,23 @@ const SectionManagement = () => {
               }`}>
                 {s.department}
               </span>
-              <Layers className="text-slate-100 group-hover:text-blue-100 transition-colors" size={40} />
+              <div className="flex items-center gap-1 z-10" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={(e) => handleEditClick(e, s)}
+                  className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-blue-600 cursor-pointer"
+                  title="Edit Section"
+                >
+                  <Edit size={16} />
+                </button>
+                <button
+                  onClick={(e) => handleDeleteClick(e, s)}
+                  className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-red-600 cursor-pointer"
+                  title="Delete Section"
+                >
+                  <Trash2 size={16} />
+                </button>
+                <Layers className="text-slate-100 group-hover:text-blue-100 transition-colors ml-2" size={32} />
+              </div>
             </div>
 
             <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">{s.section_name}</h2>
@@ -210,6 +302,118 @@ const SectionManagement = () => {
                 Save Section Record
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA SA EDIT SECTION */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 bg-slate-50 border-b flex justify-between items-center">
+              <h2 className="font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                <Edit className="text-blue-600" /> Edit Section Record
+              </h2>
+              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-white rounded-full transition-all"><X className="text-slate-400" /></button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-10 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Grade Level</label>
+                  <select 
+                    required 
+                    value={editFormData.grade_level}
+                    className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
+                    onChange={(e) => handleEditLevelChange(e.target.value)}
+                  >
+                    <option value="">Select Level</option>
+                    {gradeLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                  </select>
+                </div>
+
+                {(editFormData.department === 'SHS' || editFormData.department === 'College') && (
+                  <div className="col-span-2 animate-in slide-in-from-top-2">
+                    <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1">
+                      {editFormData.department === 'SHS' ? 'Select Strand' : 'Select Program / Course'}
+                    </label>
+                    <select 
+                      required 
+                      value={editFormData.program_id}
+                      className="w-full p-4 bg-blue-50 text-blue-900 border-2 border-blue-100 rounded-2xl font-bold outline-none"
+                      onChange={(e) => setEditFormData({...editFormData, program_id: e.target.value})}
+                    >
+                      <option value="">-- Choose Program --</option>
+                      {allPrograms.filter(p => p.department === editFormData.department).map(p => (
+                        <option key={p.id} value={p.id}>{p.program_code} - {p.program_description} {p.major && `(${p.major})`}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="col-span-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Section Name</label>
+                  <input 
+                    required 
+                    type="text" 
+                    value={editFormData.section_name}
+                    placeholder="e.g. Einstein" 
+                    className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
+                    onChange={e => setEditFormData({...editFormData, section_name: e.target.value})} 
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Max Capacity</label>
+                  <input 
+                    type="number" 
+                    value={editFormData.max_capacity}
+                    className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
+                    onChange={e => setEditFormData({...editFormData, max_capacity: e.target.value})} 
+                  />
+                </div>
+              </div>
+
+              <button className="w-full bg-blue-600 text-white py-6 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 mt-4 active:scale-95">
+                Update Section Record
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-md shadow-2xl p-10 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Trash2 size={40} />
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Delete Section?</h2>
+            <p className="text-slate-500 text-sm font-bold mt-2">
+              Are you sure you want to delete <span className="text-red-600 font-black">{deletingSection?.section_name}</span>?
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mt-4 text-left">
+              <p className="text-xs font-bold text-amber-700 leading-relaxed">
+                ⚠️ WARNING: This will permanently delete this section record. It will fail if there are active schedules or enrolled students connected to this section.
+              </p>
+            </div>
+            <div className="flex gap-4 mt-8">
+              <button 
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black uppercase text-xs tracking-widest transition-all"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete}
+                className="flex-1 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-lg shadow-red-200"
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Yes, Delete"}
+              </button>
+            </div>
           </div>
         </div>
       )}

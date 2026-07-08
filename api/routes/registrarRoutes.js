@@ -12,7 +12,7 @@ import getRegistrarDashboard from '../controllers/registrar/getRegistrarDashboar
 import { getAcademicPrograms, addAcademicProgram, deleteAcademicProgram } from '../controllers/registrar/academicPrograms.js';
 import { getSubjectDetails, addSubject, deleteSubject } from '../controllers/registrar/subjectManagement.js';
 import { getClassAssignData, addClassAssign, updateClassAssign, deleteClassAssign, bulkAddClassAssign, deleteAssignment } from '../controllers/registrar/classAssignments.js';
-import { getSections, createSection, getSectionDetails, getSectionsForEnrollment } from '../controllers/registrar/sectionsManagement.js';
+import { getSections, createSection, getSectionDetails, getSectionsForEnrollment, updateSection, deleteSection } from '../controllers/registrar/sectionsManagement.js';
 import { getRegistrarRequests, getFeesCatalog, searchStudents, addRequest, cancelRequest } from '../controllers/registrar/studentRequests.js';
 import { getStudentRecords, getStudentDocuments, unlockGrades } from '../controllers/registrar/studentRecords.js';
 import { getScholarshipApplications, evaluateScholarship, readImage } from '../controllers/registrar/scholarshipManagement.js';
@@ -49,6 +49,8 @@ router.get('/sections', getSections);
 router.post('/sections', createSection);
 router.get('/sections/details', getSectionDetails);
 router.get('/sections/enrollment', getSectionsForEnrollment);
+router.put('/sections', updateSection);
+router.delete('/sections', deleteSection);
 
 router.get('/requests', getRegistrarRequests);
 router.get('/fees-catalog', getFeesCatalog);
@@ -99,6 +101,8 @@ router.get('/manage_sections.php', getSections);
 router.post('/manage_sections.php', createSection);
 router.get('/get_section_details.php', getSectionDetails);
 router.get('/get_sections_for_enrollment.php', getSectionsForEnrollment);
+router.post('/update_section.php', updateSection);
+router.post('/delete_section.php', deleteSection);
 
 router.get('/get_registrar_requests.php', getRegistrarRequests);
 router.get('/get_fees_catalog.php', getFeesCatalog);
