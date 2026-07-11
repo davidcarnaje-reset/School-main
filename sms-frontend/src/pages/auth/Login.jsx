@@ -125,7 +125,6 @@ const Login = ({ portal }) => {
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('sms_token');
       sessionStorage.removeItem('user');
-    }
     } finally {
       setLoading(false);
     }

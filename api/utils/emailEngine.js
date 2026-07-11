@@ -75,7 +75,7 @@ const getEmailBranding = async () => {
 /**
  * Standardizes a highly premium, modern, responsive HTML container for school emails.
  */
-const generateEmailHtml = (schoolName, themeColor, schoolLogo, headerTitle, title, contentHtml) => {
+const generateEmailHtml = (schoolName, themeColor, headerTitle, title, contentHtml) => {
   return `
   <!DOCTYPE html>
   <html>
@@ -85,109 +85,53 @@ const generateEmailHtml = (schoolName, themeColor, schoolLogo, headerTitle, titl
     <title>${title}</title>
     <style>
       body {
-        font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        background-color: #f8fafc;
-        color: #334155;
+        font-family: Arial, sans-serif;
+        background-color: #ffffff;
+        color: #333333;
         margin: 0;
-        padding: 0;
-        -webkit-font-smoothing: antialiased;
-      }
-      .wrapper {
-        width: 100%;
-        background-color: #f8fafc;
-        padding: 40px 20px;
-        box-sizing: border-box;
+        padding: 20px;
+        line-height: 1.6;
       }
       .container {
         max-width: 600px;
         margin: 0 auto;
-        background-color: #ffffff;
-        border-radius: 24px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-        border: 1px solid #f1f5f9;
-        overflow: hidden;
+        border: 1px solid #dddddd;
+        padding: 20px;
+        border-radius: 4px;
       }
-      .header {
-        background: linear-gradient(135deg, ${themeColor}, #0f172a);
-        padding: 40px 30px;
-        text-align: center;
-        color: #ffffff;
-      }
-      .logo-img {
-        max-height: 60px;
-        margin-bottom: 16px;
-        border-radius: 8px;
-      }
-      .header h1 {
-        margin: 0;
-        font-size: 24px;
-        font-weight: 800;
-        letter-spacing: -0.025em;
-        text-transform: uppercase;
-      }
-      .header p {
-        margin: 6px 0 0;
-        font-size: 12px;
-        opacity: 0.9;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-      }
-      .content {
-        padding: 40px 30px;
-        line-height: 1.7;
-      }
-      .content h2 {
-        font-size: 20px;
-        color: #0f172a;
+      .header h2 {
+        color: ${themeColor || '#2563eb'};
         margin-top: 0;
-        font-weight: 700;
-      }
-      .button-container {
-        text-align: center;
-        margin: 32px 0;
       }
       .btn {
-        background-color: ${themeColor};
+        display: inline-block;
+        background-color: ${themeColor || '#2563eb'};
         color: #ffffff !important;
         text-decoration: none;
-        padding: 14px 32px;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 13px;
-        display: inline-block;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+        padding: 10px 20px;
+        border-radius: 4px;
+        font-weight: bold;
+        margin: 15px 0;
       }
       .footer {
-        background-color: #f8fafc;
-        padding: 24px 30px;
-        text-align: center;
+        margin-top: 25px;
+        padding-top: 15px;
+        border-top: 1px solid #eeeeee;
         font-size: 12px;
-        color: #94a3b8;
-        border-top: 1px solid #f1f5f9;
-      }
-      .footer p {
-        margin: 4px 0;
+        color: #777777;
       }
     </style>
   </head>
   <body>
-    <div class="wrapper">
-      <div class="container">
-        <div class="header">
-          ${schoolLogo ? `<img src="${schoolLogo}" alt="${schoolName}" class="logo-img" />` : ''}
-          <h1>${schoolName}</h1>
-          <p>${headerTitle}</p>
-        </div>
-        <div class="content">
-          ${contentHtml}
-        </div>
-        <div class="footer">
-          <p>© 2026 ${schoolName}. All rights reserved.</p>
-          <p>This is an automated notification. Please do not reply directly to this email.</p>
-        </div>
+    <div class="container">
+      <div class="header">
+        <h2>${schoolName} - ${headerTitle}</h2>
+      </div>
+      <div class="content">
+        ${contentHtml}
+      </div>
+      <div class="footer">
+        <p>This is an automated notification from ${schoolName}. Please do not reply directly to this email.</p>
       </div>
     </div>
   </body>
@@ -221,7 +165,6 @@ export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, r
   const htmlTemplate = generateEmailHtml(
     branding.schoolName, 
     branding.themeColor, 
-    branding.schoolLogo, 
     "Enrollment Success", 
     "Welcome to School", 
     contentHtml
@@ -230,7 +173,7 @@ export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, r
   const mailOptions = {
     from: `"${branding.schoolName} Registrar" <${process.env.SMTP_USER}>`,
     to: toEmail,
-    subject: `🎓 Enrollment Successful! Your Student ID: ${studentId}`,
+    subject: `Enrollment Successful - Student ID: ${studentId}`,
     html: htmlTemplate,
   };
 
@@ -274,7 +217,6 @@ export const sendStaffInvitationEmail = async (toEmail, staffName, role, token, 
   const htmlTemplate = generateEmailHtml(
     branding.schoolName, 
     branding.themeColor, 
-    branding.schoolLogo, 
     "Account Invitation", 
     "Welcome to the Staff Portal", 
     contentHtml
@@ -283,7 +225,7 @@ export const sendStaffInvitationEmail = async (toEmail, staffName, role, token, 
   const mailOptions = {
     from: `"${branding.schoolName} IT Department" <${process.env.SMTP_USER}>`,
     to: toEmail,
-    subject: `🔑 Verify Your Staff Account - ${branding.schoolName}`,
+    subject: `Verify Your Staff Account - ${branding.schoolName}`,
     html: htmlTemplate,
   };
 
@@ -317,7 +259,6 @@ export const sendPasswordResetEmail = async (toEmail, firstName, resetLink) => {
   const htmlTemplate = generateEmailHtml(
     branding.schoolName, 
     branding.themeColor, 
-    branding.schoolLogo, 
     "Password Reset Request", 
     "Reset Your Password", 
     contentHtml
@@ -326,7 +267,7 @@ export const sendPasswordResetEmail = async (toEmail, firstName, resetLink) => {
   const mailOptions = {
     from: `"${branding.schoolName} IT Support" <${process.env.SMTP_USER}>`,
     to: toEmail,
-    subject: `🔒 Password Reset Request - ${branding.schoolName}`,
+    subject: `Password Reset Request - ${branding.schoolName}`,
     html: htmlTemplate,
   };
 
