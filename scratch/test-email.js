@@ -20,11 +20,20 @@ const transporter = nodemailer.createTransport({
   connectionTimeout: 10000,
 });
 
-transporter.verify((error, success) => {
+const mailOptions = {
+  from: `"${process.env.SMTP_USER}" <${process.env.SMTP_USER}>`,
+  to: process.env.SMTP_USER, // Send to self to test
+  subject: 'Test Email sending from SMS Main Backend',
+  text: 'Hello! This is a test email sent from the SMS main backend server to verify SMTP transmission.',
+  html: '<b>Hello!</b> This is a test email sent from the SMS main backend server to verify SMTP transmission.'
+};
+
+console.log('Attempting to send mail...');
+transporter.sendMail(mailOptions, (error, info) => {
   if (error) {
-    console.error('SMTP Connection Error:', error);
+    console.error('SMTP Send Error:', error);
   } else {
-    console.log('SMTP connection is ready to take messages:', success);
+    console.log('SMTP Send Success:', info);
   }
   process.exit(0);
 });
