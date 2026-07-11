@@ -57,17 +57,34 @@ const Login = ({ portal }) => {
 
       // ALIGNMENT: Binabasa na natin ang '.status === 'success'' parameter galing sa Node
       if (response.data && response.data.status === 'success') {
-        
-        // 1. I-secure ang tokens at profile assets sa memory layer
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('sms_token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        const user = response.data.user;
+        const token = response.data.token;
+        const userRole = user.role;
+
+        // Clear existing session/local storage first to avoid mixed credentials
+        localStorage.removeItem('token');
+        localStorage.removeItem('sms_token');
+        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('sms_token');
+        sessionStorage.removeItem('user');
+
+        if (userRole === 'admin') {
+          // Store only in sessionStorage so closing the tab/browser logs them out!
+          sessionStorage.setItem('token', token);
+          sessionStorage.setItem('sms_token', token);
+          sessionStorage.setItem('user', JSON.stringify(user));
+        } else {
+          // Store in localStorage for persistent login
+          localStorage.setItem('token', token);
+          localStorage.setItem('sms_token', token);
+          localStorage.setItem('user', JSON.stringify(user));
+        }
         
         // 2. Pasabugin ang state trigger sa global context wrapper
-        setUser(response.data.user); 
+        setUser(user); 
         
         // 3. SECURE INTERNALS ROLE REDIRECTION ROUTER
-        const userRole = response.data.user.role;
         if (userRole === 'admin') {
           navigate('/admin/dashboard');
         } else if (userRole === 'registrar') {
@@ -81,18 +98,34 @@ const Login = ({ portal }) => {
         } else {
           setError("Access denied: Invalid application role mapping configuration.");
           setUser(null);
-          localStorage.clear();
+          localStorage.removeItem('token');
+          localStorage.removeItem('sms_token');
+          localStorage.removeItem('user');
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('sms_token');
+          sessionStorage.removeItem('user');
         }
       } else {
         setError(response.data.message || "Invalid authentication check mapping payload."); 
         setUser(null);
-        localStorage.clear();
+        localStorage.removeItem('token');
+        localStorage.removeItem('sms_token');
+        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('sms_token');
+        sessionStorage.removeItem('user');
       }
     } catch (err) {
       console.error("🔑 [AUTH ENGINE SYSTEM EXCEPTION]:", err);
       setError(err.response?.data?.message || "Connection failed. Server might be down.");
       setUser(null);
-      localStorage.clear();
+      localStorage.removeItem('token');
+      localStorage.removeItem('sms_token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('sms_token');
+      sessionStorage.removeItem('user');
+    }
     } finally {
       setLoading(false);
     }

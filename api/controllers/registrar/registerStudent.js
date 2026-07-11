@@ -169,7 +169,7 @@ const registerStudent = async (req, res) => {
 
     // Isolated welcome email dispatch routine
     try {
-      await sendStudentWelcomeEmail(email, full_name, student_id);
+      await sendStudentWelcomeEmail(email, full_name, student_id, req);
     } catch (mailError) {
       console.error(`⚠️ Welcome email dispatch failed for ${email}:`, mailError);
     }

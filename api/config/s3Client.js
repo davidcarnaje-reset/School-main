@@ -1,7 +1,12 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Initialize the S3 Client for Cloudflare R2 pointing to R2_ENDPOINT
 const s3Client = new S3Client({

@@ -1,6 +1,6 @@
 import pool from '../../config/db.js';
 import crypto from 'crypto';
-import { sendPasswordResetEmail } from '../../utils/emailEngine.js';
+import { sendPasswordResetEmail, getFrontendUrl } from '../../utils/emailEngine.js';
 
 export const forgotPassword = async (req, res) => {
   try {
@@ -41,7 +41,8 @@ export const forgotPassword = async (req, res) => {
     }
 
     const portalType = userType === 'users' ? 'staff' : 'student';
-    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}&portal=${portalType}`;
+    const frontendUrl = getFrontendUrl(req);
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&portal=${portalType}`;
 
     // Send email using emailEngine
     try {

@@ -33,19 +33,47 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('sms_token') || localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
+    // 1. Check sessionStorage first (temporary sessions like admin)
+    let token = sessionStorage.getItem('sms_token') || sessionStorage.getItem('token');
+    let savedUser = sessionStorage.getItem('user');
+
+    // 2. If not in sessionStorage, check localStorage (persistent sessions like student/staff)
+    if (!token || !savedUser) {
+      token = localStorage.getItem('sms_token') || localStorage.getItem('token');
+      savedUser = localStorage.getItem('user');
+
+      // If we found an admin session in localStorage, clear it immediately
+      // to ensure admin sessions are strictly non-persistent!
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed && parsed.role === 'admin') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('sms_token');
+            localStorage.removeItem('user');
+            token = null;
+            savedUser = null;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
 
     if (token && savedUser) {
       try {
         setUser(JSON.parse(savedUser));
       } catch (err) {
         setUser(null);
-        localStorage.clear(); // Isang bagsakang linis para sa stale tracking values
+        localStorage.removeItem('token');
+        localStorage.removeItem('sms_token');
+        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('sms_token');
+        sessionStorage.removeItem('user');
       }
     } else {
       setUser(null);
-      localStorage.clear(); // Clean clear on missing token parameters
     }
 
     fetchBranding();
@@ -61,7 +89,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.clear(); // Siguraduhing sunog ang lahat ng active credentials tokens
+    localStorage.removeItem('token');
+    localStorage.removeItem('sms_token');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('sms_token');
+    sessionStorage.removeItem('user');
     setUser(null);
     window.location.href = '/';
   };

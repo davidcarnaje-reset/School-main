@@ -1,5 +1,40 @@
 import nodemailer from 'nodemailer';
 import pool from '../config/db.js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env relative to this file
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+/**
+ * Resolves the frontend base URL dynamically from the request headers
+ * or from the FRONTEND_URL environment variable.
+ */
+export const getFrontendUrl = (req) => {
+  if (process.env.FRONTEND_URL) {
+    return process.env.FRONTEND_URL;
+  }
+  if (req) {
+    const origin = req.headers.origin;
+    if (origin) {
+      return origin;
+    }
+    const referer = req.headers.referer;
+    if (referer) {
+      try {
+        const parsed = new URL(referer);
+        return `${parsed.protocol}//${parsed.host}`;
+      } catch (err) {
+        // ignore
+      }
+    }
+  }
+  return 'http://localhost:5173';
+};
 
 // Initialize the Nodemailer SMTP transport engine
 const transporter = nodemailer.createTransport({
@@ -163,8 +198,9 @@ const generateEmailHtml = (schoolName, themeColor, schoolLogo, headerTitle, titl
 /**
  * Sends a clean, premium HTML welcome email to the newly enrolled student.
  */
-export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId) => {
+export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, req) => {
   const branding = await getEmailBranding();
+  const frontendUrl = getFrontendUrl(req);
 
   const contentHtml = `
     <h2>Congratulations, ${studentName}!</h2>
@@ -178,7 +214,7 @@ export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId) =
     <p>You can now use this Student ID to access the Student Portal, check your class schedule, grade evaluations, and financial billing statements.</p>
     
     <div class="button-container">
-      <a href="http://localhost:5173" class="btn" target="_blank">Access Student Portal</a>
+      <a href="${frontendUrl}" class="btn" target="_blank">Access Student Portal</a>
     </div>
   `;
 
@@ -211,8 +247,9 @@ export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId) =
 /**
  * Sends a clean, premium HTML invitation email to the newly created staff member.
  */
-export const sendStaffInvitationEmail = async (toEmail, staffName, role, token, username) => {
-  const setupLink = `http://localhost:5173/setup-password?token=${token}&email=${encodeURIComponent(toEmail)}`;
+export const sendStaffInvitationEmail = async (toEmail, staffName, role, token, username, req) => {
+  const frontendUrl = getFrontendUrl(req);
+  const setupLink = `${frontendUrl}/setup-password?token=${token}&email=${encodeURIComponent(toEmail)}`;
   const branding = await getEmailBranding();
 
   const contentHtml = `

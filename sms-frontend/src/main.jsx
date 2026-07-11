@@ -6,7 +6,7 @@ import axios from 'axios';
 
 axios.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('sms_token');
+    const token = sessionStorage.getItem('sms_token') || sessionStorage.getItem('token') || localStorage.getItem('sms_token') || localStorage.getItem('token');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }

@@ -53,15 +53,22 @@ export const createUser = async (req, res) => {
     );
 
     // Send verification / invitation email to the newly invited staff member
+    let emailSent = false;
+    let emailErrorMsg = null;
     try {
-      await sendStaffInvitationEmail(email, fullName, role, verificationToken, username);
+      await sendStaffInvitationEmail(email, fullName, role, verificationToken, username, req);
+      emailSent = true;
     } catch (emailErr) {
       console.error("[EMAIL ALERT] Failed to send staff invitation email:", emailErr.message);
+      emailErrorMsg = emailErr.message;
     }
 
     return res.json({
       success: true,
-      message: "Staff invited successfully. Verification token generated.",
+      message: emailSent 
+        ? "Staff invited successfully. Verification token generated and email sent."
+        : `Staff invited successfully, but invitation email failed to send: ${emailErrorMsg}. Please check SMTP configurations in the .env file.`,
+      emailSent,
       data: { id: nextId, username, email, role }
     });
   } catch (error) {
