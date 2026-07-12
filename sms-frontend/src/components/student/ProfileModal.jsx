@@ -43,7 +43,7 @@ const ProfileModal = ({
                 {previewUrl ? (
                   <img src={previewUrl} className="w-full h-full object-cover" alt="Preview" />
                 ) : studentData?.profile_image ? (
-                  <img src={`${API_BASE_URL}/uploads/profiles/${studentData.profile_image}`} className="w-full h-full object-cover" alt="Profile" />
+                  <img src={studentData.profile_image.startsWith('http') ? studentData.profile_image : `${API_BASE_URL}/uploads/profiles/${studentData.profile_image}`} className="w-full h-full object-cover" alt="Profile" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-slate-100">
                     <User size={60} className="text-slate-300" />

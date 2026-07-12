@@ -88,6 +88,16 @@ export const AuthProvider = ({ children }) => {
     return `${API_BASE_URL}/uploads/branding/${logoPath}`;
   };
 
+  const getProfileImageUrl = (imagePath) => {
+    if (!imagePath || imagePath === 'default.png' || imagePath === 'default.jpg') {
+      return "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
+    }
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    return `${API_BASE_URL}/uploads/profiles/${imagePath}`;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('sms_token');
@@ -100,7 +110,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout, loading, branding, fetchBranding, API_BASE_URL, getLogoUrl }}>
+    <AuthContext.Provider value={{ user, setUser, logout, loading, branding, fetchBranding, API_BASE_URL, getLogoUrl, getProfileImageUrl }}>
       {!loading && children}
     </AuthContext.Provider>
   );

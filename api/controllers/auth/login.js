@@ -50,6 +50,7 @@ export const login = async (req, res) => {
         status: 'success',
         token: token,
         user: {
+          id: student.student_id,
           username: student.student_id,
           name: displayName,
           role: 'student',
@@ -117,6 +118,7 @@ export const login = async (req, res) => {
       status: 'success',
       token: token,
       user: {
+        id: user.id,
         username: user.username,
         name: displayName,
         role: assignedRole

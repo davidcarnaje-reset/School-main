@@ -89,4 +89,62 @@ export const updateBranding = async (req, res) => {
   }
 };
 
-export default { getBranding, updateBranding };
+// GET school college grading settings
+export const getSchoolSettings = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT 
+         college_grading_scale,
+         college_prelim_weight,
+         college_midterm_weight,
+         college_finals_weight
+       FROM school_settings 
+       WHERE id = 1`
+    );
+    
+    return res.json({
+      status: "success",
+      data: rows[0] || {
+        college_grading_scale: "1_highest",
+        college_prelim_weight: 30.00,
+        college_midterm_weight: 30.00,
+        college_finals_weight: 40.00
+      }
+    });
+  } catch (error) {
+    console.error("Get school settings error:", error);
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// SAVE school college grading settings
+export const saveSchoolSettings = async (req, res) => {
+  try {
+    const scale = req.body.college_grading_scale ?? '1_highest';
+    const prelim = parseFloat(req.body.college_prelim_weight ?? 30);
+    const midterm = parseFloat(req.body.college_midterm_weight ?? 30);
+    const finals = parseFloat(req.body.college_finals_weight ?? 40);
+
+    // Validate weights sum to 100
+    if (Math.abs(prelim + midterm + finals - 100) > 0.01) {
+      return res.json({ status: "error", message: "Weights must sum to 100%" });
+    }
+
+    await pool.query(
+      `UPDATE school_settings SET
+         college_grading_scale = ?,
+         college_prelim_weight = ?,
+         college_midterm_weight = ?,
+         college_finals_weight = ?
+       WHERE id = 1`,
+      [scale, prelim, midterm, finals]
+    );
+
+    return res.json({ status: "success", message: "College grading settings saved" });
+  } catch (error) {
+    console.error("Save school settings error:", error);
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+export default { getBranding, updateBranding, getSchoolSettings, saveSchoolSettings };

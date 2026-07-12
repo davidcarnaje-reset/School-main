@@ -257,7 +257,7 @@ const StudentLayout = () => {
               </div>
               <div className="w-11 h-11 bg-slate-200 rounded-2xl overflow-hidden shadow-sm border-2 border-white ring-1 ring-slate-100">
                 {studentData?.profile_image ? (
-                  <img src={`${API_BASE_URL}/uploads/profiles/${studentData.profile_image}`} className="w-full h-full object-cover" alt="Profile" />
+                  <img src={studentData.profile_image.startsWith('http') ? studentData.profile_image : `${API_BASE_URL}/uploads/profiles/${studentData.profile_image}`} className="w-full h-full object-cover" alt="Profile" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center font-black text-slate-400 bg-slate-100">
                     {studentData?.first_name?.charAt(0) || <User size={20}/>}

@@ -2,9 +2,9 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { getBranding, updateBranding } from '../controllers/admin/brandingController.js';
+import { getBranding, updateBranding, getSchoolSettings, saveSchoolSettings } from '../controllers/admin/brandingController.js';
 
-import { getUsers, createUser, updateUser, deleteUser } from '../controllers/admin/user.js';
+import { getUsers, createUser, updateUser, deleteUser, updateUserProfile } from '../controllers/admin/user.js';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '../controllers/admin/room.js';
 import { getAdminPromotions, createPromotion, deletePromotion } from '../controllers/admin/promotion.js';
 
@@ -17,6 +17,24 @@ const upload = multer({ storage: storage });
 
 // Multer Memory Storage Configuration for promotions uploads
 const uploadPromo = multer({ storage: multer.memoryStorage() });
+
+// Config disk storage for profile updates
+const profileStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = './uploads/profiles';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const id = req.body.id || 'admin_temp';
+    const role = req.body.role || 'user';
+    const ext = path.extname(file.originalname);
+    cb(null, `${role}_${id}_${Date.now()}${ext}`);
+  }
+});
+const uploadProfile = multer({ storage: profileStorage });
 
 // Branding Endpoints
 router.get('/branding', getBranding);
@@ -74,5 +92,15 @@ router.post('/delete_promotion.php', (req, res) => {
   req.params.id = req.body.id;
   deletePromotion(req, res);
 });
+
+// User Profile Updates
+router.post('/update-profile', uploadProfile.single('profile_image'), updateUserProfile);
+router.post('/update_user_profile.php', uploadProfile.single('profile_image'), updateUserProfile);
+
+// School College settings
+router.get('/school-settings', getSchoolSettings);
+router.get('/get_school_settings.php', getSchoolSettings);
+router.post('/school-settings', saveSchoolSettings);
+router.post('/save_school_settings.php', saveSchoolSettings);
 
 export default router;

@@ -142,7 +142,7 @@ const generateEmailHtml = (schoolName, themeColor, headerTitle, title, contentHt
 /**
  * Sends a clean, premium HTML welcome email to the newly enrolled student.
  */
-export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, req) => {
+export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, password, req) => {
   const branding = await getEmailBranding();
   const frontendUrl = getFrontendUrl(req);
 
@@ -150,12 +150,13 @@ export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, r
     <h2>Congratulations, ${studentName}!</h2>
     <p>Your enrollment has been successfully processed and verified by the school registrar. We are thrilled to welcome you to the academic year!</p>
     
-    <div style="background-color: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid ${branding.themeColor}; text-align: center;">
-      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 700; margin-bottom: 4px;">Assigned Student ID</div>
-      <div style="font-size: 28px; font-weight: 800; color: ${branding.themeColor}; letter-spacing: 0.05em; font-family: monospace; margin: 0;">${studentId}</div>
+    <div style="background-color: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid ${branding.themeColor}; text-align: left;">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 700; margin-bottom: 8px;">Your Account Credentials</div>
+      <div style="font-size: 14px; margin-bottom: 6px; color: #334155;"><strong style="color: #0f172a;">Student ID / Username:</strong> <span style="font-family: monospace; font-size: 15px; font-weight: 700; color: ${branding.themeColor};">${studentId}</span></div>
+      <div style="font-size: 14px; color: #334155;"><strong style="color: #0f172a;">Password:</strong> <span style="font-family: monospace; font-size: 15px; font-weight: 700; color: ${branding.themeColor};">${password}</span></div>
     </div>
 
-    <p>You can now use this Student ID to access the Student Portal, check your class schedule, grade evaluations, and financial billing statements.</p>
+    <p>You can now use these credentials to access the Student Portal, check your class schedule, grade evaluations, and financial billing statements.</p>
     
     <div class="button-container">
       <a href="${frontendUrl}" class="btn" target="_blank">Access Student Portal</a>

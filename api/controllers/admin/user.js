@@ -1,6 +1,7 @@
 import pool from '../../config/db.js';
 import bcrypt from 'bcryptjs';
 import { sendStaffInvitationEmail } from '../../utils/emailEngine.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // GET all users
 export const getUsers = async (req, res) => {
@@ -155,4 +156,57 @@ export const checkEmail = async (req, res) => {
   }
 };
 
-export default { getUsers, createUser, updateUser, deleteUser, checkEmail };
+// UPDATE user profile (photo and full name updates)
+export const updateUserProfile = async (req, res) => {
+  const id = req.body.id;
+  const full_name = req.body.full_name ? req.body.full_name.trim() : '';
+  const role = req.body.role;
+
+  if (!id) {
+    return res.status(400).json({ success: false, message: "Invalid User ID" });
+  }
+
+  try {
+    let profileImageSql = "";
+    const params = [];
+
+    if (req.file) {
+      profileImageSql = ", profile_image = ?";
+      params.push(req.file.filename);
+    }
+
+    let query = "";
+    if (role === 'student') {
+      query = `UPDATE students SET status = 'Active' ${profileImageSql} WHERE student_id = ?`;
+    } else {
+      query = `UPDATE users SET full_name = ? ${profileImageSql} WHERE id = ?`;
+      params.unshift(full_name);
+    }
+    params.push(id);
+
+    const [result] = await pool.query(query, params);
+
+    if (result.affectedRows > 0) {
+      // Log audit trail
+      const actionType = 'UPDATE_PROFILE';
+      const targetName = full_name ? full_name : `Student ID: ${id}`;
+      const logDesc = `Updated profile details/image for: ${targetName} (${role})`;
+      
+      try {
+        await logAuditTrail(id, role, actionType, logDesc, req);
+      } catch (auditErr) {
+        console.warn("Audit trail logging failed:", auditErr.message);
+      }
+
+      return res.json({ success: true, message: "Profile updated successfully!" });
+    } else {
+      return res.status(404).json({ success: false, message: "Record not found." });
+    }
+
+  } catch (error) {
+    console.error("Update user profile error:", error);
+    return res.status(500).json({ success: false, message: "Database Error: " + error.message });
+  }
+};
+
+export default { getUsers, createUser, updateUser, deleteUser, checkEmail, updateUserProfile };

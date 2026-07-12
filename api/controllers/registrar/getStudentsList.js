@@ -5,6 +5,7 @@ const getStudentsList = async (req, res) => {
     const sql = `
       SELECT 
           s.*, 
+          DATE_FORMAT(s.dob, '%Y-%m-%d') as dob,
           e.grade_level, 
           e.status as enrollment_status, 
           e.enrollment_type, 

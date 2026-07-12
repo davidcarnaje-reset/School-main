@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 
 const StudentManagement = () => {
-  const { branding, API_BASE_URL, getLogoUrl } = useAuth();
+  const { branding, API_BASE_URL, getLogoUrl, getProfileImageUrl } = useAuth();
   const [students, setStudents] = useState([]);
   const [programs, setPrograms] = useState([]); // BAGONG STATE PARA SA COURSES/STRANDS
   const [loading, setLoading] = useState(true);
@@ -20,6 +20,7 @@ const StudentManagement = () => {
   const [gradeFilter, setGradeFilter] = useState('All');
   const [viewModal, setViewModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [successData, setSuccessData] = useState(null);
 
   // --- DAGDAG: PROVINCE AT CITY DATA ---
   const PHILIPPINE_PLACES = {
@@ -179,8 +180,10 @@ const fetchData = async () => {
         setProfileImage(null);
         setCurrentStep(1);
         fetchData();
-        const studentId = response.data.student_id || (response.data.data && response.data.data.student_id);
-        alert("Enrolled successfully! ID: " + studentId);
+        const studentId = response.data.student_id;
+        const password = response.data.password;
+        const fullName = response.data.full_name;
+        setSuccessData({ student_id: studentId, password, full_name: fullName });
       } else { 
         alert(response.data.message); 
       }
@@ -312,7 +315,7 @@ const fetchData = async () => {
                     >
                       {/* DITO YUNG LOGIC SA TABLE: Picture o First Letter */}
                       {s.profile_image ? (
-                        <img src={`${API_BASE_URL}/uploads/profiles/${s.profile_image}`} className="w-full h-full object-cover" alt="profile" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+                        <img src={getProfileImageUrl(s.profile_image)} className="w-full h-full object-cover" alt="profile" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
                       ) : (
                         <span className="uppercase">{s.first_name?.charAt(0)}</span>
                       )}
@@ -540,6 +543,42 @@ const fetchData = async () => {
         </div>
       )}
 
+{/* ENROLLMENT SUCCESS MODAL */}
+{successData && (
+  <div className="fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 text-center relative animate-in zoom-in-95 duration-200">
+      <div className="mx-auto w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6">
+        <Check size={32} />
+      </div>
+      <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">Enrollment Success</h3>
+      <p className="text-slate-500 text-xs mb-6">Student profile created successfully! The credentials have been sent to their email.</p>
+      
+      <div className="bg-slate-50 rounded-3xl p-6 mb-6 text-left border border-slate-100 space-y-4">
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Student Name</p>
+          <p className="text-sm font-bold text-slate-800">{successData.full_name}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Student ID / Username</p>
+          <p className="text-sm font-mono font-bold text-blue-600 select-all">{successData.student_id}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Generated Password</p>
+          <p className="text-sm font-mono font-bold text-emerald-600 select-all">{successData.password}</p>
+        </div>
+      </div>
+      
+      <button 
+        onClick={() => setSuccessData(null)} 
+        className="w-full py-4 text-white font-bold rounded-2xl transition-all hover:scale-102 active:scale-98 shadow-md"
+        style={{backgroundColor: branding.theme_color || '#2563eb'}}
+      >
+        Close & Continue
+      </button>
+    </div>
+  </div>
+)}
+
 {/* STUDENT PROFILE VIEW MODAL (PRINT/PDF) */}
 {viewModal && selectedStudent && (
   <div className="fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm print:p-0 print:bg-white">
@@ -578,14 +617,14 @@ const fetchData = async () => {
               <div className="relative">
                  <div className="w-24 h-24 rounded-2xl bg-slate-100 overflow-hidden border-2 border-slate-200 shadow-md flex items-center justify-center">
                     {/* DITO YUNG LOGIC SA MODAL: Picture o First Letter */}
-                    {selectedStudent.profile_image ? (
-                       <img 
-                          src={`${API_BASE_URL}/uploads/profiles/${selectedStudent.profile_image}`} 
-                          className="w-full h-full object-cover"
-                          alt="Profile"
-                          onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                       />
-                    ) : (
+                     {selectedStudent.profile_image ? (
+                        <img 
+                           src={getProfileImageUrl(selectedStudent.profile_image)} 
+                           className="w-full h-full object-cover"
+                           alt="Profile"
+                           onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
+                     ) : (
                        <div className="flex items-center justify-center w-full h-full text-slate-400 font-black text-4xl uppercase">
                           {selectedStudent.first_name?.charAt(0)}
                        </div>

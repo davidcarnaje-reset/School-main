@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import s3Client from '../../config/s3Client.js';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { sendStudentWelcomeEmail } from '../../utils/emailEngine.js';
+import bcrypt from 'bcryptjs';
 
 /**
  * Registers a new student using a secure database transaction, calculating next sequential ID,
@@ -90,12 +91,16 @@ const registerStudent = async (req, res) => {
     const [maxUserSettingsIdRows] = await connection.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM user_settings FOR UPDATE");
     const userSettingsTableId = maxUserSettingsIdRows[0].maxId + 1;
 
+    // Generate temporary password
+    const generatedPassword = 'Stud_' + crypto.randomBytes(4).toString('hex') + '!';
+    const hashedPassword = await bcrypt.hash(generatedPassword, 10);
+
     // 4. Insert into students table (role='student', is_verified=1 by default)
     const studentSql = `
       INSERT INTO students (
         id, student_id, lrn, first_name, middle_name, last_name, suffix, 
-        gender, dob, email, mobile_no, verification_token, role, is_verified, profile_image
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'student', 1, ?)
+        gender, dob, email, mobile_no, password, verification_token, role, is_verified, profile_image
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'student', 1, ?)
     `;
 
     await connection.query(studentSql, [
@@ -110,6 +115,7 @@ const registerStudent = async (req, res) => {
       dob || null,
       email,
       mobile_no || null,
+      hashedPassword,
       token,
       profile_image
     ]);
@@ -169,7 +175,7 @@ const registerStudent = async (req, res) => {
 
     // Isolated welcome email dispatch routine
     try {
-      await sendStudentWelcomeEmail(email, full_name, student_id, req);
+      await sendStudentWelcomeEmail(email, full_name, student_id, generatedPassword, req);
     } catch (mailError) {
       console.error(`⚠️ Welcome email dispatch failed for ${email}:`, mailError);
     }
@@ -177,6 +183,7 @@ const registerStudent = async (req, res) => {
     return res.status(201).json({
       success: true,
       student_id: student_id,
+      password: generatedPassword,
       enrollment_id: enrollment_id,
       full_name: full_name
     });

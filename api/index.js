@@ -10,6 +10,8 @@ import registrarRoutes from './routes/registrarRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import smokeTestRoutes from './routes/smokeTest.js';
 import adminRoutes from './routes/adminRoutes.js';
+import teacherRoutes from './routes/teacherRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
 import { getPublicPromotions } from './controllers/admin/promotion.js';
 
 
@@ -69,6 +71,12 @@ app.use('/api/registrar', registrarRoutes);
 
 // 7. Student Portal General Data
 app.use('/api/student', studentRoutes);
+
+// 7.5. Teacher Portal
+app.use('/api/teacher', teacherRoutes);
+
+// 7.6. User Settings
+app.use('/api/settings', settingsRoutes);
 
 // 8. Health & Utility Endpoints (for Vercel)
 app.use('/api/test', smokeTestRoutes);
