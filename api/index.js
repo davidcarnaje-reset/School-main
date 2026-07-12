@@ -12,9 +12,8 @@ import smokeTestRoutes from './routes/smokeTest.js';
 import adminRoutes from './routes/adminRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
+import schoolRoutes from './routes/schoolRoutes.js';
 import { getPublicPromotions } from './controllers/admin/promotion.js';
-
-
 
 // I-load ang environment variables
 import path from 'path';
@@ -31,9 +30,16 @@ const app = express();
 app.use(cors({
   origin: '*', // Pwede nating higpitan ito kapag production na sa Vercel
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-school-id']
 }));
 app.use(express.json());
+
+// Global multi-tenant school extractor middleware
+app.use((req, res, next) => {
+  const schoolId = req.headers['x-school-id'] || req.query.school_id;
+  req.school_id = schoolId ? parseInt(schoolId, 10) : 1;
+  next();
+});
 
 // =======================================================
 // [ ROUTE MAPPER: IMIMITATE NATIN ANG ATING PHP FOLDER TREE ]
@@ -41,6 +47,9 @@ app.use(express.json());
 
 // 1. Auth Branch (Na-convert na sa Yugto 4)
 app.use('/api/auth', authRoutes);
+
+// Schools Branch (Multi-Tenant)
+app.use('/api/schools', schoolRoutes);
 
 // 1.5. Admin Branch (Branding Engine, etc.)
 app.use('/api/admin', adminRoutes);

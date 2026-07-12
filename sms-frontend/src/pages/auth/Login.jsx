@@ -69,7 +69,7 @@ const Login = ({ portal }) => {
         sessionStorage.removeItem('sms_token');
         sessionStorage.removeItem('user');
 
-        if (userRole === 'admin') {
+        if (userRole === 'admin' || userRole === 'super_admin') {
           // Store only in sessionStorage so closing the tab/browser logs them out!
           sessionStorage.setItem('token', token);
           sessionStorage.setItem('sms_token', token);
@@ -85,7 +85,10 @@ const Login = ({ portal }) => {
         setUser(user); 
         
         // 3. SECURE INTERNALS ROLE REDIRECTION ROUTER
-        if (userRole === 'admin') {
+        if (userRole === 'super_admin') {
+          localStorage.removeItem('selected_school_id');
+          navigate('/admin/schools');
+        } else if (userRole === 'admin') {
           navigate('/admin/dashboard');
         } else if (userRole === 'registrar') {
           navigate('/registrar/dashboard');

@@ -22,7 +22,7 @@ import CreateAnnouncementModal from "../components/shared/CreateAnnouncementModa
 import ReadNotificationModal from "../components/shared/ReadNotificationModal";
 
 const CashierLayout = () => {
-  const { logout, user, branding, API_BASE_URL, getLogoUrl } = useAuth();
+  const { logout, user, branding, activePermissions, API_BASE_URL, getLogoUrl } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCreateNotifModalOpen, setIsCreateNotifModalOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -78,18 +78,33 @@ const CashierLayout = () => {
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/cashier/dashboard" },
-    { icon: Search, label: "Student Billing", path: "/cashier/billing" },
-    { icon: CreditCard, label: "Process Payments", path: "/cashier/payments" },
-    { icon: Layers, label: "Fee Catalog", path: "/cashier/fees" },
-    { icon: Receipt, label: "Scholarships", path: "/cashier/scholarships" },
+    { icon: Search, label: "Student Billing", path: "/cashier/billing", module: "billing" },
+    { icon: CreditCard, label: "Process Payments", path: "/cashier/payments", module: "payments" },
+    { icon: Layers, label: "Fee Catalog", path: "/cashier/fees", module: "fees" },
+    { icon: Receipt, label: "Scholarships", path: "/cashier/scholarships", module: "scholarships" },
     {
       icon: BookOpen,
       label: "Scholarships Catalog",
       path: "/cashier/scholarship-catalog",
+      module: "scholarship_catalog"
     },
-    { icon: History, label: "Collection Reports", path: "/cashier/reports" },
-    { icon: Banknote, label: "Payroll", path: "/cashier/payroll" },
+    { icon: History, label: "Collection Reports", path: "/cashier/reports", module: "reports" },
+    { icon: Banknote, label: "Payroll", path: "/cashier/payroll", module: "payroll" },
   ];
+
+  const isModuleEnabled = (role, moduleName) => {
+    if (!activePermissions || activePermissions.length === 0) return true;
+    const perm = activePermissions.find(p => 
+      p.role.toLowerCase() === role.toLowerCase() && 
+      p.module_name.toLowerCase() === moduleName.toLowerCase()
+    );
+    return perm ? perm.is_enabled === 1 : false;
+  };
+
+  const filteredMenuItems = menuItems.filter(item => {
+    if (!item.module) return true;
+    return isModuleEnabled(user?.role, item.module);
+  });
 
   return (
     <div
@@ -138,7 +153,7 @@ const CashierLayout = () => {
           {/* NAVIGATION - Reduced Paddings & Icon Size */}
           {/* NAVIGATION - Smooth & Rounded */}
           <nav className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar">
-            {menuItems.map((item) => {
+            {filteredMenuItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <Link

@@ -7,7 +7,8 @@ import pool from '../../config/db.js';
  */
 export const getBranding = async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM school_settings WHERE id = 1");
+    const schoolId = req.query.school_id || req.school_id || 1;
+    const [rows] = await pool.query("SELECT * FROM school_settings WHERE id = ?", [schoolId]);
     if (rows.length > 0) {
       return res.json({
         status: 'success',
@@ -56,15 +57,18 @@ export const updateBranding = async (req, res) => {
       school_logo_url = `${publicUrl}/branding/${uniqueFileName}`;
     }
 
+    const schoolId = req.school_id || 1;
+
     // Run the upsert MySQL query against the TiDB Cloud dashboard config table (school_settings)
     await pool.query(
       `INSERT INTO school_settings (id, school_name, theme_color, school_logo) 
-       VALUES (1, ?, ?, ?) 
+       VALUES (?, ?, ?, ?) 
        ON DUPLICATE KEY UPDATE 
          school_name=?, 
          theme_color=?, 
          school_logo=COALESCE(?, school_logo);`,
       [
+        schoolId,
         school_name,
         theme_color,
         school_logo_url,
@@ -75,7 +79,7 @@ export const updateBranding = async (req, res) => {
     );
 
     // Retrieve updated config row
-    const [updatedRows] = await pool.query("SELECT * FROM school_settings WHERE id = 1");
+    const [updatedRows] = await pool.query("SELECT * FROM school_settings WHERE id = ?", [schoolId]);
 
     return res.status(200).json({
       status: 'success',
@@ -92,6 +96,7 @@ export const updateBranding = async (req, res) => {
 // GET school college grading settings
 export const getSchoolSettings = async (req, res) => {
   try {
+    const schoolId = req.school_id || 1;
     const [rows] = await pool.query(
       `SELECT 
          college_grading_scale,
@@ -99,8 +104,9 @@ export const getSchoolSettings = async (req, res) => {
          college_midterm_weight,
          college_finals_weight
        FROM school_settings 
-       WHERE id = 1`
-    );
+       WHERE id = ?`,
+       [schoolId]
+     );
     
     return res.json({
       status: "success",
@@ -130,14 +136,16 @@ export const saveSchoolSettings = async (req, res) => {
       return res.json({ status: "error", message: "Weights must sum to 100%" });
     }
 
+    const schoolId = req.school_id || 1;
+
     await pool.query(
       `UPDATE school_settings SET
          college_grading_scale = ?,
          college_prelim_weight = ?,
          college_midterm_weight = ?,
          college_finals_weight = ?
-       WHERE id = 1`,
-      [scale, prelim, midterm, finals]
+       WHERE id = ?`,
+      [scale, prelim, midterm, finals, schoolId]
     );
 
     return res.json({ status: "success", message: "College grading settings saved" });

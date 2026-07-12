@@ -13,16 +13,36 @@ export const AuthProvider = ({ children }) => {
     school_logo: null
   });
 
+  const [activePermissions, setActivePermissions] = useState([]);
+
   // ====================================================================
   // ARCHITECT'S CORE ROUTING LAYER
   // Bound strictly to port 5000 Node.js API environment gateway
   // ====================================================================
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-  const fetchBranding = async () => {
+  // Global Axios interceptor to automatically add school ID and Authorization header
+  axios.interceptors.request.use((config) => {
+    const schoolId = localStorage.getItem('selected_school_id') || 
+                     (sessionStorage.getItem('user') ? JSON.parse(sessionStorage.getItem('user')).school_id : null) ||
+                     (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).school_id : null);
+    if (schoolId) {
+      config.headers['x-school-id'] = schoolId;
+    }
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  }, (error) => {
+    return Promise.reject(error);
+  });
+
+  const fetchBranding = async (schoolId) => {
     try {
+      const activeSchoolId = schoolId || localStorage.getItem('selected_school_id') || 1;
       // 🚀 RESTFUL UPDATE: Tinanggal ang legacy .php extension file callback!
-      const res = await axios.get(`${API_BASE_URL}/admin/branding`);
+      const res = await axios.get(`${API_BASE_URL}/admin/branding?school_id=${activeSchoolId}`);
       if (res.data && res.data.status === 'success') {
         setBranding(res.data.data);
         document.documentElement.style.setProperty('--primary-color', res.data.data.theme_color);
@@ -31,6 +51,29 @@ export const AuthProvider = ({ children }) => {
       console.error("🔑 [AUTH CONTEXT API ALERT] Branding payload retrieval crashed:", err.message);
     }
   };
+
+  const fetchPermissions = async (schoolId) => {
+    try {
+      const activeSchoolId = schoolId || localStorage.getItem('selected_school_id') || (user ? user.school_id : 1);
+      const res = await axios.get(`${API_BASE_URL}/schools/${activeSchoolId}/permissions`);
+      if (res.data && res.data.success) {
+        setActivePermissions(res.data.permissions);
+      }
+    } catch (err) {
+      console.error("🔑 [AUTH CONTEXT API ALERT] Permissions retrieval failed:", err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (user && user.school_id) {
+      fetchPermissions(user.school_id);
+    } else {
+      const savedSchoolId = localStorage.getItem('selected_school_id');
+      if (savedSchoolId) {
+        fetchPermissions(savedSchoolId);
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     // 1. Check sessionStorage first (temporary sessions like admin)
@@ -77,6 +120,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     fetchBranding();
+    fetchPermissions();
     setLoading(false);
   }, []);
 
@@ -110,7 +154,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout, loading, branding, fetchBranding, API_BASE_URL, getLogoUrl, getProfileImageUrl }}>
+    <AuthContext.Provider value={{ user, setUser, logout, loading, branding, fetchBranding, activePermissions, fetchPermissions, API_BASE_URL, getLogoUrl, getProfileImageUrl }}>
       {!loading && children}
     </AuthContext.Provider>
   );
