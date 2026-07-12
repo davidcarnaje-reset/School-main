@@ -100,7 +100,7 @@ const registerStudent = async (req, res) => {
       INSERT INTO students (
         id, student_id, lrn, first_name, middle_name, last_name, suffix, 
         gender, dob, email, mobile_no, password, verification_token, role, is_verified, profile_image
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'student', 1, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'student', 1, ?)
     `;
 
     await connection.query(studentSql, [
