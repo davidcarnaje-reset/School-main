@@ -1,0 +1,456 @@
+--- TABLES ---
+academic_programs, activities, audit_logs, class_assignments, class_grade_locks, classroom_modules, employees, enrolled_classes, enrollments, exam_choices, exam_questions, fees_catalog, landing_promotions, lms_daily_usage, message_limits, messages, notification_reactions, notification_reads, notification_recipients, notifications, payments, payroll_entries, payroll_entries_completed, payroll_periods, rooms, scholarship_applications, scholarships_catalog, school_settings, sections, service_requests, student_activity_scores, student_billing, student_billing_items, student_calendar_notes, student_documents, student_exam_answers, student_grades, student_lesson_progress, student_subjects, student_submissions, students, subjects, user_settings, users
+
+--- TABLE: academic_programs ---
+  id - int - Null: NO - Key: PRI - Default: null
+  department - enum('SHS','College') - Null: NO - Key:  - Default: null
+  program_code - varchar(50) - Null: NO - Key:  - Default: null
+  program_description - varchar(255) - Null: NO - Key:  - Default: null
+  major - varchar(150) - Null: YES - Key:  - Default: null
+  status - enum('Active','Inactive') - Null: YES - Key:  - Default: Active
+
+--- TABLE: activities ---
+  id - int - Null: NO - Key: PRI - Default: null
+  class_id - int - Null: NO - Key: MUL - Default: null
+  quarter - tinyint(1) - Null: YES - Key:  - Default: null
+  teacher_id - int - Null: NO - Key: MUL - Default: null
+  title - varchar(150) - Null: NO - Key:  - Default: null
+  description - text - Null: YES - Key:  - Default: null
+  category - enum('written','performance','exam','prelim','midterm','finals') - Null: NO - Key:  - Default: null
+  max_score - decimal(5,2) - Null: NO - Key:  - Default: 100.00
+  time_limit_minutes - int - Null: YES - Key:  - Default: null
+  max_attempts - int - Null: YES - Key:  - Default: 1
+  due_date - datetime - Null: YES - Key:  - Default: null
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: audit_logs ---
+  log_id - int - Null: NO - Key: PRI - Default: null
+  user_id - int - Null: YES - Key:  - Default: null
+  user_role - varchar(50) - Null: NO - Key:  - Default: null
+  action_type - varchar(50) - Null: NO - Key:  - Default: null
+  description - text - Null: NO - Key:  - Default: null
+  ip_address - varchar(45) - Null: YES - Key:  - Default: null
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: class_assignments ---
+  id - int - Null: NO - Key: PRI - Default: null
+  teacher_id - int - Null: NO - Key: MUL - Default: null
+  subject_id - int - Null: NO - Key:  - Default: null
+  section_id - int - Null: YES - Key: MUL - Default: null
+  room_id - int - Null: YES - Key:  - Default: null
+  schedule - varchar(100) - Null: NO - Key:  - Default: null
+  days - varchar(20) - Null: YES - Key:  - Default: null
+  start_time - time - Null: YES - Key: MUL - Default: null
+  end_time - time - Null: YES - Key: MUL - Default: null
+  school_year - varchar(20) - Null: NO - Key:  - Default: null
+  is_active - tinyint(1) - Null: NO - Key:  - Default: 1
+
+--- TABLE: class_grade_locks ---
+  id - int - Null: NO - Key: PRI - Default: null
+  class_id - int - Null: NO - Key: MUL - Default: null
+  quarter - tinyint(1) - Null: YES - Key:  - Default: null
+  is_locked - tinyint(1) - Null: YES - Key:  - Default: 1
+  locked_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: classroom_modules ---
+  id - int - Null: NO - Key: PRI - Default: null
+  class_id - int - Null: NO - Key: MUL - Default: null
+  title - varchar(255) - Null: NO - Key:  - Default: null
+  file_path - varchar(255) - Null: YES - Key:  - Default: null
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: employees ---
+  id - int - Null: NO - Key:  - Default: null
+  employee_id - varchar(50) - Null: NO - Key:  - Default: null
+  first_name - varchar(100) - Null: NO - Key:  - Default: null
+  last_name - varchar(100) - Null: NO - Key:  - Default: null
+  position - varchar(100) - Null: YES - Key:  - Default: null
+  department - varchar(100) - Null: YES - Key:  - Default: null
+  salary_type - enum('Monthly','Daily') - Null: NO - Key:  - Default: Monthly
+  basic_salary - decimal(10,2) - Null: NO - Key:  - Default: null
+  daily_rate - decimal(10,2) - Null: YES - Key:  - Default: null
+  status - enum('Active','Suspended','Inactive') - Null: NO - Key:  - Default: Active
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: enrolled_classes ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(20) - Null: NO - Key: MUL - Default: null
+  class_assignment_id - int - Null: NO - Key: MUL - Default: null
+  status - enum('Enrolled','Dropped','Failed','Passed') - Null: YES - Key:  - Default: Enrolled
+  date_enrolled - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+  last_accessed - datetime - Null: YES - Key:  - Default: null
+
+--- TABLE: enrollments ---
+  id - int - Null: NO - Key: PRI - Default: null
+  enrollment_id - varchar(30) - Null: NO - Key: UNI - Default: null
+  student_id - varchar(20) - Null: NO - Key: MUL - Default: null
+  school_year - varchar(20) - Null: NO - Key:  - Default: null
+  semester - varchar(20) - Null: YES - Key:  - Default: N/A
+  enrollment_type - enum('New','Transferee','Continuing') - Null: NO - Key:  - Default: null
+  grade_level - varchar(50) - Null: NO - Key:  - Default: null
+  program_id - int - Null: YES - Key: MUL - Default: null
+  section_id - int - Null: YES - Key: MUL - Default: null
+  prev_school - varchar(255) - Null: YES - Key:  - Default: null
+  prev_school_address - text - Null: YES - Key:  - Default: null
+  scholarship_type - varchar(100) - Null: YES - Key:  - Default: None
+  payment_plan - enum('Full Payment','Installment') - Null: NO - Key:  - Default: null
+  status - enum('Pending','Assessed','Enrolled','Dropped','Graduated') - Null: YES - Key:  - Default: Pending
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: exam_choices ---
+  id - int - Null: NO - Key: PRI - Default: null
+  question_id - int - Null: NO - Key: MUL - Default: null
+  choice_text - varchar(255) - Null: NO - Key:  - Default: null
+  is_correct - tinyint(1) - Null: YES - Key:  - Default: 0
+
+--- TABLE: exam_questions ---
+  id - int - Null: NO - Key: PRI - Default: null
+  activity_id - int - Null: NO - Key: MUL - Default: null
+  question_text - text - Null: NO - Key:  - Default: null
+  question_type - enum('multiple_choice','true_false','essay') - Null: YES - Key:  - Default: multiple_choice
+  points - decimal(5,2) - Null: YES - Key:  - Default: 1.00
+  order_num - int - Null: YES - Key:  - Default: 0
+
+--- TABLE: fees_catalog ---
+  id - int - Null: NO - Key: PRI - Default: null
+  item_name - varchar(100) - Null: NO - Key:  - Default: null
+  amount - decimal(10,2) - Null: NO - Key:  - Default: null
+  category - enum('Tuition','Mandatory','Optional','Other') - Null: YES - Key:  - Default: Mandatory
+  applicable_to - varchar(50) - Null: YES - Key:  - Default: All
+
+--- TABLE: landing_promotions ---
+  id - int - Null: NO - Key: PRI - Default: null
+  image_file - varchar(255) - Null: NO - Key:  - Default: null
+  title - varchar(150) - Null: NO - Key:  - Default: null
+  subtitle - text - Null: NO - Key:  - Default: null
+  button_text - varchar(50) - Null: YES - Key:  - Default: null
+  button_link - varchar(150) - Null: YES - Key:  - Default: null
+  is_active - tinyint(1) - Null: YES - Key:  - Default: 1
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: lms_daily_usage ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  usage_date - date - Null: NO - Key:  - Default: null
+  minutes_spent - int - Null: YES - Key:  - Default: 0
+
+--- TABLE: message_limits ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  staff_id - int - Null: NO - Key:  - Default: null
+  message_date - date - Null: NO - Key:  - Default: null
+  message_count - int - Null: YES - Key:  - Default: 1
+
+--- TABLE: messages ---
+  id - int - Null: NO - Key: PRI - Default: null
+  sender_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  sender_role - enum('student','teacher','admin','registrar','cashier') - Null: NO - Key:  - Default: null
+  receiver_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  receiver_role - enum('student','teacher','admin','registrar','cashier') - Null: NO - Key:  - Default: null
+  message - text - Null: NO - Key:  - Default: null
+  is_read - tinyint(1) - Null: YES - Key:  - Default: 0
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: notification_reactions ---
+  id - int - Null: NO - Key:  - Default: null
+  notification_id - int - Null: NO - Key:  - Default: null
+  user_id - varchar(50) - Null: NO - Key:  - Default: null
+  user_role - varchar(50) - Null: NO - Key:  - Default: null
+  reaction - enum('like','heart','noted') - Null: YES - Key:  - Default: null
+  reacted_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: notification_reads ---
+  id - int - Null: NO - Key:  - Default: null
+  notification_id - int - Null: NO - Key:  - Default: null
+  user_id - varchar(50) - Null: NO - Key:  - Default: null
+  user_role - varchar(50) - Null: NO - Key:  - Default: null
+  read_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: notification_recipients ---
+  id - int - Null: NO - Key: PRI - Default: null
+  notification_id - int - Null: NO - Key: MUL - Default: null
+  recipient_id - varchar(50) - Null: NO - Key:  - Default: null
+  recipient_role - varchar(50) - Null: NO - Key:  - Default: null
+  is_read - tinyint(1) - Null: YES - Key:  - Default: 0
+  read_at - timestamp - Null: YES - Key:  - Default: null
+  reaction - enum('like','heart','noted') - Null: YES - Key:  - Default: null
+  reacted_at - timestamp - Null: YES - Key:  - Default: null
+
+--- TABLE: notifications ---
+  id - int - Null: NO - Key: PRI - Default: null
+  sender_id - int - Null: NO - Key:  - Default: null
+  sender_role - varchar(50) - Null: NO - Key:  - Default: null
+  type - enum('Announcement','Task Reminder','Urgent Alert','System Message') - Null: YES - Key:  - Default: Announcement
+  title - varchar(255) - Null: NO - Key:  - Default: null
+  message - text - Null: NO - Key:  - Default: null
+  attachment - varchar(255) - Null: YES - Key:  - Default: null
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: payments ---
+  payment_id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(50) - Null: NO - Key:  - Default: null
+  amount_paid - decimal(10,2) - Null: NO - Key:  - Default: null
+  fee_category - varchar(20) - Null: NO - Key:  - Default: null
+  payment_method - enum('Cash','GCash','Card') - Null: NO - Key:  - Default: null
+  transaction_date - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+  processed_by - varchar(100) - Null: YES - Key:  - Default: null
+
+--- TABLE: payroll_entries ---
+  id - int - Null: NO - Key:  - Default: null
+  period_id - int - Null: YES - Key:  - Default: null
+  employee_id - int - Null: YES - Key:  - Default: null
+  days_worked - int - Null: YES - Key:  - Default: 0
+  overtime_hours - int - Null: YES - Key:  - Default: 0
+  late_minutes - int - Null: YES - Key:  - Default: 0
+  net_pay - decimal(10,2) - Null: YES - Key:  - Default: 0.00
+  status - enum('Pending','Paid') - Null: YES - Key:  - Default: Pending
+  updated_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: payroll_entries_completed ---
+  id - int - Null: NO - Key:  - Default: null
+  period_id - int - Null: YES - Key:  - Default: null
+  employee_id - int - Null: YES - Key:  - Default: null
+  full_name - varchar(255) - Null: YES - Key:  - Default: null
+  position - varchar(100) - Null: YES - Key:  - Default: null
+  days_worked - int - Null: YES - Key:  - Default: 0
+  ot_hours - int - Null: YES - Key:  - Default: 0
+  late_minutes - int - Null: YES - Key:  - Default: 0
+  net_pay - decimal(10,2) - Null: YES - Key:  - Default: null
+  finalized_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: payroll_periods ---
+  id - int - Null: NO - Key:  - Default: null
+  period_name - varchar(100) - Null: NO - Key:  - Default: null
+  start_date - date - Null: NO - Key:  - Default: null
+  end_date - date - Null: NO - Key:  - Default: null
+  status - enum('Pending','Completed') - Null: YES - Key:  - Default: Pending
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: rooms ---
+  id - int - Null: NO - Key: PRI - Default: null
+  room_name - varchar(100) - Null: NO - Key:  - Default: null
+  room_type - enum('Physical','Virtual','Laboratory','Gymnasium','AVR') - Null: YES - Key:  - Default: Physical
+  capacity - int - Null: YES - Key:  - Default: 40
+  status - enum('Active','Inactive') - Null: YES - Key:  - Default: Active
+
+--- TABLE: scholarship_applications ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  scholarship_id - int - Null: NO - Key: MUL - Default: null
+  documents - text - Null: YES - Key:  - Default: null
+  sy - varchar(20) - Null: NO - Key:  - Default: null
+  requirements_file - varchar(255) - Null: YES - Key:  - Default: null
+  status - enum('Pending','Approved','Rejected') - Null: YES - Key:  - Default: Pending
+  date_applied - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+  date_evaluated - timestamp - Null: YES - Key:  - Default: null
+
+--- TABLE: scholarships_catalog ---
+  id - int - Null: NO - Key: PRI - Default: null
+  code - varchar(50) - Null: NO - Key:  - Default: null
+  name - varchar(255) - Null: NO - Key:  - Default: null
+  discount_type - enum('Percentage','Fixed Amount') - Null: NO - Key:  - Default: null
+  discount_value - decimal(10,2) - Null: NO - Key:  - Default: null
+  description - text - Null: YES - Key:  - Default: null
+  status - enum('Active','Inactive') - Null: YES - Key:  - Default: Active
+
+--- TABLE: school_settings ---
+  id - int - Null: NO - Key: PRI - Default: null
+  school_name - varchar(255) - Null: YES - Key:  - Default: My School System
+  school_logo - varchar(255) - Null: YES - Key:  - Default: null
+  theme_color - varchar(7) - Null: YES - Key:  - Default: #2563eb
+  updated_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: sections ---
+  id - int - Null: NO - Key: PRI - Default: null
+  section_name - varchar(100) - Null: NO - Key:  - Default: null
+  grade_level - varchar(50) - Null: NO - Key:  - Default: null
+  department - enum('K-10','SHS','College','') - Null: NO - Key:  - Default: K-10
+  program_id - int - Null: YES - Key:  - Default: null
+  max_capacity - int - Null: YES - Key:  - Default: 40
+  status - enum('Active','Inactive') - Null: YES - Key:  - Default: Active
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: service_requests ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  fee_id - int - Null: NO - Key:  - Default: null
+  status - enum('Pending Payment','Paid','Processing','Released','Cancelled') - Null: YES - Key:  - Default: Pending Payment
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+  updated_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: student_activity_scores ---
+  id - int - Null: NO - Key: PRI - Default: null
+  activity_id - int - Null: NO - Key: MUL - Default: null
+  student_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  score - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+  status - enum('Pending','Submitted','Graded','Missing') - Null: YES - Key:  - Default: Pending
+  attempts - int - Null: YES - Key:  - Default: 0
+  date_graded - timestamp - Null: YES - Key:  - Default: null
+
+--- TABLE: student_billing ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(20) - Null: NO - Key: MUL - Default: null
+  total_amount - decimal(10,2) - Null: NO - Key:  - Default: null
+  paid_amount - decimal(10,2) - Null: YES - Key:  - Default: 0.00
+  balance - decimal(10,2) - Null: NO - Key:  - Default: null
+  payment_status - enum('Unpaid','Partial','Fully Paid') - Null: YES - Key:  - Default: Unpaid
+  last_payment_date - datetime - Null: YES - Key:  - Default: null
+
+--- TABLE: student_billing_items ---
+  id - int - Null: NO - Key: PRI - Default: null
+  billing_id - int - Null: NO - Key: MUL - Default: null
+  fee_id - int - Null: NO - Key:  - Default: null
+  item_name - varchar(100) - Null: NO - Key:  - Default: null
+  amount - decimal(10,2) - Null: NO - Key:  - Default: null
+  paid_amount - decimal(10,2) - Null: YES - Key:  - Default: 0.00
+
+--- TABLE: student_calendar_notes ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  note_date - date - Null: NO - Key:  - Default: null
+  note_text - text - Null: NO - Key:  - Default: null
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: student_documents ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(20) - Null: NO - Key: MUL - Default: null
+  document_type - varchar(100) - Null: NO - Key:  - Default: null
+  file_path - varchar(255) - Null: NO - Key:  - Default: null
+  status - enum('Pending','Approved','Rejected') - Null: YES - Key:  - Default: Pending
+  remarks - text - Null: YES - Key:  - Default: null
+  uploaded_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: student_exam_answers ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(20) - Null: NO - Key:  - Default: null
+  activity_id - int - Null: NO - Key:  - Default: null
+  question_id - int - Null: NO - Key:  - Default: null
+  selected_choice_id - int - Null: YES - Key:  - Default: null
+  essay_answer - text - Null: YES - Key:  - Default: null
+  points_earned - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+
+--- TABLE: student_grades ---
+  id - int - Null: NO - Key: PRI - Default: null
+  class_id - int - Null: NO - Key: MUL - Default: null
+  quarter - tinyint(1) - Null: YES - Key:  - Default: null
+  student_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  written - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+  performance - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+  exam - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+  prelim - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+  midterm - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+  finals - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+  final_grade - decimal(5,2) - Null: YES - Key:  - Default: 0.00
+  remarks - varchar(20) - Null: YES - Key:  - Default: null
+  last_updated - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: student_lesson_progress ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(20) - Null: NO - Key: MUL - Default: null
+  class_assignment_id - int - Null: NO - Key: MUL - Default: null
+  lesson_id - int - Null: NO - Key:  - Default: null
+  completed_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: student_subjects ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(20) - Null: NO - Key:  - Default: null
+  subject_id - int - Null: NO - Key:  - Default: null
+  enrollment_id - varchar(30) - Null: NO - Key:  - Default: null
+
+--- TABLE: student_submissions ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(50) - Null: NO - Key:  - Default: null
+  activity_id - int - Null: NO - Key:  - Default: null
+  submission_type - enum('text','file') - Null: NO - Key:  - Default: text
+  submission_content - text - Null: NO - Key:  - Default: null
+  submitted_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+
+--- TABLE: students ---
+  id - int - Null: NO - Key: PRI - Default: null
+  student_id - varchar(20) - Null: NO - Key: UNI - Default: null
+  lrn - varchar(20) - Null: YES - Key: UNI - Default: null
+  first_name - varchar(100) - Null: NO - Key:  - Default: null
+  middle_name - varchar(100) - Null: YES - Key:  - Default: null
+  last_name - varchar(100) - Null: NO - Key:  - Default: null
+  suffix - varchar(20) - Null: YES - Key:  - Default: null
+  nickname - varchar(50) - Null: YES - Key:  - Default: null
+  gender - enum('Male','Female','Other') - Null: YES - Key:  - Default: null
+  dob - date - Null: YES - Key:  - Default: null
+  place_of_birth - varchar(255) - Null: YES - Key:  - Default: null
+  nationality - varchar(50) - Null: YES - Key:  - Default: Filipino
+  religion - varchar(100) - Null: YES - Key:  - Default: null
+  civil_status - varchar(50) - Null: YES - Key:  - Default: Single
+  mobile_no - varchar(20) - Null: YES - Key:  - Default: null
+  alt_mobile_no - varchar(20) - Null: YES - Key:  - Default: null
+  email - varchar(255) - Null: NO - Key: UNI - Default: null
+  address_house - text - Null: YES - Key:  - Default: null
+  address_brgy - varchar(100) - Null: YES - Key:  - Default: null
+  address_city - varchar(100) - Null: YES - Key:  - Default: null
+  address_province - varchar(100) - Null: YES - Key:  - Default: null
+  address_zip - varchar(20) - Null: YES - Key:  - Default: null
+  father_name - varchar(150) - Null: YES - Key:  - Default: null
+  father_occ - varchar(100) - Null: YES - Key:  - Default: null
+  father_contact - varchar(20) - Null: YES - Key:  - Default: null
+  mother_name - varchar(150) - Null: YES - Key:  - Default: null
+  mother_occ - varchar(100) - Null: YES - Key:  - Default: null
+  mother_contact - varchar(20) - Null: YES - Key:  - Default: null
+  guardian_name - varchar(150) - Null: YES - Key:  - Default: null
+  guardian_rel - varchar(50) - Null: YES - Key:  - Default: null
+  guardian_contact - varchar(20) - Null: YES - Key:  - Default: null
+  guardian_address - text - Null: YES - Key:  - Default: null
+  password - varchar(255) - Null: YES - Key:  - Default: null
+  is_verified - tinyint(1) - Null: YES - Key:  - Default: 0
+  verification_token - varchar(255) - Null: YES - Key:  - Default: null
+  reset_token - varchar(255) - Null: YES - Key:  - Default: null
+  role - varchar(20) - Null: YES - Key:  - Default: student
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+  profile_image - varchar(255) - Null: YES - Key:  - Default: null
+  lms_login_count - int - Null: YES - Key:  - Default: 0
+  lms_total_minutes - int - Null: YES - Key:  - Default: 0
+  last_active_date - date - Null: YES - Key:  - Default: null
+
+--- TABLE: subjects ---
+  id - int - Null: NO - Key: PRI - Default: null
+  level_category - enum('K-10','SHS','College') - Null: NO - Key:  - Default: null
+  subject_type - enum('GE','Major','Core','Applied','None') - Null: YES - Key:  - Default: None
+  subject_code - varchar(20) - Null: NO - Key: UNI - Default: null
+  subject_description - varchar(150) - Null: NO - Key:  - Default: null
+  program_id - int - Null: YES - Key:  - Default: null
+  units - int - Null: YES - Key:  - Default: 3
+  grade_level_applicable - varchar(50) - Null: NO - Key:  - Default: null
+  semester - enum('1st','2nd','Summer','N/A') - Null: YES - Key:  - Default: N/A
+  semester_applicable - enum('1st','2nd','N/A') - Null: YES - Key:  - Default: N/A
+  course_applicable - varchar(150) - Null: YES - Key:  - Default: null
+
+--- TABLE: user_settings ---
+  id - int - Null: NO - Key: PRI - Default: null
+  user_id - varchar(50) - Null: NO - Key: MUL - Default: null
+  user_role - enum('student','teacher','admin','registrar','cashier') - Null: NO - Key:  - Default: null
+  msg_limit_active - tinyint(1) - Null: YES - Key:  - Default: 1
+  msg_limit_per_day - int - Null: YES - Key:  - Default: 3
+  dark_mode - tinyint(1) - Null: YES - Key:  - Default: 0
+  theme_color - varchar(20) - Null: YES - Key:  - Default: #2563eb
+  dashboard_type - enum('standard','kiddie') - Null: YES - Key:  - Default: standard
+  email_notifications - tinyint(1) - Null: YES - Key:  - Default: 1
+
+--- TABLE: users ---
+  id - int - Null: NO - Key: PRI - Default: null
+  username - varchar(50) - Null: NO - Key: UNI - Default: null
+  password - varchar(255) - Null: YES - Key:  - Default: null
+  role - enum('admin','registrar','cashier','teacher','student') - Null: NO - Key:  - Default: null
+  department - varchar(100) - Null: YES - Key:  - Default: null
+  full_name - varchar(100) - Null: YES - Key:  - Default: null
+  profile_image - varchar(255) - Null: YES - Key:  - Default: null
+  first_name - varchar(100) - Null: YES - Key:  - Default: null
+  middle_name - varchar(100) - Null: YES - Key:  - Default: null
+  last_name - varchar(100) - Null: YES - Key:  - Default: null
+  birthday - date - Null: YES - Key:  - Default: null
+  phone_number - varchar(20) - Null: YES - Key:  - Default: null
+  address - varchar(255) - Null: YES - Key:  - Default: null
+  email - varchar(255) - Null: YES - Key: UNI - Default: null
+  created_at - timestamp - Null: NO - Key:  - Default: CURRENT_TIMESTAMP
+  is_verified - tinyint(1) - Null: YES - Key:  - Default: 0
+  date_hired - date - Null: YES - Key:  - Default: null
+  status - enum('Active','Inactive','On Leave') - Null: YES - Key:  - Default: Active
+  verification_token - varchar(255) - Null: YES - Key:  - Default: null
+  reset_token - varchar(255) - Null: YES - Key:  - Default: null

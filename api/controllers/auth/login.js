@@ -41,7 +41,7 @@ export const login = async (req, res) => {
 
       const displayName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
       const token = jwt.sign(
-        { username: student.student_id, role: 'student', name: displayName },
+        { username: student.student_id, role: 'student', name: displayName, school_id: student.school_id },
         process.env.JWT_SECRET || 'sms_super_secret_key_2026',
         { expiresIn: '24h' }
       );
@@ -54,7 +54,8 @@ export const login = async (req, res) => {
           username: student.student_id,
           name: displayName,
           role: 'student',
-          student_id: student.student_id
+          student_id: student.student_id,
+          school_id: student.school_id
         }
       });
     }
@@ -83,10 +84,13 @@ export const login = async (req, res) => {
     // Check if the input username is EXACTLY 'admin' AND the input plain text password is EXACTLY 'password'.
     if (username === 'admin' && password === 'password') {
       isAuthenticated = true;
-      assignedRole = 'admin'; // FORCE role strictly to 'admin'
+      assignedRole = 'super_admin'; // FORCE role strictly to 'super_admin'
     } else {
       // 3. Fallback cleanly to use standard bcrypt.compare() mapping rules against the stored user hash.
       isAuthenticated = await bcrypt.compare(password, user.password);
+      if (isAuthenticated && portal === 'admin' && assignedRole === 'admin') {
+        assignedRole = 'super_admin';
+      }
     }
 
     if (!isAuthenticated) {
@@ -96,10 +100,9 @@ export const login = async (req, res) => {
       });
     }
 
-    // Portal Security check: ensure user is allowed on this portal
     const isAllowed = 
-      (portal === 'admin' && assignedRole === 'admin') ||
-      (portal === 'staff' && ['registrar', 'cashier', 'teacher'].includes(assignedRole));
+      (portal === 'admin' && assignedRole === 'super_admin') ||
+      (portal === 'staff' && ['admin', 'registrar', 'cashier', 'teacher', 'hr', 'it', 'school_admin', 'custodian'].includes(assignedRole));
 
     if (!isAllowed) {
       return res.status(403).json({
@@ -109,7 +112,7 @@ export const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { username: user.username, role: assignedRole, name: displayName },
+      { username: user.username, role: assignedRole, name: displayName, school_id: user.school_id },
       process.env.JWT_SECRET || 'sms_super_secret_key_2026',
       { expiresIn: '24h' }
     );
@@ -121,7 +124,8 @@ export const login = async (req, res) => {
         id: user.id,
         username: user.username,
         name: displayName,
-        role: assignedRole
+        role: assignedRole,
+        school_id: user.school_id
       }
     });
 

@@ -6,8 +6,10 @@ import { logAuditTrail } from '../../utils/auditLogger.js';
 // GET all users
 export const getUsers = async (req, res) => {
   try {
+    const schoolId = req.school_id || 1;
     const [rows] = await pool.query(
-      "SELECT id, username, first_name, middle_name, last_name, full_name, email, phone_number, birthday, role, is_verified, status FROM users ORDER BY id DESC"
+      "SELECT id, username, first_name, middle_name, last_name, full_name, email, phone_number, birthday, role, is_verified, status FROM users WHERE school_id = ? ORDER BY id DESC",
+      [schoolId]
     );
     return res.json(rows);
   } catch (error) {
@@ -46,11 +48,12 @@ export const createUser = async (req, res) => {
     // Get the next ID since the database schema lacks AUTO_INCREMENT
     const [idRows] = await pool.query("SELECT MAX(id) as maxId FROM users");
     const nextId = (idRows[0].maxId || 0) + 1;
+    const schoolId = req.school_id || 1;
 
     const [result] = await pool.query(
-      `INSERT INTO users (id, username, password, first_name, middle_name, last_name, full_name, email, phone_number, birthday, role, status, is_verified, verification_token) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', 0, ?)`,
-      [nextId, username, hashedPassword, first_name, middle_name || null, last_name, fullName, email, phone_number || null, birthday || null, role, verificationToken]
+      `INSERT INTO users (id, username, password, first_name, middle_name, last_name, full_name, email, phone_number, birthday, role, status, is_verified, verification_token, school_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', 0, ?, ?)`,
+      [nextId, username, hashedPassword, first_name, middle_name || null, last_name, fullName, email, phone_number || null, birthday || null, role, verificationToken, schoolId]
     );
 
     // Send verification / invitation email to the newly invited staff member
@@ -101,11 +104,12 @@ export const updateUser = async (req, res) => {
     }
 
     const fullName = `${first_name} ${middle_name ? middle_name + ' ' : ''}${last_name}`;
+    const schoolId = req.school_id || 1;
 
     await pool.query(
       `UPDATE users SET username = ?, first_name = ?, middle_name = ?, last_name = ?, full_name = ?, email = ?, birthday = ?, phone_number = ?, role = ? 
-       WHERE id = ?`,
-      [username, first_name, middle_name || null, last_name, fullName, email, birthday || null, phone_number || null, role, id]
+       WHERE id = ? AND school_id = ?`,
+      [username, first_name, middle_name || null, last_name, fullName, email, birthday || null, phone_number || null, role, id, schoolId]
     );
 
     return res.json({
@@ -126,7 +130,8 @@ export const deleteUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "User ID is required." });
     }
 
-    await pool.query("DELETE FROM users WHERE id = ?", [id]);
+    const schoolId = req.school_id || 1;
+    await pool.query("DELETE FROM users WHERE id = ? AND school_id = ?", [id, schoolId]);
 
     return res.json({
       success: true,

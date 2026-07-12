@@ -5,8 +5,10 @@ import pool from '../../config/db.js';
 // GET all active promotions (for public landing page)
 export const getPublicPromotions = async (req, res) => {
   try {
+    const schoolId = req.query.school_id || req.school_id || 1;
     const [rows] = await pool.query(
-      "SELECT id, image_file, title, subtitle, button_text, button_link, is_active, created_at FROM landing_promotions WHERE is_active = 1 ORDER BY id DESC"
+      "SELECT id, image_file, title, subtitle, button_text, button_link, is_active, created_at FROM landing_promotions WHERE is_active = 1 AND school_id = ? ORDER BY id DESC",
+      [schoolId]
     );
     return res.json({
       success: true,
@@ -21,8 +23,10 @@ export const getPublicPromotions = async (req, res) => {
 // GET all promotions (for admin dashboard view)
 export const getAdminPromotions = async (req, res) => {
   try {
+    const schoolId = req.school_id || 1;
     const [rows] = await pool.query(
-      "SELECT id, image_file, title, subtitle, button_text, button_link, is_active, created_at FROM landing_promotions ORDER BY id DESC"
+      "SELECT id, image_file, title, subtitle, button_text, button_link, is_active, created_at FROM landing_promotions WHERE school_id = ? ORDER BY id DESC",
+      [schoolId]
     );
     return res.json({
       success: true,
@@ -63,10 +67,11 @@ export const createPromotion = async (req, res) => {
     // Get the next ID since the database schema lacks AUTO_INCREMENT
     const [idRows] = await pool.query("SELECT MAX(id) as maxId FROM landing_promotions");
     const nextId = (idRows[0].maxId || 0) + 1;
+    const schoolId = req.school_id || 1;
 
     await pool.query(
-      "INSERT INTO landing_promotions (id, image_file, title, subtitle, button_text, button_link, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)",
-      [nextId, image_file_url, title, subtitle || '', button_text || null, button_link || '/login']
+      "INSERT INTO landing_promotions (id, image_file, title, subtitle, button_text, button_link, is_active, school_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+      [nextId, image_file_url, title, subtitle || '', button_text || null, button_link || '/login', schoolId]
     );
 
     return res.json({
@@ -88,7 +93,8 @@ export const deletePromotion = async (req, res) => {
       return res.status(400).json({ success: false, message: "Promotion ID is required." });
     }
 
-    await pool.query("DELETE FROM landing_promotions WHERE id = ?", [id]);
+    const schoolId = req.school_id || 1;
+    await pool.query("DELETE FROM landing_promotions WHERE id = ? AND school_id = ?", [id, schoolId]);
 
     return res.json({
       success: true,

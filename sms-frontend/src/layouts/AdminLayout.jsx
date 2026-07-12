@@ -6,7 +6,8 @@ import {
   BookOpen, CreditCard, UserCircle, Search, Receipt, 
   History, ClipboardList, GraduationCap, Layers, FileText,
   Library, Award, ChevronLeft, ChevronRight, MapPin,
-  Bell, Megaphone, Banknote, FileCheck2, Image
+  Bell, Megaphone, Banknote, FileCheck2, Image, Globe, Compass, School,
+  Server, Shield, LifeBuoy, Zap, FileSpreadsheet, Building, Package, Wrench, Key
 } from 'lucide-react'; 
 import { useAuth } from '../context/AuthContext';
 import UserProfileModal from '../components/admin/UserProfileModal'; 
@@ -14,7 +15,7 @@ import CreateAnnouncementModal from '../components/shared/CreateAnnouncementModa
 import ReadNotificationModal from '../components/shared/ReadNotificationModal';
 
 const AdminLayout = () => {
-  const { logout, user, branding, API_BASE_URL, getLogoUrl } = useAuth();
+  const { logout, user, branding, activePermissions, API_BASE_URL, getLogoUrl } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const [isCollapsed, setIsCollapsed] = useState(false); 
   const location = useLocation();
@@ -78,7 +79,13 @@ const AdminLayout = () => {
     }
   };
 
+  const activeSchoolId = localStorage.getItem('selected_school_id');
+
   const menuConfig = {
+    super_admin_global: [
+      { icon: <Globe size={20} />, label: 'Campuses', path: '/admin/schools' },
+      { icon: <LayoutDashboard size={20} />, label: 'Network Reports', path: '/admin/dashboard' },
+    ],
     admin: [
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/admin/dashboard' },
       { icon: <Users size={20} />, label: 'User Management', path: '/admin/users' },
@@ -88,31 +95,82 @@ const AdminLayout = () => {
     ],
     registrar: [
         { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/registrar/dashboard' },
-        { icon: <UserCircle size={20} />, label: 'Student Masterlist', path: '/registrar/students' },
+        { icon: <UserCircle size={20} />, label: 'Student Masterlist', path: '/registrar/students', module: 'students' },
         { type: 'header', label: 'Academics' }, 
-        { icon: <Library size={20} />, label: 'Academic Programs', path: '/registrar/programs' }, 
-        { icon: <BookOpen size={20} />, label: 'Subject Management', path: '/registrar/subjects'},
-        { icon: <GraduationCap size={20} />, label: 'Class Assignments', path: '/registrar/assignments' },
+        { icon: <Library size={20} />, label: 'Academic Programs', path: '/registrar/programs', module: 'programs' }, 
+        { icon: <BookOpen size={20} />, label: 'Subject Management', path: '/registrar/subjects', module: 'subjects' },
+        { icon: <GraduationCap size={20} />, label: 'Class Assignments', path: '/registrar/assignments', module: 'assignments' },
         { type: 'header', label: 'Enrollment & Requests' },
-        { icon: <ClipboardList size={20} />, label: 'Enrollment Module', path: '/registrar/enrollment' },
-        { icon: <FileText size={20} />, label: 'Student Requests', path: '/registrar/requests' }, 
-        { icon: <Award size={20} />, label: 'Scholarship Applications', path: '/registrar/scholarships' },
-        { icon: <Layers size={20} />, label: 'Section Management', path: '/registrar/sections' },
-        { icon: <FileCheck2 size={20} />, label: 'Student Grades', path: '/registrar/grades' },
+        { icon: <ClipboardList size={20} />, label: 'Enrollment Module', path: '/registrar/enrollment', module: 'enrollment' },
+        { icon: <FileText size={20} />, label: 'Student Requests', path: '/registrar/requests', module: 'requests' }, 
+        { icon: <Award size={20} />, label: 'Scholarship Applications', path: '/registrar/scholarships', module: 'scholarships' },
+        { icon: <Layers size={20} />, label: 'Section Management', path: '/registrar/sections', module: 'sections' },
+        { icon: <FileCheck2 size={20} />, label: 'Student Grades', path: '/registrar/grades', module: 'grades' },
     ],
-    cashier: [
-        { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/cashier/dashboard' },
-        { icon: <Search size={20} />, label: 'Student Billing', path: '/cashier/billing' },
-        { icon: <CreditCard size={20} />, label: 'Process Payment', path: '/cashier/payments' },
-        { icon: <Layers size={20} />, label: 'Fee Catalog', path: '/cashier/fees' },
-        { icon: <Receipt size={20} />, label: 'Scholarships', path: '/cashier/scholarships' },
-        { icon: <BookOpen size={20} />, label: 'Scholarship Catalog', path: '/cashier/scholarship-catalog' },
-        { icon: <History size={20} />, label: 'Collection Reports', path: '/cashier/reports' },
-        { icon: <Banknote size={20} />, label: 'Payroll', path: '/cashier/payroll' },
-      ]
+    hr: [
+      { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/hr/dashboard' },
+      { icon: <Users size={20} />, label: 'Employee Directory', path: '/hr/employees', module: 'employees' },
+      { icon: <Banknote size={20} />, label: 'Payroll Management', path: '/hr/payroll', module: 'payroll' },
+      { icon: <ClipboardList size={20} />, label: 'Attendance (DTR)', path: '/hr/attendance', module: 'attendance' }
+    ],
+    it: [
+      { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/it/dashboard' },
+      { icon: <Server size={20} />, label: 'Infrastructure', path: '/it/infrastructure', module: 'infrastructure' },
+      { icon: <Shield size={20} />, label: 'Security & Audits', path: '/it/security', module: 'security' },
+      { icon: <LifeBuoy size={20} />, label: 'Tech Support', path: '/it/support', module: 'support' }
+    ],
+    school_admin: [
+      { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/school-admin/dashboard' },
+      { icon: <Zap size={20} />, label: 'Utility Bills', path: '/school-admin/utilities', module: 'utilities' },
+      { icon: <FileSpreadsheet size={20} />, label: 'Service Contracts', path: '/school-admin/contracts', module: 'contracts' },
+      { icon: <Building size={20} />, label: 'Facilities Manage', path: '/school-admin/facilities', module: 'facilities' }
+    ],
+    custodian: [
+      { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/custodian/dashboard' },
+      { icon: <Package size={20} />, label: 'Inventory List', path: '/custodian/inventory', module: 'inventory' },
+      { icon: <Wrench size={20} />, label: 'Maintenance Coord', path: '/custodian/maintenance', module: 'maintenance' },
+      { icon: <Key size={20} />, label: 'Room Assets List', path: '/custodian/assets', module: 'assets' }
+    ]
   };
 
-  const currentMenu = menuConfig[user?.role] || [];
+  let currentMenu = [];
+  if (user?.role === 'super_admin') {
+    currentMenu = activeSchoolId ? menuConfig.admin : menuConfig.super_admin_global;
+  } else {
+    currentMenu = menuConfig[user?.role] || [];
+  }
+
+  const isModuleEnabled = (role, moduleName) => {
+    if (!activePermissions || activePermissions.length === 0) return true;
+    const perm = activePermissions.find(p => 
+      p.role.toLowerCase() === role.toLowerCase() && 
+      p.module_name.toLowerCase() === moduleName.toLowerCase()
+    );
+    return perm ? perm.is_enabled === 1 : false;
+  };
+
+  const filteredMenu = currentMenu.filter(item => {
+    if (item.type === 'header') return true;
+    if (!item.module) return true;
+    return isModuleEnabled(user?.role, item.module);
+  });
+
+  const finalMenu = [];
+  for (let i = 0; i < filteredMenu.length; i++) {
+    const currentItem = filteredMenu[i];
+    if (currentItem.type === 'header') {
+      let hasSubItems = false;
+      for (let j = i + 1; j < filteredMenu.length; j++) {
+        if (filteredMenu[j].type === 'header') break;
+        hasSubItems = true;
+      }
+      if (hasSubItems) {
+        finalMenu.push(currentItem);
+      }
+    } else {
+      finalMenu.push(currentItem);
+    }
+  }
 
   const getLogoSrc = () => {
     return getLogoUrl(branding?.school_logo);
@@ -148,20 +206,38 @@ const AdminLayout = () => {
           {/* LOGO HEADER */}
           <div className={`h-20 px-4 border-b border-slate-800 flex items-center shrink-0 transition-all ${isCollapsed ? 'lg:justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-3 overflow-hidden">
-              {branding.school_logo ? (
+              {activeSchoolId && branding.school_logo ? (
                 <img src={getLogoSrc()} alt="School Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg" />
               ) : (
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg" style={{ backgroundColor: branding.theme_color || '#2563eb' }}>{branding.school_name?.charAt(0)}</div>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg" style={{ backgroundColor: branding.theme_color || '#2563eb' }}>
+                  {activeSchoolId ? branding.school_name?.charAt(0) : 'N'}
+                </div>
               )}
               <span className={`text-[15px] leading-tight font-black text-white tracking-tight line-clamp-2 w-36 whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'lg:w-0 lg:opacity-0 lg:hidden' : 'opacity-100'}`}>
-                  {branding.school_name}
+                  {activeSchoolId ? branding.school_name : "Network Control"}
               </span>
             </div>
           </div>
 
+          {/* Super Admin Back to Network button */}
+          {user?.role === 'super_admin' && activeSchoolId && !isCollapsed && (
+            <div className="px-4 pt-4 shrink-0">
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('selected_school_id');
+                  window.location.href = '/admin/schools';
+                }}
+                className="w-full py-2.5 px-4 bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-wider transition-all border border-slate-800"
+              >
+                <Globe size={12} />
+                Exit Campus View
+              </button>
+            </div>
+          )}
+
           {/* NAVIGATION LIST */}
           <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {currentMenu.map((item, index) => {
+            {finalMenu.map((item, index) => {
               
               if (item.type === 'header') {
                   return (
@@ -212,6 +288,15 @@ const AdminLayout = () => {
           <div className="flex items-center space-x-4">
             <button className="p-2 lg:hidden text-slate-600" onClick={() => setIsSidebarOpen(true)}><Menu size={20} /></button>
             <h2 className="text-slate-800 font-black text-lg lg:text-xl capitalize">{location.pathname.split('/').pop()?.replace('-', ' ')}</h2>
+            {activeSchoolId ? (
+              <span className="hidden sm:inline-block px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                🏫 {branding.school_name}
+              </span>
+            ) : user?.role === 'super_admin' && (
+              <span className="hidden sm:inline-block px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                🌐 Global Control
+              </span>
+            )}
           </div>
 
           <div className="flex items-center">
@@ -296,7 +381,25 @@ const AdminLayout = () => {
 
         {/* CONTENT */}
         <div className="p-6 lg:p-10">
-          <div className="max-w-7xl mx-auto"><Outlet /></div>
+          <div className="max-w-7xl mx-auto">
+            {user?.role === 'super_admin' && !activeSchoolId && location.pathname !== '/admin/schools' ? (
+              <div className="h-[60vh] bg-white rounded-[2.5rem] p-12 text-center border border-slate-100 shadow-xl max-w-xl mx-auto flex flex-col items-center justify-center animate-in zoom-in duration-300">
+                <Compass className="text-blue-600 mb-4 animate-bounce" size={60} />
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">Active Campus Required</h3>
+                <p className="text-slate-500 mt-2 max-w-sm font-medium">
+                  Upang pamahalaan ang mga kwarto, branding, o users, kailangan mo munang pumili ng aktibong campus sa Campus Registry.
+                </p>
+                <Link 
+                  to="/admin/schools" 
+                  className="mt-6 px-8 py-3.5 bg-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 hover:scale-105 active:scale-95 transition-all text-xs uppercase tracking-widest"
+                >
+                  Go to Campus Registry
+                </Link>
+              </div>
+            ) : (
+              <Outlet />
+            )}
+          </div>
         </div>
       </main>
 
