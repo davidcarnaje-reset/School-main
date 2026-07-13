@@ -16,6 +16,7 @@ import {
   Receipt,
   BookOpen,
   Banknote,
+  ShieldAlert
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import CreateAnnouncementModal from "../components/shared/CreateAnnouncementModal";
@@ -93,7 +94,7 @@ const CashierLayout = () => {
   ];
 
   const isModuleEnabled = (role, moduleName) => {
-    if (!activePermissions || activePermissions.length === 0) return true;
+    if (activePermissions === null) return false;
     const perm = activePermissions.find(p => 
       p.role.toLowerCase() === role.toLowerCase() && 
       p.module_name.toLowerCase() === moduleName.toLowerCase()
@@ -101,9 +102,18 @@ const CashierLayout = () => {
     return perm ? perm.is_enabled === 1 : false;
   };
 
-  const filteredMenuItems = menuItems.filter(item => {
+  const isCurrentPortalEnabled = () => {
+    if (activePermissions === null) return true; // Wait for load
+    const rolePerms = activePermissions.filter(p => p.role.toLowerCase() === 'cashier');
+    if (rolePerms.length === 0) return true;
+    return rolePerms.some(p => p.is_enabled === 1);
+  };
+
+  const portalEnabled = isCurrentPortalEnabled();
+
+  const filteredMenuItems = !portalEnabled ? [] : menuItems.filter(item => {
     if (!item.module) return true;
-    return isModuleEnabled(user?.role, item.module);
+    return isModuleEnabled("cashier", item.module);
   });
 
   return (
@@ -308,7 +318,21 @@ const CashierLayout = () => {
         </header>
 
         <div className="flex-1 overflow-y-auto no-scrollbar pt-2 px-4 lg:px-8 pb-10">
-          <Outlet />
+          {!portalEnabled ? (
+            <div className="h-[60vh] bg-white rounded-[2.5rem] p-12 text-center border border-slate-100 shadow-xl max-w-xl mx-auto flex flex-col items-center justify-center mt-8 animate-in zoom-in duration-300">
+              <ShieldAlert className="text-amber-500 mb-4 animate-bounce" size={60} />
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight">Portal Access Disabled</h3>
+              <p className="text-slate-500 mt-2 max-w-sm font-medium">
+                Ang portal na ito ay kasalukuyang naka-disable para sa inyong campus. Mangyaring makipag-ugnayan sa Super Admin upang i-enable ito.
+              </p>
+              <div className="mt-4 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold uppercase tracking-wider border border-amber-100 flex items-center gap-2">
+                <ShieldAlert size={14} />
+                Please contact Super Admin
+              </div>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </div>
       </main>
 

@@ -7,7 +7,9 @@ import {
   History, ClipboardList, GraduationCap, Layers, FileText,
   Library, Award, ChevronLeft, ChevronRight, MapPin,
   Bell, Megaphone, Banknote, FileCheck2, Image, Globe, Compass, School,
-  Server, Shield, LifeBuoy, Zap, FileSpreadsheet, Building, Package, Wrench, Key
+  Server, Shield, LifeBuoy, Zap, FileSpreadsheet, Building, Package, Wrench, Key, Sliders,
+  Laptop, HelpCircle, BarChart2, Activity, ShieldAlert,
+  UserCheck, FolderOpen, AlertCircle, CheckCircle2, Heart
 } from 'lucide-react'; 
 import { useAuth } from '../context/AuthContext';
 import UserProfileModal from '../components/admin/UserProfileModal'; 
@@ -79,7 +81,9 @@ const AdminLayout = () => {
     }
   };
 
-  const activeSchoolId = localStorage.getItem('selected_school_id');
+  const activeSchoolId = user?.role === 'super_admin'
+    ? localStorage.getItem('selected_school_id')
+    : (localStorage.getItem('selected_school_id') || (user ? user.school_id : null));
 
   const menuConfig = {
     super_admin_global: [
@@ -92,6 +96,7 @@ const AdminLayout = () => {
       { icon: <Settings size={20} />, label: 'Branding Engine', path: '/admin/branding' },
       { icon: <Image size={20} />, label: 'Landing Banners', path: '/admin/promotions' },
       { icon: <MapPin size={20} />, label: 'Room Management', path: '/admin/rooms' },
+      { icon: <Sliders size={20} />, label: 'Module Settings', path: '/admin/permissions' },
     ],
     registrar: [
         { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/registrar/dashboard' },
@@ -110,14 +115,30 @@ const AdminLayout = () => {
     hr: [
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/hr/dashboard' },
       { icon: <Users size={20} />, label: 'Employee Directory', path: '/hr/employees', module: 'employees' },
-      { icon: <Banknote size={20} />, label: 'Payroll Management', path: '/hr/payroll', module: 'payroll' },
-      { icon: <ClipboardList size={20} />, label: 'Attendance (DTR)', path: '/hr/attendance', module: 'attendance' }
+      { icon: <UserCheck size={20} />, label: 'Onboarding Hires', path: '/hr/onboarding', module: 'onboarding' },
+      { icon: <ClipboardList size={20} />, label: 'Attendance (DTR)', path: '/hr/attendance', module: 'attendance' },
+      { icon: <FileText size={20} />, label: 'Leave Requests', path: '/hr/leave', module: 'leave' },
+      { icon: <Banknote size={20} />, label: 'Payroll Support', path: '/hr/payroll-support', module: 'payroll_support' },
+      { icon: <Award size={20} />, label: 'Evaluations (KPI)', path: '/hr/performance', module: 'performance' },
+      { icon: <BookOpen size={20} />, label: 'Staff Training', path: '/hr/training', module: 'training' },
+      { icon: <FolderOpen size={20} />, label: 'Employee 201 Files', path: '/hr/documents', module: 'documents' },
+      { icon: <AlertCircle size={20} />, label: 'Disciplinary Cases', path: '/hr/disciplinary', module: 'disciplinary' },
+      { icon: <CheckCircle2 size={20} />, label: 'Clearance Status', path: '/hr/clearance', module: 'clearance' },
+      { icon: <Heart size={20} />, label: 'Benefits & HMO', path: '/hr/benefits', module: 'benefits' },
+      { icon: <BarChart2 size={20} />, label: 'HR Analytics Reports', path: '/hr/reports', module: 'reports' }
     ],
     it: [
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/it/dashboard' },
-      { icon: <Server size={20} />, label: 'Infrastructure', path: '/it/infrastructure', module: 'infrastructure' },
-      { icon: <Shield size={20} />, label: 'Security & Audits', path: '/it/security', module: 'security' },
-      { icon: <LifeBuoy size={20} />, label: 'Tech Support', path: '/it/support', module: 'support' }
+      { icon: <LifeBuoy size={20} />, label: 'Help Desk / Tickets', path: '/it/helpdesk', module: 'helpdesk' },
+      { icon: <Package size={20} />, label: 'Hardware Inventory', path: '/it/inventory', module: 'inventory' },
+      { icon: <Laptop size={20} />, label: 'Asset Borrowing', path: '/it/borrowing', module: 'borrowing' },
+      { icon: <Wrench size={20} />, label: 'System Maintenance', path: '/it/maintenance', module: 'maintenance' },
+      { icon: <Layers size={20} />, label: 'Software Licenses', path: '/it/software', module: 'software' },
+      { icon: <Activity size={20} />, label: 'Network Monitoring', path: '/it/network', module: 'network' },
+      { icon: <HelpCircle size={20} />, label: 'User Support', path: '/it/support', module: 'support' },
+      { icon: <Megaphone size={20} />, label: 'Announcements', path: '/it/announcements', module: 'announcements' },
+      { icon: <BarChart2 size={20} />, label: 'IT Reports', path: '/it/reports', module: 'reports' },
+      { icon: <Shield size={20} />, label: 'Audit Security Logs', path: '/it/audits', module: 'audits' }
     ],
     school_admin: [
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/school-admin/dashboard' },
@@ -141,7 +162,7 @@ const AdminLayout = () => {
   }
 
   const isModuleEnabled = (role, moduleName) => {
-    if (!activePermissions || activePermissions.length === 0) return true;
+    if (activePermissions === null) return false;
     const perm = activePermissions.find(p => 
       p.role.toLowerCase() === role.toLowerCase() && 
       p.module_name.toLowerCase() === moduleName.toLowerCase()
@@ -149,7 +170,17 @@ const AdminLayout = () => {
     return perm ? perm.is_enabled === 1 : false;
   };
 
-  const filteredMenu = currentMenu.filter(item => {
+  const isCurrentPortalEnabled = () => {
+    if (user?.role === 'super_admin' || user?.role === 'admin') return true;
+    if (activePermissions === null) return true; // Wait for permissions to load
+    const rolePerms = activePermissions.filter(p => p.role.toLowerCase() === user.role.toLowerCase());
+    if (rolePerms.length === 0) return true;
+    return rolePerms.some(p => p.is_enabled === 1);
+  };
+
+  const portalEnabled = isCurrentPortalEnabled();
+
+  const filteredMenu = !portalEnabled ? [] : currentMenu.filter(item => {
     if (item.type === 'header') return true;
     if (!item.module) return true;
     return isModuleEnabled(user?.role, item.module);
@@ -210,11 +241,11 @@ const AdminLayout = () => {
                 <img src={getLogoSrc()} alt="School Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg" />
               ) : (
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg" style={{ backgroundColor: branding.theme_color || '#2563eb' }}>
-                  {activeSchoolId ? branding.school_name?.charAt(0) : 'N'}
+                  {activeSchoolId ? branding.school_name?.charAt(0) : 'S'}
                 </div>
               )}
               <span className={`text-[15px] leading-tight font-black text-white tracking-tight line-clamp-2 w-36 whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'lg:w-0 lg:opacity-0 lg:hidden' : 'opacity-100'}`}>
-                  {activeSchoolId ? branding.school_name : "Network Control"}
+                  {activeSchoolId ? branding.school_name : "School Management System"}
               </span>
             </div>
           </div>
@@ -382,7 +413,19 @@ const AdminLayout = () => {
         {/* CONTENT */}
         <div className="p-6 lg:p-10">
           <div className="max-w-7xl mx-auto">
-            {user?.role === 'super_admin' && !activeSchoolId && location.pathname !== '/admin/schools' ? (
+            {!portalEnabled ? (
+              <div className="h-[60vh] bg-white rounded-[2.5rem] p-12 text-center border border-slate-100 shadow-xl max-w-xl mx-auto flex flex-col items-center justify-center animate-in zoom-in duration-300">
+                <ShieldAlert className="text-amber-500 mb-4 animate-bounce" size={60} />
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">Portal Access Disabled</h3>
+                <p className="text-slate-500 mt-2 max-w-sm font-medium">
+                  Ang portal na ito ay kasalukuyang naka-disable para sa inyong campus. Mangyaring makipag-ugnayan sa Super Admin upang i-enable ito.
+                </p>
+                <div className="mt-4 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold uppercase tracking-wider border border-amber-100 flex items-center gap-2">
+                  <ShieldAlert size={14} />
+                  Please contact Super Admin
+                </div>
+              </div>
+            ) : user?.role === 'super_admin' && !activeSchoolId && location.pathname !== '/admin/schools' ? (
               <div className="h-[60vh] bg-white rounded-[2.5rem] p-12 text-center border border-slate-100 shadow-xl max-w-xl mx-auto flex flex-col items-center justify-center animate-in zoom-in duration-300">
                 <Compass className="text-blue-600 mb-4 animate-bounce" size={60} />
                 <h3 className="text-2xl font-black text-slate-800 tracking-tight">Active Campus Required</h3>

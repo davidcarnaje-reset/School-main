@@ -98,6 +98,14 @@ const Login = ({ portal }) => {
           navigate('/teacher/dashboard');
         } else if (userRole === 'student') {
           navigate('/student/dashboard');
+        } else if (userRole === 'it') {
+          navigate('/it/dashboard');
+        } else if (userRole === 'hr') {
+          navigate('/hr/dashboard');
+        } else if (userRole === 'school_admin') {
+          navigate('/school-admin/dashboard');
+        } else if (userRole === 'custodian') {
+          navigate('/custodian/dashboard');
         } else {
           setError("Access denied: Invalid application role mapping configuration.");
           setUser(null);

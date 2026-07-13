@@ -1,24 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { X, Loader2, ShieldCheck, AlertTriangle, Sliders, Cpu, UserCheck, Briefcase, Key, Compass, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, ShieldCheck, AlertTriangle, Sliders, Cpu, UserCheck, Briefcase, Key, Compass, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const SchoolPermissionsModal = ({ isOpen, onClose, school }) => {
-  const { API_BASE_URL, fetchPermissions } = useAuth();
+const SchoolPermissions = () => {
+  const { API_BASE_URL, fetchPermissions, branding } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [permissions, setPermissions] = useState([]);
   
   // Accordion state to collapse/expand roles configurations
   const [activeSection, setActiveSection] = useState('hr');
+  
+  const activeSchoolId = localStorage.getItem('selected_school_id');
 
-  // Fetch school permissions when modal opens
+  // Fetch school permissions on mount
   useEffect(() => {
-    if (isOpen && school) {
+    if (activeSchoolId) {
       const getPermissions = async () => {
         try {
           setLoading(true);
-          const res = await axios.get(`${API_BASE_URL}/schools/${school.id}/permissions`);
+          const res = await axios.get(`${API_BASE_URL}/schools/${activeSchoolId}/permissions`);
           if (res.data.success) {
             setPermissions(res.data.permissions);
           }
@@ -30,9 +32,15 @@ const SchoolPermissionsModal = ({ isOpen, onClose, school }) => {
       };
       getPermissions();
     }
-  }, [isOpen, school]);
+  }, [activeSchoolId]);
 
-  if (!isOpen || !school) return null;
+  if (!activeSchoolId) {
+    return (
+      <div className="p-8 text-center text-slate-500 font-bold">
+        Mangyaring pumili muna ng active school campus sa Campus Registry.
+      </div>
+    );
+  }
 
   // Group permissions helper
   const getPermission = (role, moduleName) => {
@@ -105,13 +113,12 @@ const SchoolPermissionsModal = ({ isOpen, onClose, school }) => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const res = await axios.post(`${API_BASE_URL}/schools/${school.id}/permissions`, {
+      const res = await axios.post(`${API_BASE_URL}/schools/${activeSchoolId}/permissions`, {
         permissions: permissions
       });
       if (res.data.success) {
-        fetchPermissions(school.id);
+        fetchPermissions(activeSchoolId);
         alert("Campus role configuration and modules updated successfully!");
-        onClose();
       }
     } catch (error) {
       console.error("Error saving school permissions:", error);
@@ -197,99 +204,96 @@ const SchoolPermissionsModal = ({ isOpen, onClose, school }) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[150] p-4 animate-in fade-in duration-300">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        
-        {/* MODAL HEADER */}
-        <div className="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
-              <Sliders size={22} />
-            </div>
-            <div>
-              <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight leading-tight">Roles & Module Config</h2>
-              <p className="text-slate-400 text-xs font-medium mt-0.5">Manage modular features for <span className="text-blue-600 font-bold">{school.name}</span></p>
-            </div>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="w-10 h-10 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors"
-          >
-            <X size={20} />
-          </button>
+    <div className="p-6 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+      
+      {/* PAGE HEADER */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <Sliders className="text-blue-600" size={32} />
+            Roles & Module Settings
+          </h1>
+          <p className="text-sm font-medium text-slate-500 mt-1">
+            Configure active portal systems and module assignments for <span className="text-blue-600 font-bold">{branding?.school_name}</span>.
+          </p>
         </div>
+        <button 
+          onClick={handleSave} 
+          disabled={loading || saving}
+          className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition-all shadow-xl shadow-blue-200 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+        >
+          {saving && <Loader2 className="animate-spin" size={14} />}
+          Save Configuration
+        </button>
+      </div>
 
-        {/* MODAL BODY */}
-        <div className="flex-grow p-6 md:p-8 overflow-y-auto space-y-6">
-          {loading ? (
-            <div className="h-80 flex flex-col items-center justify-center text-slate-400">
-              <Loader2 className="animate-spin mb-4" size={40} />
-              <p className="text-sm font-bold uppercase tracking-widest">Loading configuration...</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {rolesConfig.map((roleObj) => {
-                const isExpanded = activeSection === roleObj.key;
-                const isEnabled = isRoleEnabled(roleObj.key);
+      {loading ? (
+        <div className="h-80 flex flex-col items-center justify-center text-slate-400">
+          <Loader2 className="animate-spin mb-4" size={40} />
+          <p className="text-sm font-bold uppercase tracking-widest">Loading configuration...</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {rolesConfig.map((roleObj) => {
+            const isExpanded = activeSection === roleObj.key;
+            const isEnabled = isRoleEnabled(roleObj.key);
 
-                return (
-                  <div 
-                    key={roleObj.key}
-                    className={`border rounded-3xl overflow-hidden transition-all duration-300 ${isExpanded ? 'border-blue-200 shadow-lg shadow-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200'}`}
-                  >
-                    {/* ACCORDION HEADER */}
+            return (
+              <div 
+                key={roleObj.key}
+                className={`border rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isExpanded ? 'border-blue-200 shadow-xl shadow-blue-50/20' : 'border-slate-100 hover:border-slate-200'}`}
+              >
+                {/* SECTION HEADER */}
+                <div 
+                  className={`p-5 flex items-center justify-between gap-4 cursor-pointer select-none ${isExpanded ? 'bg-blue-50/10' : 'bg-white'}`}
+                  onClick={() => setActiveSection(isExpanded ? null : roleObj.key)}
+                >
+                  <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 shrink-0 shadow-sm">
+                      {roleObj.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-black text-slate-800 tracking-tight leading-tight">{roleObj.title}</h3>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${isEnabled ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400'}`}>
+                          {isEnabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] font-medium mt-1 leading-normal line-clamp-1">{roleObj.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => toggleRoleStatus(roleObj.key, !isEnabled)}
+                      className={`w-11 h-6.5 rounded-full p-0.5 transition-all duration-300 ${isEnabled ? 'bg-blue-600' : 'bg-slate-200'}`}
+                    >
+                      <div className={`w-5.5 h-5.5 rounded-full bg-white transition-all transform ${isEnabled ? 'translate-x-4.5' : 'translate-x-0'}`} />
+                    </button>
+                    
                     <div 
-                      className={`p-5 flex items-center justify-between gap-4 cursor-pointer select-none ${isExpanded ? 'bg-blue-50/20' : 'bg-white'}`}
+                      className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 cursor-pointer"
                       onClick={() => setActiveSection(isExpanded ? null : roleObj.key)}
                     >
-                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100 shrink-0 shadow-sm">
-                          {roleObj.icon}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-base font-black text-slate-800 tracking-tight leading-tight">{roleObj.title}</h3>
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${isEnabled ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400'}`}>
-                              {isEnabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                          </div>
-                          <p className="text-slate-400 text-[11px] font-medium mt-1 leading-normal line-clamp-1">{roleObj.description}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                        {/* Global Switch for the role */}
-                        <button
-                          type="button"
-                          onClick={() => toggleRoleStatus(roleObj.key, !isEnabled)}
-                          className={`w-11 h-6.5 rounded-full p-0.5 transition-all duration-300 ${isEnabled ? 'bg-blue-600' : 'bg-slate-200'}`}
-                        >
-                          <div className={`w-5.5 h-5.5 rounded-full bg-white transition-all transform ${isEnabled ? 'translate-x-4.5' : 'translate-x-0'}`} />
-                        </button>
-                        
-                        <div 
-                          className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 cursor-pointer"
-                          onClick={() => setActiveSection(isExpanded ? null : roleObj.key)}
-                        >
-                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </div>
-                      </div>
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
+                  </div>
+                </div>
 
-                    {/* ACCORDION CONTENT */}
-                    {isExpanded && (
-                      <div className="p-6 border-t border-slate-100 bg-slate-50/50 space-y-4 animate-in slide-in-from-top-2 duration-300">
-                        {/* Auto payroll disabled warning badge */}
-                        {roleObj.key === 'hr' && isEnabled && (
-                          <div className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl flex items-start gap-2 text-xs font-bold leading-relaxed">
-                            <AlertTriangle size={16} className="shrink-0 mt-0.5 text-blue-600" />
-                            <span>
-                              Ang pag-enable sa HR portal ay awtomatikong magdi-disable sa <strong>Payroll module sa Cashier</strong> upang maiwasan ang conflict.
-                            </span>
-                          </div>
-                        )}
+                {/* SECTION MODULES CONTENT */}
+                {isExpanded && (
+                  <div className="p-6 border-t border-slate-100 bg-slate-50/30 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                    {roleObj.key === 'hr' && isEnabled && (
+                      <div className="p-3.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl flex items-start gap-2.5 text-xs font-bold leading-relaxed">
+                        <AlertTriangle size={16} className="shrink-0 mt-0.5 text-blue-600" />
+                        <span>
+                          Ang pag-enable sa HR portal ay awtomatikong magdi-disable sa <strong>Payroll module sa Cashier</strong> upang maiwasan ang conflict.
+                        </span>
+                      </div>
+                    )}
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                         {permissions
                           .filter((p) => p.role.toLowerCase() === roleObj.key.toLowerCase())
                           .map((p) => (
@@ -314,37 +318,15 @@ const SchoolPermissionsModal = ({ isOpen, onClose, school }) => {
                             </div>
                           ))}
                       </div>
-                      </div>
-                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                )}
+              </div>
+            );
+          })}
         </div>
-
-        {/* MODAL FOOTER */}
-        <div className="p-6 md:p-8 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 shrink-0">
-          <button 
-            onClick={onClose} 
-            disabled={saving}
-            className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-xl text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={handleSave} 
-            disabled={loading || saving}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-200 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-          >
-            {saving && <Loader2 className="animate-spin" size={14} />}
-            Save Settings
-          </button>
-        </div>
-
-      </div>
+      )}
     </div>
   );
 };
 
-export default SchoolPermissionsModal;
+export default SchoolPermissions;

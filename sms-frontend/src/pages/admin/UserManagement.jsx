@@ -290,6 +290,9 @@ const UserManagement = () => {
                     <option value="registrar">Registrar</option>
                     <option value="cashier">Cashier</option>
                     <option value="it">IT</option>
+                    <option value="hr">Human Resources (HR)</option>
+                    <option value="school_admin">School Admin</option>
+                    <option value="custodian">Custodian</option>
                     <option value="admin">Administrator</option>
                     <option value="Teacher">Teacher</option>
                   </select>

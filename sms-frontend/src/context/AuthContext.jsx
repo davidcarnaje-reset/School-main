@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
     school_logo: null
   });
 
-  const [activePermissions, setActivePermissions] = useState([]);
+  const [activePermissions, setActivePermissions] = useState(null);
 
   // ====================================================================
   // ARCHITECT'S CORE ROUTING LAYER

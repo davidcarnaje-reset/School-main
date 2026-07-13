@@ -90,6 +90,35 @@ import RoomManagement from './pages/admin/RoomManagement';
 import CashierLayout from './layouts/CashierLayout';
 import LandingPromotions from './pages/admin/LandingPromotions';
 import SchoolManagement from './pages/admin/SchoolManagement';
+import SchoolPermissions from './pages/admin/SchoolPermissions';
+
+// IT Pages
+import ItDashboard from './pages/it/ItDashboard';
+import ItHelpDesk from './pages/it/ItHelpDesk';
+import ItInventory from './pages/it/ItInventory';
+import ItBorrowing from './pages/it/ItBorrowing';
+import ItMaintenance from './pages/it/ItMaintenance';
+import ItSoftware from './pages/it/ItSoftware';
+import ItNetwork from './pages/it/ItNetwork';
+import ItUserSupport from './pages/it/ItUserSupport';
+import ItAnnouncements from './pages/it/ItAnnouncements';
+import ItReports from './pages/it/ItReports';
+import ItAuditLogs from './pages/it/ItAuditLogs';
+
+// HR Pages
+import HrDashboard from './pages/hr/HrDashboard';
+import HrEmployees from './pages/hr/HrEmployees';
+import HrOnboarding from './pages/hr/HrOnboarding';
+import HrAttendance from './pages/hr/HrAttendance';
+import HrLeave from './pages/hr/HrLeave';
+import HrPayrollSupport from './pages/hr/HrPayrollSupport';
+import HrPerformance from './pages/hr/HrPerformance';
+import HrTraining from './pages/hr/HrTraining';
+import HrDocuments from './pages/hr/HrDocuments';
+import HrDisciplinary from './pages/hr/HrDisciplinary';
+import HrClearance from './pages/hr/HrClearance';
+import HrBenefits from './pages/hr/HrBenefits';
+import HrReports from './pages/hr/HrReports';
 
 
 // Placeholder Components
@@ -100,176 +129,9 @@ const AdminDashboard = () => (
   </div>
 );
 
-const HrDashboard = () => (
-  <div className="space-y-8 animate-in fade-in duration-500">
-    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[2rem] p-8 text-white shadow-xl shadow-blue-100/50">
-      <h1 className="text-3xl font-black tracking-tight leading-none">HR Command Center</h1>
-      <p className="mt-2 text-blue-100 font-medium text-sm">Pamahalaan ang mga empleyado, payroll structures, at daily time records (DTR).</p>
-    </div>
-    
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Employees</p>
-          <h3 className="text-3xl font-black text-slate-800 mt-1">42</h3>
-        </div>
-        <p className="text-xs text-emerald-500 font-bold">● 38 Active today</p>
-      </div>
+// HR Portal Placeholder Components is removed as they are fully built standalone pages now
 
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pending DTR Leaves</p>
-          <h3 className="text-3xl font-black text-slate-800 mt-1">3</h3>
-        </div>
-        <p className="text-xs text-blue-500 font-bold">Requires your approval</p>
-      </div>
-
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current Payroll Batch</p>
-          <h3 className="text-3xl font-black text-slate-800 mt-1">July 15</h3>
-        </div>
-        <p className="text-xs text-slate-500 font-bold">Status: Processing</p>
-      </div>
-    </div>
-  </div>
-);
-
-const HrEmployees = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Employee Directory</h2>
-      <p className="text-slate-400 text-sm font-medium">Listahan at pamamahala ng mga faculty at non-teaching staff.</p>
-    </div>
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
-            <th className="py-4">Name</th>
-            <th className="py-4">Department</th>
-            <th className="py-4">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-50 text-sm font-medium text-slate-700">
-          <tr>
-            <td className="py-4">Jackie Mendoza</td>
-            <td className="py-4">Registrar's Office</td>
-            <td className="py-4"><span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">Active</span></td>
-          </tr>
-          <tr>
-            <td className="py-4">Julliana Santos</td>
-            <td className="py-4">Academic Faculty</td>
-            <td className="py-4"><span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">Active</span></td>
-          </tr>
-          <tr>
-            <td className="py-4">Myoui Mina</td>
-            <td className="py-4">Finance / Cashier</td>
-            <td className="py-4"><span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">Active</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
-const HrPayroll = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Payroll Management</h2>
-      <p className="text-slate-400 text-sm font-medium">Pamamahala ng sahod, tax deductions, at payslips.</p>
-    </div>
-    <div className="p-8 rounded-[2rem] bg-slate-50 border border-slate-200 text-center">
-      <p className="text-slate-500 font-medium">Ang payroll system ay aktibo. Maaari ka nang mag-generate ng payslips para sa darating na kinsenas.</p>
-      <button className="mt-4 px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-md hover:scale-105 transition-all text-xs uppercase tracking-wider">Generate Payslips</button>
-    </div>
-  </div>
-);
-
-const HrAttendance = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Attendance & DTR</h2>
-      <p className="text-slate-400 text-sm font-medium">Daily Time Record tracking at mga kahilingan sa leave.</p>
-    </div>
-    <div className="p-8 rounded-[2rem] bg-slate-50 border border-slate-200 text-center">
-      <p className="text-slate-500 font-medium">Walang pending na time correction requests sa ngayon.</p>
-    </div>
-  </div>
-);
-
-// IT Portal Placeholder Components
-const ItDashboard = () => (
-  <div className="space-y-8 animate-in fade-in duration-500">
-    <div className="bg-gradient-to-r from-slate-800 to-slate-950 rounded-[2rem] p-8 text-white shadow-xl">
-      <h1 className="text-3xl font-black tracking-tight leading-none">IT Admin Command Center</h1>
-      <p className="mt-2 text-slate-300 font-medium text-sm">Monitor network infrastructure, configure security protocols, and review tech tickets.</p>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Server Health</p>
-          <h3 className="text-2xl font-black text-emerald-500 mt-1">99.98%</h3>
-        </div>
-        <p className="text-xs text-slate-500 font-bold">All nodes operational</p>
-      </div>
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Security Alerts</p>
-          <h3 className="text-2xl font-black text-slate-800 mt-1">0</h3>
-        </div>
-        <p className="text-xs text-emerald-500 font-bold">No breaches detected</p>
-      </div>
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Open Tickets</p>
-          <h3 className="text-2xl font-black text-slate-800 mt-1">2</h3>
-        </div>
-        <p className="text-xs text-blue-500 font-bold">Assign to technician</p>
-      </div>
-    </div>
-  </div>
-);
-
-const ItInfrastructure = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">System & Servers Configuration</h2>
-      <p className="text-slate-400 text-sm font-medium">Manage deployment variables and database replication health.</p>
-    </div>
-    <div className="p-8 rounded-[2rem] bg-slate-50 border border-slate-200">
-      <p className="text-slate-600 font-medium text-sm">Database Uptime: <strong className="text-emerald-600">32 days</strong></p>
-      <p className="text-slate-600 font-medium text-sm mt-2">Active Server Nodes: <strong>3 Nodes (Load Balanced)</strong></p>
-    </div>
-  </div>
-);
-
-const ItSecurity = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Security & Audit Logs</h2>
-      <p className="text-slate-400 text-sm font-medium">Inspect authentication sheets and detect anomalies.</p>
-    </div>
-    <div className="p-6 rounded-[2rem] bg-slate-50 border border-slate-200">
-      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Recent Logs</p>
-      <ul className="text-xs space-y-2 text-slate-600 font-semibold font-mono">
-        <li>[00:15:32] USER "admin" logged in from 192.168.1.1</li>
-        <li>[23:45:01] BACKUP task triggered successfully</li>
-      </ul>
-    </div>
-  </div>
-);
-
-const ItSupport = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Tech Support Tickets</h2>
-      <p className="text-slate-400 text-sm font-medium">Resolve campus IT concerns and staff requests.</p>
-    </div>
-    <div className="p-8 rounded-[2rem] bg-slate-50 border border-slate-200 text-center text-slate-500 font-medium text-sm">
-      Walang pending na technical tickets sa kasalukuyan.
-    </div>
-  </div>
-);
+// IT Portal Placeholder Components is removed as they are fully built standalone pages now
 
 // School Admin Portal Placeholder Components
 const SchoolAdminDashboard = () => (
@@ -452,6 +314,7 @@ function App() {
             <Route path="rooms" element={<RoomManagement />} />
             <Route path="promotions" element={<LandingPromotions />} />
             <Route path="schools" element={<SchoolManagement />} />
+            <Route path="permissions" element={<SchoolPermissions />} />
           </Route>
 
           {/* 4. CASHIER ROUTES */}
@@ -540,8 +403,17 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<HrDashboard />} />
             <Route path="employees" element={<HrEmployees />} />
-            <Route path="payroll" element={<HrPayroll />} />
+            <Route path="onboarding" element={<HrOnboarding />} />
             <Route path="attendance" element={<HrAttendance />} />
+            <Route path="leave" element={<HrLeave />} />
+            <Route path="payroll-support" element={<HrPayrollSupport />} />
+            <Route path="performance" element={<HrPerformance />} />
+            <Route path="training" element={<HrTraining />} />
+            <Route path="documents" element={<HrDocuments />} />
+            <Route path="disciplinary" element={<HrDisciplinary />} />
+            <Route path="clearance" element={<HrClearance />} />
+            <Route path="benefits" element={<HrBenefits />} />
+            <Route path="reports" element={<HrReports />} />
           </Route>
 
           {/* =======================================================
@@ -554,9 +426,16 @@ function App() {
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<ItDashboard />} />
-            <Route path="infrastructure" element={<ItInfrastructure />} />
-            <Route path="security" element={<ItSecurity />} />
-            <Route path="support" element={<ItSupport />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
+            <Route path="inventory" element={<ItInventory />} />
+            <Route path="borrowing" element={<ItBorrowing />} />
+            <Route path="maintenance" element={<ItMaintenance />} />
+            <Route path="software" element={<ItSoftware />} />
+            <Route path="network" element={<ItNetwork />} />
+            <Route path="support" element={<ItUserSupport />} />
+            <Route path="announcements" element={<ItAnnouncements />} />
+            <Route path="reports" element={<ItReports />} />
+            <Route path="audits" element={<ItAuditLogs />} />
           </Route>
 
           {/* =======================================================

@@ -6,7 +6,15 @@ const PublicRoute = ({ children }) => {
 
   if (user && user.role) {
     const userRole = user.role.toLowerCase();
-    const targetPath = (userRole === 'super_admin' || userRole === 'admin') ? '/admin/dashboard' : `/${userRole}/dashboard`;
+    let targetPath = `/${userRole}/dashboard`;
+    if (userRole === 'super_admin') {
+      const activeSchoolId = localStorage.getItem('selected_school_id');
+      targetPath = activeSchoolId ? '/admin/dashboard' : '/admin/schools';
+    } else if (userRole === 'admin') {
+      targetPath = '/admin/dashboard';
+    } else if (userRole === 'school_admin') {
+      targetPath = '/school-admin/dashboard';
+    }
     return <Navigate to={targetPath} replace />;
   }
 
