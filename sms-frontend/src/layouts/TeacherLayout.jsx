@@ -342,7 +342,7 @@ const TeacherLayout = () => {
             onMouseLeave={(e) => removeHover(e, isProfileActive)}
           >
             <div className="w-10 h-10 rounded-full shrink-0 overflow-hidden border-2 border-white shadow-sm">
-              {user?.profile_image ? (
+              {user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? (
                 <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover" alt="Avatar" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-xs font-black text-white" style={{ backgroundColor: themeColor }}>
@@ -476,7 +476,7 @@ const TeacherLayout = () => {
                 <p className="text-[9px] font-bold uppercase mt-1 tracking-widest" style={{ color: themeColor }}>System Verified</p>
               </div>
               <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white shadow-sm shrink-0" style={{ backgroundColor: themeColor }}>
-                {user?.profile_image ? <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-white">{user?.full_name?.charAt(0) || 'U'}</div>}
+                {user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-white">{user?.full_name?.charAt(0) || 'U'}</div>}
               </div>
             </div>
           </div>

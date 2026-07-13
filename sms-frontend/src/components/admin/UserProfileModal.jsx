@@ -72,11 +72,11 @@ const UserProfileModal = ({ isOpen, onClose, user, branding, logout }) => {
               <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 border-4 border-slate-50 shadow-md">
                 {imagePreview ? (
                   <img src={imagePreview} className="w-full h-full object-cover" alt="Preview"/>
-                ) : user?.profile_image ? (
+                ) : user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? (
                   <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover" alt="Current"/>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-4xl font-black text-slate-300">
-                    {user?.full_name?.charAt(0)}
+                    {user?.full_name?.charAt(0) || user?.name?.charAt(0) || 'U'}
                   </div>
                 )}
               </div>

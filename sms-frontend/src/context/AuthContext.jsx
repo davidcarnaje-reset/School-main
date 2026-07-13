@@ -21,11 +21,17 @@ export const AuthProvider = ({ children }) => {
   // ====================================================================
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-  // Global Axios interceptor to automatically add school ID and Authorization header
   axios.interceptors.request.use((config) => {
-    const schoolId = localStorage.getItem('selected_school_id') || 
-                     (sessionStorage.getItem('user') ? JSON.parse(sessionStorage.getItem('user')).school_id : null) ||
-                     (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).school_id : null);
+    let currentUser = null;
+    try {
+      const saved = sessionStorage.getItem('user') || localStorage.getItem('user');
+      if (saved) currentUser = JSON.parse(saved);
+    } catch (e) {}
+
+    const schoolId = currentUser && currentUser.role !== 'super_admin'
+      ? currentUser.school_id
+      : (localStorage.getItem('selected_school_id') || (currentUser ? currentUser.school_id : null));
+
     if (schoolId) {
       config.headers['x-school-id'] = schoolId;
     }

@@ -53,9 +53,11 @@ export const login = async (req, res) => {
           id: student.student_id,
           username: student.student_id,
           name: displayName,
+          full_name: displayName,
           role: 'student',
           student_id: student.student_id,
-          school_id: student.school_id
+          school_id: student.school_id,
+          profile_image: student.profile_image
         }
       });
     }
@@ -124,8 +126,10 @@ export const login = async (req, res) => {
         id: user.id,
         username: user.username,
         name: displayName,
+        full_name: displayName,
         role: assignedRole,
-        school_id: user.school_id
+        school_id: user.school_id,
+        profile_image: user.profile_image
       }
     });
 

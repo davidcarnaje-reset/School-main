@@ -60,6 +60,12 @@ const Login = ({ portal }) => {
         const user = response.data.user;
         const token = response.data.token;
         const userRole = user.role;
+        const activeSchoolId = localStorage.getItem('selected_school_id');
+        if (userRole !== 'super_admin' && activeSchoolId && String(user.school_id) !== String(activeSchoolId)) {
+          setError("Access denied: Hindi ka rehistrado sa campus na ito.");
+          setLoading(false);
+          return;
+        }
 
         // Clear existing session/local storage first to avoid mixed credentials
         localStorage.removeItem('token');

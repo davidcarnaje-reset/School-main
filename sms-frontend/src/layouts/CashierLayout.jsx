@@ -302,7 +302,7 @@ const CashierLayout = () => {
                 </p>
               </div>
               <div className="w-10 h-10 bg-white rounded-xl border-2 border-white shadow-lg flex items-center justify-center overflow-hidden ring-1 ring-slate-200">
-                {user?.profile_image ? (
+                {user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? (
                   <img
                     src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`}
                     className="w-full h-full object-cover"

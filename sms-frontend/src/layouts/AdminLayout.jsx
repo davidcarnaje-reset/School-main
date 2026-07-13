@@ -9,7 +9,8 @@ import {
   Bell, Megaphone, Banknote, FileCheck2, Image, Globe, Compass, School,
   Server, Shield, LifeBuoy, Zap, FileSpreadsheet, Building, Package, Wrench, Key, Sliders,
   Laptop, HelpCircle, BarChart2, Activity, ShieldAlert,
-  UserCheck, FolderOpen, AlertCircle, CheckCircle2, Heart, Trash2
+  UserCheck, FolderOpen, AlertCircle, CheckCircle2, Heart, Trash2,
+  Calendar, Clock
 } from 'lucide-react'; 
 import { useAuth } from '../context/AuthContext';
 import UserProfileModal from '../components/admin/UserProfileModal'; 
@@ -83,7 +84,7 @@ const AdminLayout = () => {
 
   const activeSchoolId = user?.role === 'super_admin'
     ? localStorage.getItem('selected_school_id')
-    : (localStorage.getItem('selected_school_id') || (user ? user.school_id : null));
+    : (user ? user.school_id : null);
 
   const menuConfig = {
     super_admin_global: [
@@ -411,7 +412,7 @@ const AdminLayout = () => {
                   <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: branding.theme_color }}>{user?.role}</p>
               </div>
               <div className="w-11 h-11 bg-slate-200 rounded-2xl overflow-hidden shadow-sm border-2 border-white ring-1 ring-slate-100">
-                 {user?.profile_image ? <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">{user?.full_name?.charAt(0)}</div>}
+                 {user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">{user?.full_name?.charAt(0) || user?.name?.charAt(0) || 'U'}</div>}
               </div>
             </div>
           </div>
