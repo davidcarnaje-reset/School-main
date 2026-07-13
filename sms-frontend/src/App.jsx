@@ -120,6 +120,19 @@ import HrClearance from './pages/hr/HrClearance';
 import HrBenefits from './pages/hr/HrBenefits';
 import HrReports from './pages/hr/HrReports';
 
+// Custodian Pages
+import CustodianDashboard from './pages/custodian/CustodianDashboard';
+import CustodianInventory from './pages/custodian/CustodianInventory';
+import CustodianBorrowing from './pages/custodian/CustodianBorrowing';
+import CustodianReservations from './pages/custodian/CustodianReservations';
+import CustodianMaintenance from './pages/custodian/CustodianMaintenance';
+import CustodianPreventive from './pages/custodian/CustodianPreventive';
+import CustodianInspection from './pages/custodian/CustodianInspection';
+import CustodianLostFound from './pages/custodian/CustodianLostFound';
+import CustodianSupplies from './pages/custodian/CustodianSupplies';
+import CustodianDisposal from './pages/custodian/CustodianDisposal';
+import CustodianReports from './pages/custodian/CustodianReports';
+
 
 // Placeholder Components
 const AdminDashboard = () => (
@@ -202,74 +215,7 @@ const SchoolAdminFacilities = () => (
   </div>
 );
 
-// Custodian Portal Placeholder Components
-const CustodianDashboard = () => (
-  <div className="space-y-8 animate-in fade-in duration-500">
-    <div className="bg-gradient-to-r from-amber-600 to-orange-600 rounded-[2rem] p-8 text-white shadow-xl shadow-amber-100/50">
-      <h1 className="text-3xl font-black tracking-tight leading-none">Property Custodian Board</h1>
-      <p className="mt-2 text-amber-100 font-medium text-sm">Track equipment inventory, supplies list, and handle room keys configurations.</p>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Asset Value</p>
-          <h3 className="text-2xl font-black text-slate-800 mt-1">2,450 Items</h3>
-        </div>
-        <p className="text-xs text-emerald-500 font-bold">100% Accounted for</p>
-      </div>
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Low Stock Supplies</p>
-          <h3 className="text-2xl font-black text-red-500 mt-1">4 Warnings</h3>
-        </div>
-        <p className="text-xs text-slate-500 font-bold">Whiteboard markers, paper sheets</p>
-      </div>
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col justify-between h-40">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Open Key Requests</p>
-          <h3 className="text-2xl font-black text-slate-800 mt-1">0 Requests</h3>
-        </div>
-        <p className="text-xs text-slate-500 font-bold">All keys returned</p>
-      </div>
-    </div>
-  </div>
-);
-
-const CustodianInventory = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Supplies & Equipment Inventory</h2>
-      <p className="text-slate-400 text-sm font-medium">Record laboratory kits, computer setups, desks, and supplies logistics.</p>
-    </div>
-    <div className="p-8 rounded-[2rem] bg-slate-50 border border-slate-200 text-center text-slate-500 font-medium text-sm">
-      Wala pang bagong natatanggap na procurement materials ngayon.
-    </div>
-  </div>
-);
-
-const CustodianMaintenance = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Asset Damage & Maintenance Coordination</h2>
-      <p className="text-slate-400 text-sm font-medium">Manage aircon repairs, structural fixes, and damage reports.</p>
-    </div>
-    <div className="p-8 rounded-[2rem] bg-slate-50 border border-slate-200 text-center text-slate-500 font-medium text-sm">
-      Lahat ng gamit sa campus ay kasalukuyang ligtas at operational.
-    </div>
-  </div>
-);
-
-const CustodianAssets = () => (
-  <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl space-y-6">
-    <div>
-      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Classroom Assets & Key Assignments</h2>
-      <p className="text-slate-400 text-sm font-medium">Monitor room supplies distribution and building lock logs.</p>
-    </div>
-    <div className="p-8 rounded-[2rem] bg-slate-50 border border-slate-200 text-center text-slate-500 font-medium text-sm">
-      Lahat ng classroom assets ay accounted for.
-    </div>
-  </div>
-);
+// Custodian Portal Placeholder Components is removed as they are fully built standalone pages now
 
 const Unauthorized = () => (
   <div className="h-screen flex flex-col items-center justify-center p-10 text-center bg-slate-50">
@@ -464,8 +410,15 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<CustodianDashboard />} />
             <Route path="inventory" element={<CustodianInventory />} />
+            <Route path="borrowing" element={<CustodianBorrowing />} />
+            <Route path="reservations" element={<CustodianReservations />} />
             <Route path="maintenance" element={<CustodianMaintenance />} />
-            <Route path="assets" element={<CustodianAssets />} />
+            <Route path="preventive" element={<CustodianPreventive />} />
+            <Route path="inspection" element={<CustodianInspection />} />
+            <Route path="lost-found" element={<CustodianLostFound />} />
+            <Route path="supplies" element={<CustodianSupplies />} />
+            <Route path="disposal" element={<CustodianDisposal />} />
+            <Route path="reports" element={<CustodianReports />} />
           </Route>
 
           {/* =======================================================

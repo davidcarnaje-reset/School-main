@@ -9,7 +9,7 @@ import {
   Bell, Megaphone, Banknote, FileCheck2, Image, Globe, Compass, School,
   Server, Shield, LifeBuoy, Zap, FileSpreadsheet, Building, Package, Wrench, Key, Sliders,
   Laptop, HelpCircle, BarChart2, Activity, ShieldAlert,
-  UserCheck, FolderOpen, AlertCircle, CheckCircle2, Heart
+  UserCheck, FolderOpen, AlertCircle, CheckCircle2, Heart, Trash2
 } from 'lucide-react'; 
 import { useAuth } from '../context/AuthContext';
 import UserProfileModal from '../components/admin/UserProfileModal'; 
@@ -148,9 +148,16 @@ const AdminLayout = () => {
     ],
     custodian: [
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/custodian/dashboard' },
-      { icon: <Package size={20} />, label: 'Inventory List', path: '/custodian/inventory', module: 'inventory' },
-      { icon: <Wrench size={20} />, label: 'Maintenance Coord', path: '/custodian/maintenance', module: 'maintenance' },
-      { icon: <Key size={20} />, label: 'Room Assets List', path: '/custodian/assets', module: 'assets' }
+      { icon: <Package size={20} />, label: 'Asset Inventory', path: '/custodian/inventory', module: 'inventory' },
+      { icon: <Laptop size={20} />, label: 'Equipment Borrowing', path: '/custodian/borrowing', module: 'borrowing' },
+      { icon: <Calendar size={20} />, label: 'Facility Reservations', path: '/custodian/reservations', module: 'reservations' },
+      { icon: <Wrench size={20} />, label: 'Maintenance Requests', path: '/custodian/maintenance', module: 'maintenance' },
+      { icon: <Clock size={20} />, label: 'Preventive Maintenance', path: '/custodian/preventive', module: 'preventive' },
+      { icon: <Shield size={20} />, label: 'Property Inspection', path: '/custodian/inspection', module: 'inspection' },
+      { icon: <HelpCircle size={20} />, label: 'Lost and Found', path: '/custodian/lost-found', module: 'lost_found' },
+      { icon: <Sliders size={20} />, label: 'Supply Management', path: '/custodian/supplies', module: 'supplies' },
+      { icon: <Trash2 size={20} />, label: 'Disposal Management', path: '/custodian/disposal', module: 'disposal' },
+      { icon: <BarChart2 size={20} />, label: 'Reports & Audits', path: '/custodian/reports', module: 'reports' }
     ]
   };
 
