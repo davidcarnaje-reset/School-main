@@ -3,7 +3,7 @@ import axios from 'axios';
 import { 
   UserPlus, X, Mail, RefreshCw, Calendar, Phone, GraduationCap, 
   BookOpen, User, Users, CreditCard, ChevronRight, ChevronLeft, Check, MapPin, Camera,
-  Search, Filter, Printer
+  Search, Filter, Printer, Briefcase
 } from 'lucide-react'; 
 import { useAuth } from '../../context/AuthContext';
 
@@ -68,7 +68,6 @@ const fetchData = async () => {
 
   const handlePrint = () => window.print();
 
-  // IN-UPDATE ANG INITIAL STATE PARA MAY STRAND AT MAJOR
   const initialFormState = {
     // STEP 1
     lrn: '', first_name: '', middle_name: '', last_name: '', suffix: '', 
@@ -77,14 +76,20 @@ const fetchData = async () => {
     // STEP 2
     email: '', mobile_no: '', alt_mobile_no: '', 
     address_house: '', address_brgy: '', address_city: '', address_province: '', address_zip: '',
-    // STEP 3
-    father_name: '', father_occ: '', father_contact: '',
-    mother_name: '', mother_occ: '', mother_contact: '',
-    guardian_name: '', guardian_rel: '', guardian_contact: '', guardian_address: '',
-    // STEP 4 UPDATES
+    // STEP 3: Educational Info
+    elem_name: '', elem_year: '', elem_address: '',
+    jhs_name: '', jhs_year: '', jhs_address: '',
+    shs_name: '', shs_year: '', shs_address: '', shs_strand: '',
+    // STEP 4: Work Details
+    is_working: false, work_company: '', work_position: '', work_address: '',
+    // STEP 5: Family Background
+    father_first_name: '', father_middle_name: '', father_last_name: '', father_no_middle: false, father_occ: '', father_contact: '',
+    mother_first_name: '', mother_middle_name: '', mother_last_name: '', mother_no_middle: false, mother_occ: '', mother_contact: '',
+    guardian_type: 'Other', guardian_first_name: '', guardian_middle_name: '', guardian_last_name: '', guardian_no_middle: false, guardian_name: '', guardian_rel: '', guardian_contact: '', guardian_occ: '', guardian_address: '',
+    // STEP 6: Academic Details
     enrollment_type: 'New', school_year: '2026-2027', grade_level: 'Grade 7', 
     program_id: '', // Dito ise-save yung ID nung napiling strand o course
-    section: 'TBA', prev_school: '', prev_school_address: '',
+    section: 'TBA',
     scholarship_type: 'None', payment_plan: 'Full Payment'
   };
 
@@ -123,12 +128,24 @@ const fetchData = async () => {
       return isEmailValid && isPhoneValid && address_city && address_province && address_zip && address_house && address_brgy;
     }
     if (currentStep === 3) {
+      // Educational background: Require Elementary name
+      return !!formData.elem_name;
+    }
+    if (currentStep === 4) {
+      // Work details: if working student, require company and position
+      if (formData.is_working) {
+        return !!(formData.work_company && formData.work_position);
+      }
+      return true;
+    }
+    if (currentStep === 5) {
       // Parents contact must be valid format if provided
       const fContactValid = !formData.father_contact || formData.father_contact === '+639' || formData.father_contact.length === 13;
       const mContactValid = !formData.mother_contact || formData.mother_contact === '+639' || formData.mother_contact.length === 13;
-      return fContactValid && mContactValid;
+      const gContactValid = !formData.guardian_contact || formData.guardian_contact === '+639' || formData.guardian_contact.length === 13;
+      return fContactValid && mContactValid && gContactValid;
     }
-    if (currentStep === 4) {
+    if (currentStep === 6) {
       const needsProgram = ['Grade 11', 'Grade 12', 'College'].includes(formData.grade_level);
       if (needsProgram && !formData.program_id) return false;
       return true;
@@ -148,22 +165,39 @@ const fetchData = async () => {
     try {
       const data = new FormData();
       
-      // Append required backend operational keys explicitly
-      const requiredFields = [
-        'lrn', 'first_name', 'middle_name', 'last_name', 'suffix', 
-        'gender', 'dob', 'email', 'mobile_no', 'school_year', 
-        'grade_level', 'program_id', 'section_id', 'payment_plan'
-      ];
+      // Dynamically combine parent full names
+      const mName = `${formData.mother_first_name || ''} ${formData.mother_no_middle ? '' : (formData.mother_middle_name || '')} ${formData.mother_last_name || ''}`.replace(/\s+/g, ' ').trim();
+      const fName = `${formData.father_first_name || ''} ${formData.father_no_middle ? '' : (formData.father_middle_name || '')} ${formData.father_last_name || ''}`.replace(/\s+/g, ' ').trim();
       
-      requiredFields.forEach(field => {
-        data.append(field, formData[field] || '');
-      });
+      const gName = formData.guardian_type === 'Mother' ? mName : formData.guardian_type === 'Father' ? fName : formData.guardian_name;
+      const gRel = formData.guardian_type === 'Mother' ? 'Mother' : formData.guardian_type === 'Father' ? 'Father' : formData.guardian_rel;
+      const gContact = formData.guardian_type === 'Mother' ? formData.mother_contact : formData.guardian_type === 'Father' ? formData.father_contact : formData.guardian_contact;
+      const gOcc = formData.guardian_type === 'Mother' ? formData.mother_occ : formData.guardian_type === 'Father' ? formData.father_occ : formData.guardian_occ;
+      const gAddress = (formData.guardian_type === 'Mother' || formData.guardian_type === 'Father')
+        ? `${formData.address_house || ''}, ${formData.address_brgy || ''}, ${formData.address_city || ''}, ${formData.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim()
+        : formData.guardian_address;
 
-      // Also append other fields from formData to preserve complete data payload
-      Object.keys(formData).forEach(key => {
-        if (!requiredFields.includes(key)) {
-          data.append(key, formData[key] || '');
-        }
+      const gFirstName = formData.guardian_type === 'Mother' ? formData.mother_first_name : formData.guardian_type === 'Father' ? formData.father_first_name : formData.guardian_first_name;
+      const gMiddleName = formData.guardian_type === 'Mother' ? formData.mother_middle_name : formData.guardian_type === 'Father' ? formData.father_middle_name : formData.guardian_middle_name;
+      const gLastName = formData.guardian_type === 'Mother' ? formData.mother_last_name : formData.guardian_type === 'Father' ? formData.father_last_name : formData.guardian_last_name;
+
+      const finalPayload = {
+        ...formData,
+        mother_name: mName,
+        father_name: fName,
+        guardian_first_name: gFirstName,
+        guardian_middle_name: gMiddleName,
+        guardian_last_name: gLastName,
+        guardian_name: gName,
+        guardian_rel: gRel,
+        guardian_contact: gContact,
+        guardian_occ: gOcc,
+        guardian_address: gAddress
+      };
+
+      // Append everything to FormData
+      Object.keys(finalPayload).forEach(key => {
+        data.append(key, finalPayload[key] === null || finalPayload[key] === undefined ? '' : finalPayload[key]);
       });
 
       if (profileImage) {
@@ -202,6 +236,103 @@ const fetchData = async () => {
     return matchesSearch && matchesGrade;
   });
 
+  const getGuardianValue = (field) => {
+    if (formData.guardian_type === 'Mother') {
+      if (field === 'guardian_first_name') return formData.mother_first_name || '';
+      if (field === 'guardian_middle_name') return formData.mother_middle_name || '';
+      if (field === 'guardian_last_name') return formData.mother_last_name || '';
+      if (field === 'guardian_no_middle') return formData.mother_no_middle || false;
+      if (field === 'guardian_name') {
+        return `${formData.mother_first_name || ''} ${formData.mother_no_middle ? '' : (formData.mother_middle_name || '')} ${formData.mother_last_name || ''}`.replace(/\s+/g, ' ').trim();
+      }
+      if (field === 'guardian_rel') return 'Mother';
+      if (field === 'guardian_contact') return formData.mother_contact || '';
+      if (field === 'guardian_occ') return formData.mother_occ || '';
+      if (field === 'guardian_address') {
+        return `${formData.address_house || ''}, ${formData.address_brgy || ''}, ${formData.address_city || ''}, ${formData.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim();
+      }
+    }
+    if (formData.guardian_type === 'Father') {
+      if (field === 'guardian_first_name') return formData.father_first_name || '';
+      if (field === 'guardian_middle_name') return formData.father_middle_name || '';
+      if (field === 'guardian_last_name') return formData.father_last_name || '';
+      if (field === 'guardian_no_middle') return formData.father_no_middle || false;
+      if (field === 'guardian_name') {
+        return `${formData.father_first_name || ''} ${formData.father_no_middle ? '' : (formData.father_middle_name || '')} ${formData.father_last_name || ''}`.replace(/\s+/g, ' ').trim();
+      }
+      if (field === 'guardian_rel') return 'Father';
+      if (field === 'guardian_contact') return formData.father_contact || '';
+      if (field === 'guardian_occ') return formData.father_occ || '';
+      if (field === 'guardian_address') {
+        return `${formData.address_house || ''}, ${formData.address_brgy || ''}, ${formData.address_city || ''}, ${formData.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim();
+      }
+    }
+    if (field === 'guardian_no_middle') return formData.guardian_no_middle || false;
+    return formData[field] || '';
+  };
+
+  const handleGuardianTypeChange = (type) => {
+    setFormData(prev => {
+      let updates = { guardian_type: type };
+      if (type === 'Mother') {
+        updates.guardian_first_name = prev.mother_first_name;
+        updates.guardian_middle_name = prev.mother_middle_name;
+        updates.guardian_last_name = prev.mother_last_name;
+        updates.guardian_no_middle = prev.mother_no_middle;
+        updates.guardian_name = `${prev.mother_first_name || ''} ${prev.mother_no_middle ? '' : (prev.mother_middle_name || '')} ${prev.mother_last_name || ''}`.replace(/\s+/g, ' ').trim();
+        updates.guardian_rel = 'Mother';
+        updates.guardian_contact = prev.mother_contact;
+        updates.guardian_occ = prev.mother_occ;
+        updates.guardian_address = `${prev.address_house || ''}, ${prev.address_brgy || ''}, ${prev.address_city || ''}, ${prev.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim();
+      } else if (type === 'Father') {
+        updates.guardian_first_name = prev.father_first_name;
+        updates.guardian_middle_name = prev.father_middle_name;
+        updates.guardian_last_name = prev.father_last_name;
+        updates.guardian_no_middle = prev.father_no_middle;
+        updates.guardian_name = `${prev.father_first_name || ''} ${prev.father_no_middle ? '' : (prev.father_middle_name || '')} ${prev.father_last_name || ''}`.replace(/\s+/g, ' ').trim();
+        updates.guardian_rel = 'Father';
+        updates.guardian_contact = prev.father_contact;
+        updates.guardian_occ = prev.father_occ;
+        updates.guardian_address = `${prev.address_house || ''}, ${prev.address_brgy || ''}, ${prev.address_city || ''}, ${prev.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim();
+      } else {
+        updates.guardian_first_name = '';
+        updates.guardian_middle_name = '';
+        updates.guardian_last_name = '';
+        updates.guardian_no_middle = false;
+        updates.guardian_name = '';
+        updates.guardian_rel = '';
+        updates.guardian_contact = '';
+        updates.guardian_occ = '';
+        updates.guardian_address = '';
+      }
+      return { ...prev, ...updates };
+    });
+  };
+
+  const getFatherName = (s) => {
+    if (!s) return '---';
+    if (s.father_first_name) {
+      return `${s.father_first_name} ${s.father_middle_name || ''} ${s.father_last_name}`.replace(/\s+/g, ' ').trim();
+    }
+    return s.father_name || '---';
+  };
+
+  const getMotherName = (s) => {
+    if (!s) return '---';
+    if (s.mother_first_name) {
+      return `${s.mother_first_name} ${s.mother_middle_name || ''} ${s.mother_last_name}`.replace(/\s+/g, ' ').trim();
+    }
+    return s.mother_name || '---';
+  };
+
+  const getGuardianName = (s) => {
+    if (!s) return '---';
+    if (s.guardian_first_name) {
+      return `${s.guardian_first_name} ${s.guardian_middle_name || ''} ${s.guardian_last_name}`.replace(/\s+/g, ' ').trim();
+    }
+    return s.guardian_name || '---';
+  };
+
   // HELPER PARA SA DROPDOWNS NG SHS / COLLEGE
   const getProgramOptions = () => {
     if (formData.grade_level === 'Grade 11' || formData.grade_level === 'Grade 12') {
@@ -221,13 +352,13 @@ const fetchData = async () => {
 
   const StepIndicator = () => (
     <div className="flex items-center justify-between mb-8 px-4">
-      {[1, 2, 3, 4].map((step) => (
+      {[1, 2, 3, 4, 5, 6].map((step) => (
         <div key={step} className="flex items-center">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${currentStep >= step ? 'text-white' : 'bg-slate-100 text-slate-400'}`}
                style={currentStep >= step ? {backgroundColor: branding.theme_color || '#2563eb'} : {}}>
             {currentStep > step ? <Check size={14} /> : step}
           </div>
-          {step < 4 && <div className={`w-12 h-1 mx-2 rounded ${currentStep > step ? 'bg-blue-500' : 'bg-slate-100'}`} style={currentStep > step ? {backgroundColor: branding.theme_color || '#2563eb'} : {}} />}
+          {step < 6 && <div className={`w-12 h-1 mx-2 rounded ${currentStep > step ? 'bg-blue-500' : 'bg-slate-100'}`} style={currentStep > step ? {backgroundColor: branding.theme_color || '#2563eb'} : {}} />}
         </div>
       ))}
     </div>
@@ -374,8 +505,10 @@ const fetchData = async () => {
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
                   {currentStep === 1 && "Step 1: Personal Profile"}
                   {currentStep === 2 && "Step 2: Contact & Address"}
-                  {currentStep === 3 && "Step 3: Family Background"}
-                  {currentStep === 4 && "Step 4: Academic Details"}
+                  {currentStep === 3 && "Step 3: Educational Info"}
+                  {currentStep === 4 && "Step 4: Work Details"}
+                  {currentStep === 5 && "Step 5: Family Background"}
+                  {currentStep === 6 && "Step 6: Academic Details"}
                 </p>
               </div>
               <button onClick={() => setShowModal(false)} className="bg-white shadow-sm p-3 rounded-2xl text-slate-400 hover:text-red-500 transition-colors"><X size={20}/></button>
@@ -450,26 +583,204 @@ const fetchData = async () => {
                 </div>
               )}
 
-              {/* STEP 3: FAMILY BACKGROUND */}
+              {/* STEP 3: EDUCATIONAL INFO */}
               {currentStep === 3 && (
                 <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl">
-                    <h4 className="md:col-span-3 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2"><Users size={14}/> Father's Information</h4>
-                    <Input label="Full Name" value={formData.father_name} onChange={v=>setFormData({...formData, father_name:v})}/>
-                    <Input label="Occupation" value={formData.father_occ} onChange={v=>setFormData({...formData, father_occ:v})}/>
-                    <Input label="Contact No." value={formData.father_contact} onChange={v => handlePhoneInput(v, 'father_contact')} placeholder="+639..."/>
+                  {/* GRADE SCHOOL (ELEMENTARY) */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                      <GraduationCap size={14}/> Elementary School (Graduated) *
+                    </h4>
+                    <div className="md:col-span-2">
+                      <Input label="Name of School *" value={formData.elem_name} onChange={v=>setFormData({...formData, elem_name:v})} required/>
+                    </div>
+                    <Input label="Year Graduated" value={formData.elem_year} onChange={v=>handleNumberOnly(v, 'elem_year', 4)} placeholder="e.g. 2020" maxLength="4"/>
+                    <div className="md:col-span-3">
+                      <Input label="School Address" value={formData.elem_address} onChange={v=>setFormData({...formData, elem_address:v})}/>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl">
-                    <h4 className="md:col-span-3 text-xs font-black text-pink-500 uppercase tracking-widest flex items-center gap-2"><Users size={14}/> Mother's Information</h4>
-                    <Input label="Full Name" value={formData.mother_name} onChange={v=>setFormData({...formData, mother_name:v})}/>
-                    <Input label="Occupation" value={formData.mother_occ} onChange={v=>setFormData({...formData, mother_occ:v})}/>
-                    <Input label="Contact No." value={formData.mother_contact} onChange={v => handlePhoneInput(v, 'mother_contact')} placeholder="+639..."/>
+
+                  {/* JUNIOR HIGH SCHOOL */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2">
+                      <GraduationCap size={14}/> Junior High School (JHS)
+                    </h4>
+                    <div className="md:col-span-2">
+                      <Input label="Name of School" value={formData.jhs_name} onChange={v=>setFormData({...formData, jhs_name:v})}/>
+                    </div>
+                    <Input label="Year Completed" value={formData.jhs_year} onChange={v=>handleNumberOnly(v, 'jhs_year', 4)} placeholder="e.g. 2024" maxLength="4"/>
+                    <div className="md:col-span-3">
+                      <Input label="School Address" value={formData.jhs_address} onChange={v=>setFormData({...formData, jhs_address:v})}/>
+                    </div>
+                  </div>
+
+                  {/* SENIOR HIGH SCHOOL */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-pink-500 uppercase tracking-widest flex items-center gap-2">
+                      <GraduationCap size={14}/> Senior High School (SHS)
+                    </h4>
+                    <div className="md:col-span-2">
+                      <Input label="Name of School" value={formData.shs_name} onChange={v=>setFormData({...formData, shs_name:v})}/>
+                    </div>
+                    <Input label="Year Completed" value={formData.shs_year} onChange={v=>handleNumberOnly(v, 'shs_year', 4)} placeholder="e.g. 2026" maxLength="4"/>
+                    <div className="md:col-span-2">
+                      <Input label="School Address" value={formData.shs_address} onChange={v=>setFormData({...formData, shs_address:v})}/>
+                    </div>
+                    <Input label="Strand / Track" value={formData.shs_strand} onChange={v=>setFormData({...formData, shs_strand:v})} placeholder="e.g. STEM, ABM, HUMSS"/>
                   </div>
                 </div>
               )}
 
-              {/* STEP 4: ACADEMIC DETAILS (UPDATED FOR SHS/COLLEGE) */}
+              {/* STEP 4: WORK DETAILS */}
               {currentStep === 4 && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                  <div className="flex items-center justify-between bg-slate-50 p-6 rounded-3xl border border-slate-100 shadow-sm">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-black text-slate-800 tracking-tight">Employed / Working Student</h4>
+                      <p className="text-xs text-slate-400 font-bold">Turn this option on if the student currently has a job.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={formData.is_working} 
+                        onChange={e => {
+                          setFormData({
+                            ...formData,
+                            is_working: e.target.checked,
+                            work_company: e.target.checked ? formData.work_company : '',
+                            work_position: e.target.checked ? formData.work_position : '',
+                            work_address: e.target.checked ? formData.work_address : ''
+                          })
+                        }} 
+                        className="sr-only peer"
+                      />
+                      <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  {formData.is_working ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 animate-in fade-in duration-300">
+                      <h4 className="md:col-span-2 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                        <Briefcase size={14}/> Employment & Work Information *
+                      </h4>
+                      <Input label="Company Name *" value={formData.work_company} onChange={v=>setFormData({...formData, work_company:v})} required/>
+                      <Input label="Position / Designation *" value={formData.work_position} onChange={v=>setFormData({...formData, work_position:v})} required/>
+                      <div className="md:col-span-2">
+                        <Input label="Company Address" value={formData.work_address} onChange={v=>setFormData({...formData, work_address:v})}/>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-blue-50/50 border border-blue-100 p-8 rounded-3xl text-center space-y-2 py-12 animate-in fade-in duration-300">
+                      <Briefcase className="text-blue-500 mx-auto opacity-60" size={32} />
+                      <h5 className="font-bold text-slate-700 text-sm">Not Currently Employed</h5>
+                      <p className="text-xs text-slate-500 max-w-xs mx-auto">This student is marked as a full-time student. No work details are required to proceed.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 5: FAMILY BACKGROUND */}
+              {currentStep === 5 && (
+                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                  {/* FATHER'S INFORMATION */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                      <Users size={14}/> Father's Information
+                    </h4>
+                    <Input label="First Name" value={formData.father_first_name} onChange={v=>setFormData({...formData, father_first_name:v})}/>
+                    <div className="space-y-1.5">
+                      <Input label="Middle Name" value={formData.father_middle_name} onChange={v=>setFormData({...formData, father_middle_name:v})} disabled={formData.father_no_middle}/>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
+                        <input type="checkbox" checked={formData.father_no_middle} onChange={e=>{
+                          setFormData({
+                            ...formData,
+                            father_no_middle: e.target.checked,
+                            father_middle_name: e.target.checked ? '' : formData.father_middle_name
+                          })
+                        }} className="rounded text-blue-500 focus:ring-blue-500" />
+                        <span>No Middle Name</span>
+                      </label>
+                    </div>
+                    <Input label="Last Name" value={formData.father_last_name} onChange={v=>setFormData({...formData, father_last_name:v})}/>
+                    <Input label="Occupation" value={formData.father_occ} onChange={v=>setFormData({...formData, father_occ:v})}/>
+                    <Input label="Contact No." value={formData.father_contact} onChange={v => handlePhoneInput(v, 'father_contact')} placeholder="+639..."/>
+                  </div>
+
+                  {/* MOTHER'S INFORMATION */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-pink-500 uppercase tracking-widest flex items-center gap-2">
+                      <Users size={14}/> Mother's Information (Maiden Name)
+                    </h4>
+                    <Input label="First Name" value={formData.mother_first_name} onChange={v=>setFormData({...formData, mother_first_name:v})}/>
+                    <div className="space-y-1.5">
+                      <Input label="Middle Name" value={formData.mother_middle_name} onChange={v=>setFormData({...formData, mother_middle_name:v})} disabled={formData.mother_no_middle}/>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
+                        <input type="checkbox" checked={formData.mother_no_middle} onChange={e=>{
+                          setFormData({
+                            ...formData,
+                            mother_no_middle: e.target.checked,
+                            mother_middle_name: e.target.checked ? '' : formData.mother_middle_name
+                          })
+                        }} className="rounded text-pink-500 focus:ring-pink-500" />
+                        <span>No Middle Name</span>
+                      </label>
+                    </div>
+                    <Input label="Maiden Last Name" value={formData.mother_last_name} onChange={v=>setFormData({...formData, mother_last_name:v})}/>
+                    <Input label="Occupation" value={formData.mother_occ} onChange={v=>setFormData({...formData, mother_occ:v})}/>
+                    <Input label="Contact No." value={formData.mother_contact} onChange={v => handlePhoneInput(v, 'mother_contact')} placeholder="+639..."/>
+                  </div>
+
+                  {/* GUARDIAN'S INFORMATION */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                      <Users size={14}/> Guardian's Information
+                    </h4>
+                    
+                    <div className="md:col-span-3 flex flex-wrap gap-4 items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Guardian:</span>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                        <input type="radio" name="guardian_type" value="Mother" checked={formData.guardian_type === 'Mother'} onChange={() => handleGuardianTypeChange('Mother')} className="text-emerald-500 focus:ring-emerald-500" />
+                        <span>Same as Mother</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                        <input type="radio" name="guardian_type" value="Father" checked={formData.guardian_type === 'Father'} onChange={() => handleGuardianTypeChange('Father')} className="text-emerald-500 focus:ring-emerald-500" />
+                        <span>Same as Father</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                        <input type="radio" name="guardian_type" value="Other" checked={formData.guardian_type === 'Other'} onChange={() => handleGuardianTypeChange('Other')} className="text-emerald-500 focus:ring-emerald-500" />
+                        <span>Other / Specify</span>
+                      </label>
+                    </div>
+
+                    <Input label="First Name" value={getGuardianValue('guardian_first_name')} onChange={v => setFormData({...formData, guardian_first_name: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'}/>
+                    <div className="space-y-1.5">
+                      <Input label="Middle Name" value={getGuardianValue('guardian_middle_name')} onChange={v => setFormData({...formData, guardian_middle_name: v})} disabled={formData.guardian_type !== 'Other' || getGuardianValue('guardian_no_middle')}/>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
+                        <input type="checkbox" checked={getGuardianValue('guardian_no_middle')} disabled={formData.guardian_type !== 'Other'} onChange={e=>{
+                          setFormData({
+                            ...formData,
+                            guardian_no_middle: e.target.checked,
+                            guardian_middle_name: e.target.checked ? '' : formData.guardian_middle_name
+                          })
+                        }} className="rounded text-emerald-500 focus:ring-emerald-500" />
+                        <span>No Middle Name</span>
+                      </label>
+                    </div>
+                    <Input label="Last Name" value={getGuardianValue('guardian_last_name')} onChange={v => setFormData({...formData, guardian_last_name: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'}/>
+                    
+                    <Input label="Relationship" value={getGuardianValue('guardian_rel')} onChange={v => setFormData({...formData, guardian_rel: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder={formData.guardian_type === 'Mother' ? 'Mother' : formData.guardian_type === 'Father' ? 'Father' : ''}/>
+                    <Input label="Contact No." value={getGuardianValue('guardian_contact')} onChange={v => handlePhoneInput(v, 'guardian_contact')} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder="+639..."/>
+                    <Input label="Occupation" value={getGuardianValue('guardian_occ')} onChange={v => setFormData({...formData, guardian_occ: v})} disabled={formData.guardian_type !== 'Other'}/>
+                    
+                    <div className="md:col-span-3">
+                      <Input label="Home Address" value={getGuardianValue('guardian_address')} onChange={v => setFormData({...formData, guardian_address: v})} disabled={formData.guardian_type !== 'Other'}/>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 6: ACADEMIC DETAILS */}
+              {currentStep === 6 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-right-4 duration-300">
                   <Select label="Enrollment Type" value={formData.enrollment_type} onChange={v=>setFormData({...formData, enrollment_type:v})} options={['New', 'Transferee', 'Continuing']}/>
                   
@@ -503,7 +814,6 @@ const fetchData = async () => {
                     </div>
                   )}
 
-                  <Input label="Previous School" value={formData.prev_school} onChange={v=>setFormData({...formData, prev_school:v})}/>
                   <Select label="Payment Plan" value={formData.payment_plan} onChange={v=>setFormData({...formData, payment_plan:v})} options={['Full Payment', 'Installment']}/>
                   
                   <div className="md:col-span-2 bg-amber-50 p-6 rounded-3xl flex items-start gap-4 border border-amber-100">
@@ -519,7 +829,7 @@ const fetchData = async () => {
                 <ChevronLeft size={20}/> Previous
               </button>
               
-              {currentStep < 4 ? (
+              {currentStep < 6 ? (
                 <button 
                   onClick={nextStep} 
                   disabled={!isStepValid()}
@@ -598,142 +908,277 @@ const fetchData = async () => {
         </div>
       </div>
 
-      <div className="p-8 overflow-y-auto flex-1 print:overflow-visible font-sans">
-        
-        {/* COMPACT LETTERHEAD (ONLY ON PRINT) */}
-        <div className="hidden print:flex items-center justify-center gap-4 mb-6 border-b-2 border-slate-800 pb-4">
-          <img src={getLogoUrl(branding.school_logo)} className="w-16 h-16 object-cover" alt="School Logo" />
-          <div className="text-left">
-            <h1 className="text-xl font-black text-slate-900 uppercase leading-tight">{branding.school_name}</h1>
-            <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Office of the School Registrar</p>
-            <p className="text-[8px] text-slate-400 italic">Official Student Academic Record</p>
-          </div>
-        </div>
+      <div className="p-8 overflow-y-auto flex-1 print:overflow-visible font-sans relative">
+         {/* Background Watermark School Logo */}
+         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] print:opacity-[0.05] z-0 select-none">
+            <img 
+               src={getLogoUrl(branding.school_logo)} 
+               className="w-[450px] h-[450px] object-contain" 
+               alt="Watermark Logo" 
+            />
+         </div>
 
-        {/* PROFILE HEADER (SCREEN & PRINT) */}
-        <div className="flex justify-between items-start mb-6 border-b pb-6" style={{borderColor: branding.theme_color || '#2563eb'}}>
-           <div className="flex items-center gap-6">
-              {/* SMALLER PROFILE IMAGE */}
-              <div className="relative">
-                 <div className="w-24 h-24 rounded-2xl bg-slate-100 overflow-hidden border-2 border-slate-200 shadow-md flex items-center justify-center">
-                    {/* DITO YUNG LOGIC SA MODAL: Picture o First Letter */}
-                     {selectedStudent.profile_image ? (
-                        <img 
-                           src={getProfileImageUrl(selectedStudent.profile_image)} 
-                           className="w-full h-full object-cover"
-                           alt="Profile"
-                           onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                        />
-                     ) : (
-                       <div className="flex items-center justify-center w-full h-full text-slate-400 font-black text-4xl uppercase">
-                          {selectedStudent.first_name?.charAt(0)}
-                       </div>
-                    )}
-                    {/* Ito yung lalabas kung sakaling broken link ang image */}
-                    <div className="hidden items-center justify-center w-full h-full text-slate-400 font-black text-4xl uppercase">
-                        {selectedStudent.first_name?.charAt(0)}
-                    </div>
+         <div className="relative z-10 space-y-6">
+            {/* COMPACT LETTERHEAD (ONLY ON PRINT) */}
+            <div className="hidden print:flex items-center justify-center gap-4 mb-6 border-b-2 border-slate-800 pb-4">
+              <img src={getLogoUrl(branding.school_logo)} className="w-16 h-16 object-cover" alt="School Logo" />
+              <div className="text-left">
+                <h1 className="text-xl font-black text-slate-900 uppercase leading-tight">{branding.school_name}</h1>
+                <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Office of the School Registrar</p>
+                <p className="text-[8px] text-slate-400 italic">Official Student Academic Record</p>
+              </div>
+            </div>
+
+            {/* PROFILE HEADER (SCREEN & PRINT) */}
+            <div className="flex justify-between items-start mb-6 border-b pb-6" style={{borderColor: branding.theme_color || '#2563eb'}}>
+               <div className="flex items-center gap-6">
+                  {/* SMALLER PROFILE IMAGE */}
+                  <div className="relative">
+                     <div className="w-24 h-24 rounded-2xl bg-slate-100 overflow-hidden border-2 border-slate-200 shadow-md flex items-center justify-center">
+                         {selectedStudent.profile_image ? (
+                            <img 
+                               src={getProfileImageUrl(selectedStudent.profile_image)} 
+                               className="w-full h-full object-cover"
+                               alt="Profile"
+                               onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                            />
+                         ) : (
+                           <div className="flex items-center justify-center w-full h-full text-slate-400 font-black text-4xl uppercase">
+                              {selectedStudent.first_name?.charAt(0)}
+                           </div>
+                         )}
+                         <div className="hidden items-center justify-center w-full h-full text-slate-400 font-black text-4xl uppercase">
+                             {selectedStudent.first_name?.charAt(0)}
+                         </div>
+                     </div>
+                  </div>
+
+                  <div>
+                     <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1">Official Enrollment File</p>
+                     <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight leading-none mb-2">
+                        {selectedStudent.first_name} {selectedStudent.middle_name} {selectedStudent.last_name}
+                     </h2>
+                     <div className="flex flex-wrap items-center gap-3">
+                        <p className="font-mono text-sm font-bold text-slate-500">ID: {selectedStudent.student_id}</p>
+                        <span className="h-3 w-[1px] bg-slate-300"></span>
+                        <p className="font-bold text-slate-600 uppercase text-[10px] flex items-center gap-1">
+                           <BookOpen size={12} className="text-blue-500"/> 
+                           {selectedStudent.grade_level} 
+                           {['Grade 11', 'Grade 12', 'College'].includes(selectedStudent.grade_level) && selectedStudent.program_code ? ` | ${selectedStudent.program_code}` : ''}
+                        </p>
+                        <span className="h-3 w-[1px] bg-slate-300"></span>
+                        
+                        {/* ENROLLMENT STATUS INDICATOR */}
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter border ${
+                          selectedStudent.enrollment_status === 'Enrolled' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                          selectedStudent.enrollment_status === 'Assessed' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
+                          'bg-slate-50 text-slate-500 border-slate-100'
+                        }`}>
+                          {selectedStudent.enrollment_status || 'Ready to Enroll'}
+                        </span>
+                     </div>
+                  </div>
+               </div>
+               
+               <div className="text-right print:hidden">
+                  <img src={getLogoUrl(branding.school_logo)} className="w-12 h-12 rounded-lg object-cover mb-1 ml-auto" alt="Logo" />
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{branding.school_name}</p>
+               </div>
+            </div>
+
+            <div className="space-y-6">
+              {/* I. PERSONAL INFORMATION TABLE */}
+              <div className="border border-blue-200 rounded-2xl overflow-hidden shadow-sm bg-white/95">
+                 <div className="bg-blue-50 text-blue-900 border-b border-blue-200 px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
+                    I. Personal Information & Contact
                  </div>
+                 <table className="w-full text-left border-collapse">
+                    <tbody>
+                       <tr className="border-b border-blue-100">
+                          <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">First Name</td>
+                          <td className="w-1/4 p-3 text-sm font-bold text-slate-800 border-r border-blue-100">{selectedStudent.first_name || '---'}</td>
+                          <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">Middle Name</td>
+                          <td className="w-1/4 p-3 text-sm text-slate-700">{selectedStudent.middle_name || '---'}</td>
+                       </tr>
+                       <tr className="border-b border-blue-100">
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">Last Name</td>
+                          <td className="p-3 text-sm font-bold text-slate-800 border-r border-blue-100">{selectedStudent.last_name || '---'}</td>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">Suffix</td>
+                          <td className="p-3 text-sm text-slate-700">{selectedStudent.suffix || '---'}</td>
+                       </tr>
+                       <tr className="border-b border-blue-100">
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">LRN</td>
+                          <td className="p-3 text-sm text-slate-700 border-r border-blue-100">{selectedStudent.lrn || '---'}</td>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">Gender</td>
+                          <td className="p-3 text-sm text-slate-700">{selectedStudent.gender || '---'}</td>
+                       </tr>
+                       <tr className="border-b border-blue-100">
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">Date of Birth</td>
+                          <td className="p-3 text-sm text-slate-700 border-r border-blue-100">{selectedStudent.dob || '---'}</td>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">Email Address</td>
+                          <td className="p-3 text-sm font-bold text-slate-800 break-all">{selectedStudent.email || '---'}</td>
+                       </tr>
+                       <tr>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">Mobile Number</td>
+                          <td className="p-3 text-sm font-bold text-slate-800 border-r border-blue-100">{selectedStudent.mobile_no || '---'}</td>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100">Home Address</td>
+                          <td className="p-3 text-sm text-slate-700">{selectedStudent.address_house || '---'}</td>
+                       </tr>
+                    </tbody>
+                 </table>
               </div>
 
-              <div>
-                 <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1">Official Enrollment File</p>
-                 <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight leading-none mb-2">
-                    {selectedStudent.first_name} {selectedStudent.middle_name} {selectedStudent.last_name}
-                 </h2>
-                 <div className="flex flex-wrap items-center gap-3">
-                    <p className="font-mono text-sm font-bold text-slate-500">ID: {selectedStudent.student_id}</p>
-                    <span className="h-3 w-[1px] bg-slate-300"></span>
-                    <p className="font-bold text-slate-600 uppercase text-[10px] flex items-center gap-1">
-                       <BookOpen size={12} className="text-blue-500"/> 
-                       {selectedStudent.grade_level} 
-                       {['Grade 11', 'Grade 12', 'College'].includes(selectedStudent.grade_level) && selectedStudent.program_code ? ` | ${selectedStudent.program_code}` : ''}
-                    </p>
-                    <span className="h-3 w-[1px] bg-slate-300"></span>
-                    
-                    {/* ENROLLMENT STATUS INDICATOR */}
-                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter border ${
-                      selectedStudent.enrollment_status === 'Enrolled' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                      selectedStudent.enrollment_status === 'Assessed' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
-                      'bg-slate-50 text-slate-500 border-slate-100'
-                    }`}>
-                      {selectedStudent.enrollment_status || 'Ready to Enroll'}
-                    </span>
+              {/* II. PARENT / GUARDIAN DETAILS TABLE */}
+              <div className="border border-emerald-200 rounded-2xl overflow-hidden shadow-sm bg-white/95">
+                 <div className="bg-emerald-50 text-emerald-900 border-b border-emerald-200 px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
+                    II. Parent / Guardian Details
                  </div>
+                 <table className="w-full text-left border-collapse">
+                    <tbody>
+                       <tr className="border-b border-emerald-100">
+                          <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-emerald-100">Father's Name</td>
+                          <td className="w-1/4 p-3 text-sm text-slate-700 border-r border-emerald-100">{getFatherName(selectedStudent)}</td>
+                          <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-emerald-100">Father Contact</td>
+                          <td className="w-1/4 p-3 text-sm text-slate-700">{selectedStudent.father_contact || '---'}</td>
+                       </tr>
+                       <tr className="border-b border-emerald-100">
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-emerald-100">Mother's Name</td>
+                          <td className="p-3 text-sm text-slate-700 border-r border-emerald-100">{getMotherName(selectedStudent)}</td>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-emerald-100">Mother Contact</td>
+                          <td className="p-3 text-sm text-slate-700">{selectedStudent.mother_contact || '---'}</td>
+                       </tr>
+                       <tr>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-emerald-100">Guardian Name</td>
+                          <td className="p-3 text-sm text-slate-700 border-r border-emerald-100">{getGuardianName(selectedStudent)}</td>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-emerald-100">Guardian Contact</td>
+                          <td className="p-3 text-sm text-slate-700">{selectedStudent.guardian_contact || '---'}</td>
+                       </tr>
+                    </tbody>
+                 </table>
               </div>
-           </div>
-           
-           <div className="text-right print:hidden">
-              <img src={getLogoUrl(branding.school_logo)} className="w-12 h-12 rounded-lg object-cover mb-1 ml-auto" alt="Logo" />
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{branding.school_name}</p>
-           </div>
-        </div>
 
-        <div className="grid grid-cols-3 gap-6">
-          {/* I. PERSONAL */}
-          <div className="col-span-3">
-            <h4 className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3 border-b pb-1">I. Personal Information & Contact</h4>
-            <div className="grid grid-cols-4 gap-y-4">
-                <InfoBox label="First Name" value={selectedStudent.first_name} bold />
-                <InfoBox label="Middle Name" value={selectedStudent.middle_name} />
-                <InfoBox label="Last Name" value={selectedStudent.last_name} bold />
-                <InfoBox label="Suffix" value={selectedStudent.suffix} />
-                
-                <InfoBox label="LRN" value={selectedStudent.lrn} />
-                <InfoBox label="Gender" value={selectedStudent.gender} />
-                <InfoBox label="Date of Birth" value={selectedStudent.dob} />
-                <InfoBox label="Email Address" value={selectedStudent.email} bold />
-                
-                <InfoBox label="Mobile Number" value={selectedStudent.mobile_no} bold />
-                <div className="col-span-3"><InfoBox label="Home Address" value={selectedStudent.address_house} bold /></div>
+              {/* III. EDUCATIONAL HISTORY TABLE */}
+              <div className="border border-indigo-200 rounded-2xl overflow-hidden shadow-sm bg-white/95">
+                 <div className="bg-indigo-50 text-indigo-900 border-b border-indigo-200 px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
+                    III. Educational History
+                 </div>
+                 <table className="w-full text-left border-collapse">
+                    <tbody>
+                       <tr className="border-b border-indigo-100">
+                          <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-indigo-100">Elementary School</td>
+                          <td className="w-1/4 p-3 text-sm text-slate-700 border-r border-indigo-100">
+                             <div>{selectedStudent.elem_name || '---'}</div>
+                             {selectedStudent.elem_year && <div className="text-[10px] text-slate-400 font-bold">Graduated: {selectedStudent.elem_year}</div>}
+                          </td>
+                          <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-indigo-100">Elementary Address</td>
+                          <td className="w-1/4 p-3 text-sm text-slate-700">{selectedStudent.elem_address || '---'}</td>
+                       </tr>
+                       <tr className="border-b border-indigo-100">
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-indigo-100">Junior High School</td>
+                          <td className="p-3 text-sm text-slate-700 border-r border-indigo-100">
+                             <div>{selectedStudent.jhs_name || '---'}</div>
+                             {selectedStudent.jhs_year && <div className="text-[10px] text-slate-400 font-bold">Completed: {selectedStudent.jhs_year}</div>}
+                          </td>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-indigo-100">JHS Address</td>
+                          <td className="p-3 text-sm text-slate-700">{selectedStudent.jhs_address || '---'}</td>
+                       </tr>
+                       <tr>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-indigo-100">Senior High School</td>
+                          <td className="p-3 text-sm text-slate-700 border-r border-indigo-100">
+                             <div>{selectedStudent.shs_name || '---'}</div>
+                             {selectedStudent.shs_year && <div className="text-[10px] text-slate-400 font-bold">Completed: {selectedStudent.shs_year}</div>}
+                             {selectedStudent.shs_strand && <div className="text-[10px] text-blue-500 font-bold">Strand: {selectedStudent.shs_strand}</div>}
+                          </td>
+                          <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-indigo-100">SHS Address</td>
+                          <td className="p-3 text-sm text-slate-700">{selectedStudent.shs_address || '---'}</td>
+                       </tr>
+                    </tbody>
+                 </table>
+              </div>
+
+              {/* IV. EMPLOYMENT & WORK DETAILS TABLE */}
+              <div className="border border-purple-200 rounded-2xl overflow-hidden shadow-sm bg-white/95">
+                 <div className="bg-purple-50 text-purple-900 border-b border-purple-200 px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
+                    IV. Employment & Work Details
+                 </div>
+                 <table className="w-full text-left border-collapse">
+                    <tbody>
+                       {selectedStudent.is_working ? (
+                          <>
+                             <tr className="border-b border-purple-100">
+                                <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-purple-100">Employment Status</td>
+                                <td className="w-1/4 p-3 text-sm font-bold text-slate-800 border-r border-purple-100">Working Student</td>
+                                <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-purple-100">Company Name</td>
+                                <td className="w-1/4 p-3 text-sm text-slate-700">{selectedStudent.work_company || '---'}</td>
+                             </tr>
+                             <tr>
+                                <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-purple-100">Job Designation</td>
+                                <td className="p-3 text-sm text-slate-700 border-r border-purple-100">{selectedStudent.work_position || '---'}</td>
+                                <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-purple-100">Work Address</td>
+                                <td className="p-3 text-sm text-slate-700">{selectedStudent.work_address || '---'}</td>
+                             </tr>
+                          </>
+                       ) : (
+                          <tr>
+                             <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-purple-100">Employment Status</td>
+                             <td colSpan="3" className="p-3 text-sm font-medium text-slate-500 italic">Full-time Student (Not Employed)</td>
+                          </tr>
+                       )}
+                    </tbody>
+                 </table>
+              </div>
+
+              {/* V. ACADEMIC RECORD TABLE */}
+              <div className="border border-amber-200 rounded-2xl overflow-hidden shadow-sm bg-white/95">
+                 <div className="bg-amber-50 text-amber-900 border-b border-amber-200 px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
+                    V. Academic Record
+                 </div>
+                 <table className="w-full text-left border-collapse">
+                    <tbody>
+                       <tr className="border-b border-amber-100">
+                          <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-amber-100">School Year</td>
+                          <td className="w-1/4 p-3 text-sm font-bold text-slate-800 border-r border-amber-100">{selectedStudent.school_year || '---'}</td>
+                          <td className="w-1/4 bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-amber-100">Grade Level</td>
+                          <td className="w-1/4 p-3 text-sm font-bold text-slate-800">{selectedStudent.grade_level || '---'}</td>
+                       </tr>
+                       <tr>
+                          {['Grade 11', 'Grade 12', 'College'].includes(selectedStudent.grade_level) ? (
+                             <>
+                                <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-amber-100">
+                                   {selectedStudent.grade_level === 'College' ? 'Course & Major' : 'SHS Strand'}
+                                </td>
+                                <td className="p-3 text-sm font-bold text-slate-800 border-r border-amber-100">
+                                   {selectedStudent.program_desc || selectedStudent.program_code || '---'}
+                                </td>
+                                <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-amber-100">Enrollment Type</td>
+                                <td className="p-3 text-sm text-slate-700">{selectedStudent.enrollment_type || '---'}</td>
+                             </>
+                          ) : (
+                             <>
+                                <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-amber-100">Enrollment Type</td>
+                                <td className="p-3 text-sm text-slate-700 border-r border-amber-100">{selectedStudent.enrollment_type || '---'}</td>
+                                <td className="bg-slate-50/80 p-3 font-bold text-slate-500 text-[10px] uppercase tracking-wider border-r border-blue-100"></td>
+                                <td className="p-3 text-sm text-slate-700"></td>
+                             </>
+                          )}
+                       </tr>
+                    </tbody>
+                 </table>
+              </div>
             </div>
-          </div>
 
-          {/* II. PARENTS */}
-          <div className="col-span-3">
-             <h4 className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-3 border-b pb-1">II. Parent / Guardian Details</h4>
-             <div className="grid grid-cols-3 gap-y-4">
-                <InfoBox label="Father's Name" value={selectedStudent.father_name} />
-                <InfoBox label="Father Contact" value={selectedStudent.father_contact} />
-                <div className="hidden md:block"></div>
-                <InfoBox label="Mother's Name" value={selectedStudent.mother_name} />
-                <InfoBox label="Mother Contact" value={selectedStudent.mother_contact} />
-                <div className="hidden md:block"></div>
-                <InfoBox label="Guardian Name" value={selectedStudent.guardian_name} />
-                <InfoBox label="Guardian Contact" value={selectedStudent.guardian_contact} />
-             </div>
-          </div>
-
-          {/* III. ACADEMIC RECORD */}
-          <div className="col-span-3">
-            <h4 className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-3 border-b pb-1">III. Academic Record</h4>
-            <div className="grid grid-cols-3 gap-y-4">
-                <InfoBox label="School Year" value={selectedStudent.school_year} bold />
-                <InfoBox label="Grade Level" value={selectedStudent.grade_level} bold />
-                
-                {['Grade 11', 'Grade 12', 'College'].includes(selectedStudent.grade_level) && (
-                   <div className="col-span-1">
-                      <InfoBox label={selectedStudent.grade_level === 'College' ? 'Course & Major' : 'SHS Strand'} value={selectedStudent.program_desc || selectedStudent.program_code} bold />
-                   </div>
-                )}
-                
-                <InfoBox label="Enrollment Type" value={selectedStudent.enrollment_type} />
-                <div className="col-span-2"><InfoBox label="Previous School" value={selectedStudent.prev_school} /></div>
+            {/* SIGNATURES ON PRINT */}
+            <div className="hidden print:flex justify-between mt-12 pt-6 border-t border-slate-300">
+               <div className="text-center w-56">
+                  <div className="border-b border-slate-800 mb-1"></div>
+                  <p className="text-[8px] font-black uppercase text-slate-500">Registrar Signature</p>
+               </div>
+               <div className="text-center">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Date Printed</p>
+                  <p className="text-[10px] font-bold">{new Date().toLocaleDateString()}</p>
+               </div>
             </div>
-          </div>
-        </div>
-
-        {/* SIGNATURES ON PRINT */}
-        <div className="hidden print:flex justify-between mt-12 pt-6 border-t border-slate-300">
-           <div className="text-center w-56">
-              <div className="border-b border-slate-800 mb-1"></div>
-              <p className="text-[8px] font-black uppercase text-slate-500">Registrar Signature</p>
-           </div>
-           <div className="text-center">
-              <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Date Printed</p>
-              <p className="text-[10px] font-bold">{new Date().toLocaleDateString()}</p>
-           </div>
-        </div>
+         </div>
       </div>
     </div>
   </div>

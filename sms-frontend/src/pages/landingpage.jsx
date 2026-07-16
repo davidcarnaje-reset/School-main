@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { GraduationCap, Users, ShieldCheck, ArrowRight, ArrowLeft, Menu, X, ChevronLeft, ChevronRight, CheckCircle, Search, School, Compass, Loader2 } from 'lucide-react';
+import { GraduationCap, Users, ShieldCheck, ArrowRight, ArrowLeft, Menu, X, ChevronLeft, ChevronRight, CheckCircle, Search, School, Compass, Loader2, Camera, User, Check, Mail, RefreshCw, Briefcase, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const LandingPage = () => {
@@ -20,6 +20,355 @@ const LandingPage = () => {
   const [loadingSchools, setLoadingSchools] = useState(true);
   const [selectedSchoolId, setSelectedSchoolId] = useState(localStorage.getItem('selected_school_id'));
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Admissions & Wizard States
+  const [showAdmissionsModal, setShowAdmissionsModal] = useState(false);
+  const [showRegisterWizard, setShowRegisterWizard] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [programs, setPrograms] = useState([]);
+  const [saveLoading, setSaveLoading] = useState(false);
+  
+  const initialFormState = {
+    lrn: '', first_name: '', middle_name: '', last_name: '', suffix: '', 
+    nickname: '', gender: 'Male', dob: '', place_of_birth: '', 
+    nationality: 'Filipino', religion: '', civil_status: 'Single',
+    email: '', mobile_no: '', alt_mobile_no: '', 
+    address_house: '', address_brgy: '', address_city: '', address_province: '', address_zip: '',
+    elem_name: '', elem_year: '', elem_address: '',
+    jhs_name: '', jhs_year: '', jhs_address: '',
+    shs_name: '', shs_year: '', shs_address: '', shs_strand: '',
+    is_working: false, work_company: '', work_position: '', work_address: '',
+    father_first_name: '', father_middle_name: '', father_last_name: '', father_no_middle: false, father_occ: '', father_contact: '',
+    mother_first_name: '', mother_middle_name: '', mother_last_name: '', mother_no_middle: false, mother_occ: '', mother_contact: '',
+    guardian_type: 'Other', guardian_first_name: '', guardian_middle_name: '', guardian_last_name: '', guardian_no_middle: false, guardian_name: '', guardian_rel: '', guardian_contact: '', guardian_occ: '', guardian_address: '',
+    enrollment_type: 'New', school_year: '2026-2027', grade_level: 'Grade 7', 
+    program_id: '', section: 'TBA', scholarship_type: 'None', payment_plan: 'Full Payment'
+  };
+
+  const [formData, setFormData] = useState(initialFormState);
+  const [profileImage, setProfileImage] = useState(null);
+  const [successData, setSuccessData] = useState(null);
+  
+  // Captcha states
+  const [captchaChallenge, setCaptchaChallenge] = useState('');
+  const [captchaInput, setCaptchaInput] = useState('');
+  const [captchaError, setCaptchaError] = useState(false);
+
+  const PHILIPPINE_PLACES = {
+    "Bulacan": ["Obando", "Meycauayan", "Marilao", "Bocaue", "Malolos", "Baliuag"],
+    "Metro Manila": ["Valenzuela", "Caloocan", "Quezon City", "Manila", "Malabon", "Navotas"],
+    "Pampanga": ["San Fernando", "Angeles", "Mabalacat", "Guagua"],
+    "Rizal": ["Antipolo", "Taytay", "Cainta", "Binangonan"]
+  };
+
+  const gradeLevels = [
+    'Kinder', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 
+    'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12', 'College'
+  ];
+
+  // Helper inputs formatters
+  const handlePhoneInput = (val, field) => {
+    if (val === '') {
+      setFormData(prev => ({ ...prev, [field]: '+639' }));
+      return;
+    }
+    const numbersOnly = val.replace(/\D/g, '');
+    if (numbersOnly.startsWith('639')) {
+      const formatted = '+' + numbersOnly.slice(0, 12);
+      setFormData(prev => ({ ...prev, [field]: formatted }));
+    } else if (numbersOnly.startsWith('9')) {
+      const formatted = '+639' + numbersOnly.slice(1, 10);
+      setFormData(prev => ({ ...prev, [field]: formatted }));
+    } else {
+      const clean = numbersOnly.slice(0, 9);
+      setFormData(prev => ({ ...prev, [field]: '+639' + clean }));
+    }
+  };
+
+  const handleNumberOnly = (val, field, max) => {
+    const cleaned = val.replace(/\D/g, '').slice(0, max);
+    setFormData(prev => ({ ...prev, [field]: cleaned }));
+  };
+
+  // Guardian automatic copy/helpers
+  const getGuardianValue = (field) => {
+    if (formData.guardian_type === 'Mother') {
+      if (field === 'guardian_first_name') return formData.mother_first_name;
+      if (field === 'guardian_middle_name') return formData.mother_middle_name;
+      if (field === 'guardian_last_name') return formData.mother_last_name;
+      if (field === 'guardian_no_middle') return formData.mother_no_middle;
+      if (field === 'guardian_rel') return 'Mother';
+      if (field === 'guardian_contact') return formData.mother_contact;
+      if (field === 'guardian_occ') return formData.mother_occ;
+      if (field === 'guardian_address') return `${formData.address_house || ''}, ${formData.address_brgy || ''}, ${formData.address_city || ''}, ${formData.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim();
+    }
+    if (formData.guardian_type === 'Father') {
+      if (field === 'guardian_first_name') return formData.father_first_name;
+      if (field === 'guardian_middle_name') return formData.father_middle_name;
+      if (field === 'guardian_last_name') return formData.father_last_name;
+      if (field === 'guardian_no_middle') return formData.father_no_middle;
+      if (field === 'guardian_rel') return 'Father';
+      if (field === 'guardian_contact') return formData.father_contact;
+      if (field === 'guardian_occ') return formData.father_occ;
+      if (field === 'guardian_address') return `${formData.address_house || ''}, ${formData.address_brgy || ''}, ${formData.address_city || ''}, ${formData.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim();
+    }
+    return formData[field];
+  };
+
+  const handleGuardianTypeChange = (type) => {
+    if (type === 'Mother') {
+      const fullMName = `${formData.mother_first_name || ''} ${formData.mother_no_middle ? '' : (formData.mother_middle_name || '')} ${formData.mother_last_name || ''}`.replace(/\s+/g, ' ').trim();
+      const mAddr = `${formData.address_house || ''}, ${formData.address_brgy || ''}, ${formData.address_city || ''}, ${formData.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim();
+      setFormData(prev => ({
+        ...prev,
+        guardian_type: type,
+        guardian_first_name: prev.mother_first_name,
+        guardian_middle_name: prev.mother_middle_name,
+        guardian_last_name: prev.mother_last_name,
+        guardian_no_middle: prev.mother_no_middle,
+        guardian_name: fullMName,
+        guardian_rel: 'Mother',
+        guardian_contact: prev.mother_contact,
+        guardian_occ: prev.mother_occ,
+        guardian_address: mAddr
+      }));
+    } else if (type === 'Father') {
+      const fullFName = `${formData.father_first_name || ''} ${formData.father_no_middle ? '' : (formData.father_middle_name || '')} ${formData.father_last_name || ''}`.replace(/\s+/g, ' ').trim();
+      const fAddr = `${formData.address_house || ''}, ${formData.address_brgy || ''}, ${formData.address_city || ''}, ${formData.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim();
+      setFormData(prev => ({
+        ...prev,
+        guardian_type: type,
+        guardian_first_name: prev.father_first_name,
+        guardian_middle_name: prev.father_middle_name,
+        guardian_last_name: prev.father_last_name,
+        guardian_no_middle: prev.father_no_middle,
+        guardian_name: fullFName,
+        guardian_rel: 'Father',
+        guardian_contact: prev.father_contact,
+        guardian_occ: prev.father_occ,
+        guardian_address: fAddr
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        guardian_type: type,
+        guardian_first_name: '',
+        guardian_middle_name: '',
+        guardian_last_name: '',
+        guardian_no_middle: false,
+        guardian_name: '',
+        guardian_rel: '',
+        guardian_contact: '',
+        guardian_occ: '',
+        guardian_address: ''
+      }));
+    }
+  };
+
+  const getFatherName = (f) => `${f.father_first_name || ''} ${f.father_middle_name || ''} ${f.father_last_name || ''}`.replace(/\s+/g, ' ').trim() || '---';
+  const getMotherName = (f) => `${f.mother_first_name || ''} ${f.mother_middle_name || ''} ${f.mother_last_name || ''}`.replace(/\s+/g, ' ').trim() || '---';
+  const getGuardianName = (f) => `${f.guardian_first_name || ''} ${f.guardian_middle_name || ''} ${f.guardian_last_name || ''}`.replace(/\s+/g, ' ').trim() || '---';
+
+  const getProgramOptions = () => {
+    let typeFilter = null;
+    if (['Grade 11', 'Grade 12'].includes(formData.grade_level)) {
+      typeFilter = 'SHS';
+    } else if (formData.grade_level === 'College') {
+      typeFilter = 'College';
+    }
+    if (!typeFilter) return [];
+    return programs
+      .filter(p => p.program_type === typeFilter)
+      .map(p => ({ value: p.id, label: `${p.code} - ${p.name}` }));
+  };
+
+  const isStepValid = () => {
+    if (currentStep === 1) {
+      const { first_name, last_name, dob, gender, lrn } = formData;
+      const isLrnValid = !lrn || lrn.length === 12; 
+      return first_name && last_name && dob && gender && isLrnValid;
+    }
+    if (currentStep === 2) {
+      const { email, mobile_no, address_city, address_province, address_zip, address_house, address_brgy } = formData;
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const isEmailValid = emailRegex.test(email);
+      const isPhoneValid = mobile_no && mobile_no.length === 13;
+      return isEmailValid && isPhoneValid && address_city && address_province && address_zip && address_house && address_brgy;
+    }
+    if (currentStep === 3) {
+      return !!formData.elem_name;
+    }
+    if (currentStep === 4) {
+      if (formData.is_working) {
+        return !!(formData.work_company && formData.work_position);
+      }
+      return true;
+    }
+    if (currentStep === 5) {
+      const fContactValid = !formData.father_contact || formData.father_contact === '+639' || formData.father_contact.length === 13;
+      const mContactValid = !formData.mother_contact || formData.mother_contact === '+639' || formData.mother_contact.length === 13;
+      const gContactValid = !formData.guardian_contact || formData.guardian_contact === '+639' || formData.guardian_contact.length === 13;
+      return fContactValid && mContactValid && gContactValid;
+    }
+    if (currentStep === 6) {
+      const needsProgram = ['Grade 11', 'Grade 12', 'College'].includes(formData.grade_level);
+      if (needsProgram && !formData.program_id) return false;
+      return true;
+    }
+    return true;
+  };
+
+  const nextStep = () => {
+    if (isStepValid()) {
+      setCurrentStep(prev => prev + 1);
+      if (currentStep === 5) {
+        generateCaptcha();
+      }
+    }
+  };
+  const prevStep = () => setCurrentStep(prev => prev - 1);
+
+  // Captcha Generator Code
+  const generateCaptcha = () => {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let text = '';
+    for (let i = 0; i < 5; i++) {
+      text += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setCaptchaChallenge(text);
+    setCaptchaInput('');
+    setCaptchaError(false);
+    
+    setTimeout(() => {
+      const canvas = document.getElementById('captcha-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      grad.addColorStop(0, '#f8fafc');
+      grad.addColorStop(1, '#cbd5e1');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      for (let i = 0; i < 6; i++) {
+        ctx.strokeStyle = `rgba(${Math.floor(Math.random()*100)}, ${Math.floor(Math.random()*100)}, ${Math.floor(Math.random()*255)}, 0.35)`;
+        ctx.lineWidth = Math.random() * 2 + 1;
+        ctx.beginPath();
+        ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+        ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+        ctx.stroke();
+      }
+      
+      ctx.font = 'bold 24px monospace';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        ctx.fillStyle = `rgb(${Math.floor(Math.random()*80)}, ${Math.floor(Math.random()*80)}, ${Math.floor(Math.random()*150)})`;
+        ctx.save();
+        const x = 16 + i * 22;
+        const y = canvas.height / 2 + (Math.random() * 8 - 4);
+        const angle = (Math.random() * 26 - 13) * Math.PI / 180;
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillText(char, 0, 0);
+        ctx.restore();
+      }
+    }, 150);
+  };
+
+  const handleAdmissionSubmit = async (e) => {
+    e.preventDefault();
+    if (!isStepValid()) return;
+    
+    // CAPTCHA VALIDATION
+    if (captchaInput.trim().toUpperCase() !== captchaChallenge) {
+      setCaptchaError(true);
+      generateCaptcha();
+      return;
+    }
+    
+    setSaveLoading(true);
+    try {
+      const data = new FormData();
+      
+      const mName = `${formData.mother_first_name || ''} ${formData.mother_no_middle ? '' : (formData.mother_middle_name || '')} ${formData.mother_last_name || ''}`.replace(/\s+/g, ' ').trim();
+      const fName = `${formData.father_first_name || ''} ${formData.father_no_middle ? '' : (formData.father_middle_name || '')} ${formData.father_last_name || ''}`.replace(/\s+/g, ' ').trim();
+      
+      const gName = formData.guardian_type === 'Mother' ? mName : formData.guardian_type === 'Father' ? fName : formData.guardian_name;
+      const gRel = formData.guardian_type === 'Mother' ? 'Mother' : formData.guardian_type === 'Father' ? 'Father' : formData.guardian_rel;
+      const gContact = formData.guardian_type === 'Mother' ? formData.mother_contact : formData.guardian_type === 'Father' ? formData.father_contact : formData.guardian_contact;
+      const gOcc = formData.guardian_type === 'Mother' ? formData.mother_occ : formData.guardian_type === 'Father' ? formData.father_occ : formData.guardian_occ;
+      const gAddress = (formData.guardian_type === 'Mother' || formData.guardian_type === 'Father')
+        ? `${formData.address_house || ''}, ${formData.address_brgy || ''}, ${formData.address_city || ''}, ${formData.address_province || ''}`.replace(/^,\s*|,\s*$/g, '').trim()
+        : formData.guardian_address;
+
+      const gFirstName = formData.guardian_type === 'Mother' ? formData.mother_first_name : formData.guardian_type === 'Father' ? formData.father_first_name : formData.guardian_first_name;
+      const gMiddleName = formData.guardian_type === 'Mother' ? formData.mother_middle_name : formData.guardian_type === 'Father' ? formData.father_middle_name : formData.guardian_middle_name;
+      const gLastName = formData.guardian_type === 'Mother' ? formData.mother_last_name : formData.guardian_type === 'Father' ? formData.father_last_name : formData.guardian_last_name;
+
+      const finalPayload = {
+        ...formData,
+        mother_name: mName,
+        father_name: fName,
+        guardian_first_name: gFirstName,
+        guardian_middle_name: gMiddleName,
+        guardian_last_name: gLastName,
+        guardian_name: gName,
+        guardian_rel: gRel,
+        guardian_contact: gContact,
+        guardian_occ: gOcc,
+        guardian_address: gAddress
+      };
+
+      Object.keys(finalPayload).forEach(key => {
+        data.append(key, finalPayload[key] === null || finalPayload[key] === undefined ? '' : finalPayload[key]);
+      });
+
+      if (profileImage) {
+        data.append('profile_image', profileImage);
+      }
+
+      // Explicitly append the selected campus as the target school
+      const schoolId = selectedSchoolId || 1;
+      data.append('school_id', schoolId);
+
+      const response = await axios.post(`${API_BASE_URL}/registrar/register-student`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.success) {
+        setShowRegisterWizard(false);
+        setFormData(initialFormState);
+        setProfileImage(null);
+        setCurrentStep(1);
+        
+        const studentId = response.data.student_id;
+        const password = response.data.password;
+        const fullName = response.data.full_name;
+        setSuccessData({ student_id: studentId, password, full_name: fullName });
+      } else {
+        alert(response.data.message || 'Registration failed.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Server error occurred during application.');
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const fetchActivePrograms = async (schoolId) => {
+    try {
+      const activeId = schoolId || selectedSchoolId || 1;
+      const res = await axios.get(`${API_BASE_URL}/registrar/get_academic_programs.php?school_id=${activeId}`);
+      if (Array.isArray(res.data)) {
+        setPrograms(res.data.filter(p => p.status === 'Active'));
+      }
+    } catch (error) {
+      console.error("Error fetching academic programs:", error);
+    }
+  };
 
   // ==========================================
   // 2. FETCH ACTIVE SCHOOLS
@@ -66,6 +415,7 @@ const LandingPage = () => {
       fetchActiveSchools();
     } else {
       fetchPromotions(selectedSchoolId);
+      fetchActivePrograms(selectedSchoolId);
     }
   }, [selectedSchoolId]);
 
@@ -216,7 +566,7 @@ const LandingPage = () => {
 
           <div className="hidden md:flex items-center space-x-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
             <a href="#" className="hover:text-blue-600 transition-colors">Home</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Admissions</a>
+            <button onClick={() => setShowAdmissionsModal(true)} className="hover:text-blue-600 transition-colors uppercase font-bold text-[10px] tracking-widest outline-none bg-transparent border-0 cursor-pointer">Admissions</button>
             <a href="#" className="hover:text-blue-600 transition-colors">About Us</a>
           </div>
 
@@ -231,7 +581,7 @@ const LandingPage = () => {
         {isMenuOpen && (
           <div className="absolute top-full left-0 w-full bg-white border-b border-slate-200 p-6 space-y-4 md:hidden animate-in slide-in-from-top-2 duration-200">
             <a href="#" className="block text-sm font-bold text-slate-600 py-2">Home</a>
-            <a href="#" className="block text-sm font-bold text-slate-600 py-2">Admissions</a>
+            <button onClick={() => { setShowAdmissionsModal(true); setIsMenuOpen(false); }} className="block w-full text-left text-sm font-bold text-slate-600 py-2 outline-none bg-transparent border-0 cursor-pointer">Admissions</button>
             <a href="#" className="block text-sm font-bold text-slate-600 py-2">About Us</a>
             <button 
               onClick={handleChangeCampus}
@@ -351,6 +701,516 @@ const LandingPage = () => {
         </div>
       </main>
 
+      {/* ADMISSIONS INFO & REQUIREMENTS MODAL */}
+      {showAdmissionsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[110] flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden animate-in fade-in duration-300">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in duration-300">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+              <div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">Campus Admission Guide</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">{branding.school_name}</p>
+              </div>
+              <button onClick={() => setShowAdmissionsModal(false)} className="bg-white shadow-sm p-3 rounded-2xl text-slate-400 hover:text-red-500 transition-colors"><X size={20}/></button>
+            </div>
+
+            <div className="p-8 overflow-y-auto flex-grow space-y-6">
+              <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 space-y-2">
+                <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">General Admission Guidelines</h4>
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                  Welcome to our online application portal! Please read the requirements below before starting your registration. Make sure you have clear scanned copies or photos of your academic credentials and personal identification.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Required Documents</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                    <CheckCircle className="text-emerald-500 shrink-0 mt-0.5" size={16}/>
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-700 font-black">For Basic Ed (Kinder to Grade 10)</h5>
+                      <p className="text-[10px] text-slate-500 mt-1 font-bold">• Birth Certificate (PSA)<br/>• Report Card (Form 138)<br/>• 2x2 ID Photo</p>
+                    </div>
+                  </div>
+                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                    <CheckCircle className="text-emerald-500 shrink-0 mt-0.5" size={16}/>
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-700 font-black">For Senior High (Grade 11-12)</h5>
+                      <p className="text-[10px] text-slate-500 mt-1 font-bold">• Form 138 / Completion Certificate<br/>• PSA Birth Certificate<br/>• Good Moral Certificate</p>
+                    </div>
+                  </div>
+                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                    <CheckCircle className="text-emerald-500 shrink-0 mt-0.5" size={16}/>
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-700 font-black">For College Freshmen</h5>
+                      <p className="text-[10px] text-slate-500 mt-1 font-bold">• Form 138 / Transcript of Records<br/>• PSA Birth Certificate<br/>• Honorable Dismissal (Transferees)</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex items-start gap-3">
+                <AlertCircle className="text-amber-500 shrink-0" size={20}/>
+                <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                  <strong>Important Note:</strong> An official, auto-generated Student ID and Password will be provided at the end of the registration wizard upon successful submission. A welcome invitation link will also be sent to your registered email address.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-8 border-t border-slate-50 bg-slate-50/20 flex gap-4">
+              <button onClick={() => setShowAdmissionsModal(false)} className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all">Cancel</button>
+              <button 
+                onClick={() => {
+                  setShowAdmissionsModal(false);
+                  setShowRegisterWizard(true);
+                  setCurrentStep(1);
+                }} 
+                className="flex-grow py-4 text-white font-black rounded-2xl transition-all hover:scale-102 active:scale-98 shadow-lg flex items-center justify-center gap-2"
+                style={{backgroundColor: branding.theme_color || '#2563eb'}}
+              >
+                Apply Now <ArrowRight size={18}/>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WIZARD MODAL */}
+      {showRegisterWizard && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[110] flex items-center justify-center p-4 backdrop-blur-sm overflow-hidden animate-in fade-in duration-300">
+          <div className="bg-white rounded-[3rem] w-full max-w-4xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden animate-in zoom-in duration-300">
+            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">Student Registration Wizard</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                  {currentStep === 1 && "Step 1: Personal Profile"}
+                  {currentStep === 2 && "Step 2: Contact & Address"}
+                  {currentStep === 3 && "Step 3: Educational Info"}
+                  {currentStep === 4 && "Step 4: Work Details"}
+                  {currentStep === 5 && "Step 5: Family Background"}
+                  {currentStep === 6 && "Step 6: Academic Details"}
+                </p>
+              </div>
+              <button onClick={() => setShowRegisterWizard(false)} className="bg-white shadow-sm p-3 rounded-2xl text-slate-400 hover:text-red-500 transition-colors"><X size={20}/></button>
+            </div>
+
+            <div className="p-8 overflow-y-auto flex-1">
+              {/* STEP BUBBLES */}
+              <div className="flex items-center justify-between mb-8 px-4">
+                {[1, 2, 3, 4, 5, 6].map((step) => (
+                  <div key={step} className="flex items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${currentStep >= step ? 'text-white' : 'bg-slate-100 text-slate-400'}`}
+                         style={currentStep >= step ? {backgroundColor: branding.theme_color || '#2563eb'} : {}}>
+                      {currentStep > step ? <Check size={14} /> : step}
+                    </div>
+                    {step < 6 && <div className={`w-12 h-1 mx-2 rounded ${currentStep > step ? 'bg-blue-500' : 'bg-slate-100'}`} style={currentStep > step ? {backgroundColor: branding.theme_color || '#2563eb'} : {}} />}
+                  </div>
+                ))}
+              </div>
+
+              {/* STEP 1: PERSONAL INFO */}
+              {currentStep === 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-right-4 duration-300">
+                  <div className="md:col-span-3 flex flex-col items-center gap-2 bg-slate-50 p-6 rounded-3xl border border-dashed border-slate-200">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Profile Image (Optional)</label>
+                    <div className="relative w-24 h-24 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center border-2 border-white shadow-md">
+                      {profileImage ? (
+                        <img src={URL.createObjectURL(profileImage)} className="w-full h-full object-cover" alt="Preview" />
+                      ) : (
+                        <Camera className="text-slate-400" size={32} />
+                      )}
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={(e) => setProfileImage(e.target.files[0] || null)}
+                      className="text-xs font-bold text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <Input label="LRN (12 Digits)" value={formData.lrn} onChange={v => handleNumberOnly(v, 'lrn', 12)} placeholder="12-digit LRN" maxLength="12"/>
+                  </div>
+                  <div className="md:col-span-2"></div>
+                  <Input label="First Name" value={formData.first_name} onChange={v=>setFormData({...formData, first_name:v})} required/>
+                  <Input label="Middle Name" value={formData.middle_name} onChange={v=>setFormData({...formData, middle_name:v})}/>
+                  <Input label="Last Name" value={formData.last_name} onChange={v=>setFormData({...formData, last_name:v})} required/>
+                  <Input label="Suffix" value={formData.suffix} onChange={v=>setFormData({...formData, suffix:v})} placeholder="Jr, Sr, III"/>
+                  <Select label="Gender" value={formData.gender} onChange={v=>setFormData({...formData, gender:v})} options={['Male', 'Female', 'Other']}/>
+                  
+                  <Input label="Date of Birth" type="date" value={formData.dob} onChange={v=>setFormData({...formData, dob:v})} max={new Date().toISOString().split('T')[0]} required/>
+                  <Input label="Place of Birth" value={formData.place_of_birth} onChange={v=>setFormData({...formData, place_of_birth:v})}/>
+                  <Input label="Nationality" value={formData.nationality} onChange={v=>setFormData({...formData, nationality:v})}/>
+                  <Input label="Religion" value={formData.religion} onChange={v=>setFormData({...formData, religion:v})}/>
+                </div>
+              )}
+
+              {/* STEP 2: CONTACT & ADDRESS */}
+              {currentStep === 2 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-right-4 duration-300">
+                  <Input label="Email Address" type="email" value={formData.email} onChange={v=>setFormData({...formData, email:v})} required/>
+                  <Input label="Mobile Number" value={formData.mobile_no} onChange={v => handlePhoneInput(v, 'mobile_no')} placeholder="+639..." required/>
+                  <div className="md:col-span-2"><Input label="House No. / Street" value={formData.address_house} onChange={v=>setFormData({...formData, address_house:v})} required/></div>
+                  <Input label="Barangay" value={formData.address_brgy} onChange={v=>setFormData({...formData, address_brgy:v})} required/>
+                  
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Province *</label>
+                    <select value={formData.address_province} onChange={e => setFormData({...formData, address_province: e.target.value, address_city: ''})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm">
+                        <option value="">-- Select Province --</option>
+                        {Object.keys(PHILIPPINE_PLACES).map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">City / Municipality *</label>
+                    <select disabled={!formData.address_province} value={formData.address_city} onChange={e => setFormData({...formData, address_city: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm disabled:opacity-50">
+                        <option value="">-- Select City --</option>
+                        {formData.address_province && PHILIPPINE_PLACES[formData.address_province].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+
+                  <Input label="Zip Code" value={formData.address_zip} onChange={v => handleNumberOnly(v, 'address_zip', 5)} required maxLength="5"/>
+                </div>
+              )}
+
+              {/* STEP 3: EDUCATIONAL INFO */}
+              {currentStep === 3 && (
+                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                  {/* ELEMENTARY */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                      <GraduationCap size={14}/> Elementary School (Graduated) *
+                    </h4>
+                    <div className="md:col-span-2">
+                      <Input label="Name of School *" value={formData.elem_name} onChange={v=>setFormData({...formData, elem_name:v})} required/>
+                    </div>
+                    <Input label="Year Graduated" value={formData.elem_year} onChange={v=>handleNumberOnly(v, 'elem_year', 4)} placeholder="e.g. 2020" maxLength="4"/>
+                    <div className="md:col-span-3">
+                      <Input label="School Address" value={formData.elem_address} onChange={v=>setFormData({...formData, elem_address:v})}/>
+                    </div>
+                  </div>
+
+                  {/* JHS */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2">
+                      <GraduationCap size={14}/> Junior High School (JHS)
+                    </h4>
+                    <div className="md:col-span-2">
+                      <Input label="Name of School" value={formData.jhs_name} onChange={v=>setFormData({...formData, jhs_name:v})}/>
+                    </div>
+                    <Input label="Year Completed" value={formData.jhs_year} onChange={v=>handleNumberOnly(v, 'jhs_year', 4)} placeholder="e.g. 2024" maxLength="4"/>
+                    <div className="md:col-span-3">
+                      <Input label="School Address" value={formData.jhs_address} onChange={v=>setFormData({...formData, jhs_address:v})}/>
+                    </div>
+                  </div>
+
+                  {/* SHS */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-pink-500 uppercase tracking-widest flex items-center gap-2">
+                      <GraduationCap size={14}/> Senior High School (SHS)
+                    </h4>
+                    <div className="md:col-span-2">
+                      <Input label="Name of School" value={formData.shs_name} onChange={v=>setFormData({...formData, shs_name:v})}/>
+                    </div>
+                    <Input label="Year Completed" value={formData.shs_year} onChange={v=>handleNumberOnly(v, 'shs_year', 4)} placeholder="e.g. 2026" maxLength="4"/>
+                    <div className="md:col-span-2">
+                      <Input label="School Address" value={formData.shs_address} onChange={v=>setFormData({...formData, shs_address:v})}/>
+                    </div>
+                    <Input label="Strand / Track" value={formData.shs_strand} onChange={v=>setFormData({...formData, shs_strand:v})} placeholder="e.g. STEM, ABM, HUMSS"/>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4: WORK DETAILS */}
+              {currentStep === 4 && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                  <div className="flex items-center justify-between bg-slate-50 p-6 rounded-3xl border border-slate-100 shadow-sm">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-black text-slate-800 tracking-tight">Employed / Working Student</h4>
+                      <p className="text-xs text-slate-400 font-bold">Turn this option on if the student currently has a job.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={formData.is_working} 
+                        onChange={e => {
+                          setFormData({
+                            ...formData,
+                            is_working: e.target.checked,
+                            work_company: e.target.checked ? formData.work_company : '',
+                            work_position: e.target.checked ? formData.work_position : '',
+                            work_address: e.target.checked ? formData.work_address : ''
+                          })
+                        }} 
+                        className="sr-only peer"
+                      />
+                      <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  {formData.is_working ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 animate-in fade-in duration-300">
+                      <h4 className="md:col-span-2 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                        <Briefcase size={14}/> Employment & Work Information *
+                      </h4>
+                      <Input label="Company Name *" value={formData.work_company} onChange={v=>setFormData({...formData, work_company:v})} required/>
+                      <Input label="Position / Designation *" value={formData.work_position} onChange={v=>setFormData({...formData, work_position:v})} required/>
+                      <div className="md:col-span-2">
+                        <Input label="Company Address" value={formData.work_address} onChange={v=>setFormData({...formData, work_address:v})}/>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-blue-50/50 border border-blue-100 p-8 rounded-3xl text-center space-y-2 py-12 animate-in fade-in duration-300">
+                      <Briefcase className="text-blue-500 mx-auto opacity-60" size={32} />
+                      <h5 className="font-bold text-slate-700 text-sm">Not Currently Employed</h5>
+                      <p className="text-xs text-slate-500 max-w-xs mx-auto">This student is marked as a full-time student. No work details are required to proceed.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 5: FAMILY BACKGROUND */}
+              {currentStep === 5 && (
+                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                  {/* FATHER'S INFO */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                      <Users size={14}/> Father's Information
+                    </h4>
+                    <Input label="First Name" value={formData.father_first_name} onChange={v=>setFormData({...formData, father_first_name:v})}/>
+                    <div className="space-y-1.5">
+                      <Input label="Middle Name" value={formData.father_middle_name} onChange={v=>setFormData({...formData, father_middle_name:v})} disabled={formData.father_no_middle}/>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
+                        <input type="checkbox" checked={formData.father_no_middle} onChange={e=>{
+                          setFormData({
+                            ...formData,
+                            father_no_middle: e.target.checked,
+                            father_middle_name: e.target.checked ? '' : formData.father_middle_name
+                          })
+                        }} className="rounded text-blue-500 focus:ring-blue-500" />
+                        <span>No Middle Name</span>
+                      </label>
+                    </div>
+                    <Input label="Last Name" value={formData.father_last_name} onChange={v=>setFormData({...formData, father_last_name:v})}/>
+                    <Input label="Occupation" value={formData.father_occ} onChange={v=>setFormData({...formData, father_occ:v})}/>
+                    <Input label="Contact No." value={formData.father_contact} onChange={v => handlePhoneInput(v, 'father_contact')} placeholder="+639..."/>
+                  </div>
+
+                  {/* MOTHER'S INFO */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-pink-500 uppercase tracking-widest flex items-center gap-2">
+                      <Users size={14}/> Mother's Information (Maiden Name)
+                    </h4>
+                    <Input label="First Name" value={formData.mother_first_name} onChange={v=>setFormData({...formData, mother_first_name:v})}/>
+                    <div className="space-y-1.5">
+                      <Input label="Middle Name" value={formData.mother_middle_name} onChange={v=>setFormData({...formData, mother_middle_name:v})} disabled={formData.mother_no_middle}/>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
+                        <input type="checkbox" checked={formData.mother_no_middle} onChange={e=>{
+                          setFormData({
+                            ...formData,
+                            mother_no_middle: e.target.checked,
+                            mother_middle_name: e.target.checked ? '' : formData.mother_middle_name
+                          })
+                        }} className="rounded text-pink-500 focus:ring-pink-500" />
+                        <span>No Middle Name</span>
+                      </label>
+                    </div>
+                    <Input label="Maiden Last Name" value={formData.mother_last_name} onChange={v=>setFormData({...formData, mother_last_name:v})}/>
+                    <Input label="Occupation" value={formData.mother_occ} onChange={v=>setFormData({...formData, mother_occ:v})}/>
+                    <Input label="Contact No." value={formData.mother_contact} onChange={v => handlePhoneInput(v, 'mother_contact')} placeholder="+639..."/>
+                  </div>
+
+                  {/* GUARDIAN INFO */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <h4 className="md:col-span-3 text-xs font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                      <Users size={14}/> Guardian's Information
+                    </h4>
+                    <div className="md:col-span-3 flex flex-wrap gap-4 items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Guardian:</span>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                        <input type="radio" name="guardian_type_adm" value="Mother" checked={formData.guardian_type === 'Mother'} onChange={() => handleGuardianTypeChange('Mother')} className="text-emerald-500 focus:ring-emerald-500" />
+                        <span>Same as Mother</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                        <input type="radio" name="guardian_type_adm" value="Father" checked={formData.guardian_type === 'Father'} onChange={() => handleGuardianTypeChange('Father')} className="text-emerald-500 focus:ring-emerald-500" />
+                        <span>Same as Father</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                        <input type="radio" name="guardian_type_adm" value="Other" checked={formData.guardian_type === 'Other'} onChange={() => handleGuardianTypeChange('Other')} className="text-emerald-500 focus:ring-emerald-500" />
+                        <span>Other / Specify</span>
+                      </label>
+                    </div>
+
+                    <Input label="First Name" value={getGuardianValue('guardian_first_name')} onChange={v => setFormData({...formData, guardian_first_name: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'}/>
+                    <div className="space-y-1.5">
+                      <Input label="Middle Name" value={getGuardianValue('guardian_middle_name')} onChange={v => setFormData({...formData, guardian_middle_name: v})} disabled={formData.guardian_type !== 'Other' || getGuardianValue('guardian_no_middle')}/>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
+                        <input type="checkbox" checked={getGuardianValue('guardian_no_middle')} disabled={formData.guardian_type !== 'Other'} onChange={e=>{
+                          setFormData({
+                            ...formData,
+                            guardian_no_middle: e.target.checked,
+                            guardian_middle_name: e.target.checked ? '' : formData.guardian_middle_name
+                          })
+                        }} className="rounded text-emerald-500 focus:ring-emerald-500" />
+                        <span>No Middle Name</span>
+                      </label>
+                    </div>
+                    <Input label="Last Name" value={getGuardianValue('guardian_last_name')} onChange={v => setFormData({...formData, guardian_last_name: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'}/>
+                    
+                    <Input label="Relationship" value={getGuardianValue('guardian_rel')} onChange={v => setFormData({...formData, guardian_rel: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'}/>
+                    <Input label="Contact No." value={getGuardianValue('guardian_contact')} onChange={v => handlePhoneInput(v, 'guardian_contact')} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder="+639..."/>
+                    <Input label="Occupation" value={getGuardianValue('guardian_occ')} onChange={v => setFormData({...formData, guardian_occ: v})} disabled={formData.guardian_type !== 'Other'}/>
+                    
+                    <div className="md:col-span-3">
+                      <Input label="Home Address" value={getGuardianValue('guardian_address')} onChange={v => setFormData({...formData, guardian_address: v})} disabled={formData.guardian_type !== 'Other'}/>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 6: ACADEMIC DETAILS */}
+              {currentStep === 6 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-right-4 duration-300">
+                  <Select label="Enrollment Type" value={formData.enrollment_type} onChange={v=>setFormData({...formData, enrollment_type:v})} options={['New', 'Transferee', 'Continuing']}/>
+                  
+                  {/* GRADE LEVEL */}
+                  <Select 
+                    label="Grade Level" 
+                    value={formData.grade_level} 
+                    onChange={v=>{
+                       setFormData({...formData, grade_level:v, program_id: ''})
+                    }} 
+                    options={gradeLevels}
+                  />
+                  
+                  {/* STRAND OR COURSE */}
+                  {(formData.grade_level === 'Grade 11' || formData.grade_level === 'Grade 12' || formData.grade_level === 'College') && (
+                    <div className="md:col-span-2 bg-blue-50/50 p-5 rounded-2xl border border-blue-100 animate-in fade-in duration-300">
+                       <label className="text-[10px] font-black text-blue-500 uppercase ml-1 tracking-widest mb-1.5 block">
+                          {formData.grade_level === 'College' ? 'Select Course & Major *' : 'Select SHS Strand *'}
+                       </label>
+                       <select 
+                          value={formData.program_id} 
+                          onChange={e=>setFormData({...formData, program_id: e.target.value})}
+                          className="w-full p-4 bg-white border border-blue-200 rounded-2xl outline-none focus:border-blue-500 font-bold text-sm text-slate-700 shadow-sm"
+                       >
+                          <option value="">-- Select an option --</option>
+                          {getProgramOptions().map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                       </select>
+                    </div>
+                  )}
+
+                  <Select label="Payment Plan" value={formData.payment_plan} onChange={v=>setFormData({...formData, payment_plan:v})} options={['Full Payment', 'Installment']}/>
+
+                  {/* CAPTCHA CHALLENGE PANEL */}
+                  <div className="md:col-span-2 bg-slate-50 p-6 rounded-[2rem] border border-slate-100 space-y-4 mt-2">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+                          Security Verification *
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold mt-0.5">Please solve the challenge below to prove you are human.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <canvas id="captcha-canvas" width="130" height="50" className="rounded-xl shadow-sm border border-slate-200 bg-white" />
+                        <button 
+                          type="button" 
+                          onClick={generateCaptcha} 
+                          className="bg-white shadow-sm p-3 rounded-xl border border-slate-100 text-slate-400 hover:text-slate-600 transition-all hover:rotate-180 duration-500 animate-in spin-in-12"
+                        >
+                          <RefreshCw size={16}/>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                      <Input 
+                        label="Type the Captcha Code *" 
+                        value={captchaInput} 
+                        onChange={v => {
+                          setCaptchaInput(v);
+                          setCaptchaError(false);
+                        }} 
+                        placeholder="Enter 5-character code"
+                        maxLength="5"
+                        required
+                      />
+                      {captchaError && (
+                        <div className="text-xs text-red-500 font-bold mb-3 flex items-center gap-1.5 animate-bounce">
+                          <AlertCircle size={14}/>
+                          Incorrect captcha! New code generated.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-8 border-t border-slate-50 flex justify-between bg-slate-50/20">
+              <button disabled={currentStep === 1} onClick={prevStep} className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-slate-400 hover:text-slate-600 disabled:opacity-0 transition-all">
+                <ChevronLeft size={20}/> Previous
+              </button>
+              
+              {currentStep < 6 ? (
+                <button 
+                  onClick={nextStep} 
+                  disabled={!isStepValid()}
+                  className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${isStepValid() ? 'active:scale-95' : 'opacity-50 grayscale cursor-not-allowed'}`} 
+                  style={{backgroundColor: branding.theme_color || '#2563eb'}}
+                >
+                  Next Step <ChevronRight size={20}/>
+                </button>
+              ) : (
+                <button 
+                  onClick={handleAdmissionSubmit} 
+                  disabled={saveLoading || !isStepValid() || !captchaInput} 
+                  className={`flex items-center gap-2 px-10 py-3 rounded-xl font-black text-white shadow-xl transition-all ${isStepValid() && captchaInput ? 'active:scale-95' : 'opacity-50 grayscale cursor-not-allowed'}`} 
+                  style={{backgroundColor: branding.theme_color || '#2563eb'}}
+                >
+                  {saveLoading ? <RefreshCw className="animate-spin" /> : <><Check size={20}/> Submit Application</>}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ENROLLMENT SUCCESS MODAL */}
+      {successData && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[120] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 text-center relative animate-in zoom-in-95 duration-200">
+            <div className="mx-auto w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6">
+              <Check size={32} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">Application Success</h3>
+            <p className="text-slate-500 text-xs mb-6">Your admission profile was submitted successfully! Credentials have been sent to your email.</p>
+            
+            <div className="bg-slate-50 rounded-3xl p-6 mb-6 text-left border border-slate-100 space-y-4">
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Student Name</p>
+                <p className="text-sm font-bold text-slate-800">{successData.full_name}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Student ID / Username</p>
+                <p className="text-sm font-mono font-bold text-blue-600 select-all">{successData.student_id}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Generated Password</p>
+                <p className="text-sm font-mono font-bold text-emerald-600 select-all">{successData.password}</p>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => setSuccessData(null)} 
+              className="w-full py-4 text-white font-bold rounded-2xl transition-all hover:scale-102 active:scale-98 shadow-md cursor-pointer border-0"
+              style={{backgroundColor: branding.theme_color || '#2563eb'}}
+            >
+              Close & Continue
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* FOOTER */}
       <footer className="p-8 text-center border-t border-slate-100 bg-white">
         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
@@ -360,5 +1220,24 @@ const LandingPage = () => {
     </div>
   );
 };
+
+// Reusable Components WITH SUPPORT FOR MAX AND MAXLENGTH
+const Input = ({ label, type="text", value, onChange, placeholder, required=false, max, maxLength }) => (
+  <div className="space-y-1.5">
+    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">{label} {required && '*'}</label>
+    <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required} max={max} maxLength={maxLength}
+           className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm" />
+  </div>
+);
+
+const Select = ({ label, value, onChange, options }) => (
+  <div className="space-y-1.5">
+    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">{label}</label>
+    <select value={value} onChange={e=>onChange(e.target.value)}
+            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm">
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  </div>
+);
 
 export default LandingPage;

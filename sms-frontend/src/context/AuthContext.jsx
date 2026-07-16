@@ -149,6 +149,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    window.isLoggingOut = true;
     localStorage.removeItem('token');
     localStorage.removeItem('sms_token');
     localStorage.removeItem('user');
