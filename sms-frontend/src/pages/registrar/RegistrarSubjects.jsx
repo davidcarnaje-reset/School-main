@@ -14,6 +14,7 @@ const RegistrarSubjects = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [curriculumFilter, setCurriculumFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
 
   // 🛑 ARCHITECT ADDITION: State para sa Custom Delete Modal
@@ -38,7 +39,8 @@ const RegistrarSubjects = () => {
   // ARCHITECT FIX: Idinagdag ang subject_type sa initial form para mapadala sa DB
   const initialForm = {
     level_category: 'K-10', subject_type: 'None', subject_code: '', subject_description: '',
-    units: 0, grade_level_applicable: 'Grade 1', program_id: '', semester: 'N/A'
+    units: 0, grade_level_applicable: 'Grade 1', program_id: '', semester: 'N/A',
+    curriculum_year: '2024-2025'
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -137,7 +139,8 @@ const RegistrarSubjects = () => {
   const filteredSubjects = (subjects || []).filter(s => {
     const matchesSearch = `${s.subject_code} ${s.subject_description}`.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === 'All' || s.level_category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    const matchesCurriculum = curriculumFilter === 'All' || s.curriculum_year === curriculumFilter;
+    return matchesSearch && matchesCategory && matchesCurriculum;
   });
 
   return (
@@ -161,13 +164,23 @@ const RegistrarSubjects = () => {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input type="text" placeholder="Search by subject code or name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all" />
         </div>
-        <div className="relative w-full md:w-72">
+        <div className="relative w-full md:w-60">
            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all appearance-none cursor-pointer">
               <option value="All">All Categories</option>
               <option value="College">College Subjects</option>
               <option value="SHS">Senior High (SHS)</option>
               <option value="K-10">K-10 (Kinder - Gr.10)</option>
+           </select>
+        </div>
+        <div className="relative w-full md:w-60">
+           <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+           <select value={curriculumFilter} onChange={(e) => setCurriculumFilter(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all appearance-none cursor-pointer">
+              <option value="All">All Curricula</option>
+              <option value="2023-2024">2023-2024</option>
+              <option value="2024-2025">2024-2025</option>
+              <option value="2025-2026">2025-2026</option>
+              <option value="2026-2027">2026-2027</option>
            </select>
         </div>
       </div>
@@ -196,11 +209,15 @@ const RegistrarSubjects = () => {
                       <td className="p-6 pl-10">
                         <div>
                           <p className="text-sm font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors">{item.subject_code}</p>
-                          <p className="text-xs font-bold text-slate-500 mt-1">{item.subject_description}</p>
-                          {/* ARCHITECT FIX: Pinalitaw rin sa UI yung Type kung Meron */}
-                          {item.subject_type && item.subject_type !== 'None' && (
-                            <p className="text-[9px] font-black uppercase text-indigo-500 mt-1">{item.subject_type}</p>
-                          )}
+                           <p className="text-xs font-bold text-slate-500 mt-1">{item.subject_description}</p>
+                           <div className="flex gap-2 items-center mt-1">
+                             {item.subject_type && item.subject_type !== 'None' && (
+                               <span className="text-[9px] font-black uppercase text-indigo-500">{item.subject_type}</span>
+                             )}
+                             <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">
+                               Curriculum: {item.curriculum_year || '2024-2025'}
+                             </span>
+                           </div>
                         </div>
                       </td>
                       <td className="p-6">
@@ -319,6 +336,16 @@ const RegistrarSubjects = () => {
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Grade / Year Level</label>
                   <select value={formData.grade_level_applicable} onChange={e=>setFormData({...formData, grade_level_applicable: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500">
                     {LEVEL_CONFIG[formData.level_category].levels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                  </select>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Curriculum Year *</label>
+                  <select value={formData.curriculum_year} onChange={e=>setFormData({...formData, curriculum_year: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500">
+                    <option value="2023-2024">2023-2024</option>
+                    <option value="2024-2025">2024-2025</option>
+                    <option value="2025-2026">2025-2026</option>
+                    <option value="2026-2027">2026-2027</option>
                   </select>
                 </div>
                 

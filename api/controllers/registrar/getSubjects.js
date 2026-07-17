@@ -12,7 +12,9 @@ const getSubjects = async (req, res) => {
           s.grade_level_applicable,
           s.level_category,
           s.program_id,
-          COALESCE(p.program_code, 'General') as program_code
+          s.curriculum_year,
+          COALESCE(p.program_code, 'General') as program_code,
+          COALESCE(p.curriculum_year, 'N/A') as program_curriculum_year
       FROM subjects s 
       LEFT JOIN academic_programs p ON s.program_id = p.id 
       ORDER BY s.id DESC

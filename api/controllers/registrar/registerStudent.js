@@ -136,6 +136,29 @@ const registerStudent = async (req, res) => {
     const generatedPassword = 'Stud_' + crypto.randomBytes(4).toString('hex') + '!';
     const hashedPassword = await bcrypt.hash(generatedPassword, 10);
 
+    // FK Safety & Curriculum Year check before inserts
+    let safeProgramId = program_id ? parseInt(program_id, 10) : null;
+    let safeSectionId = section_id ? parseInt(section_id, 10) : null;
+    let studentCurriculumYear = school_year || '2024-2025';
+
+    if (safeProgramId) {
+      const [programCheck] = await connection.query(
+        'SELECT id, curriculum_year FROM academic_programs WHERE id = ? LIMIT 1', [safeProgramId]
+      );
+      if (programCheck.length === 0) {
+        safeProgramId = null;
+      } else {
+        studentCurriculumYear = programCheck[0].curriculum_year || studentCurriculumYear;
+      }
+    }
+
+    if (safeSectionId) {
+      const [sectionCheck] = await connection.query(
+        'SELECT id FROM sections WHERE id = ? LIMIT 1', [safeSectionId]
+      );
+      if (sectionCheck.length === 0) safeSectionId = null;
+    }
+
     // 4. Insert into students table (role='student', is_verified=1 by default)
     const studentSql = `
       INSERT INTO students (
@@ -148,8 +171,9 @@ const registerStudent = async (req, res) => {
         elem_name, elem_year, elem_address,
         jhs_name, jhs_year, jhs_address,
         shs_name, shs_year, shs_address, shs_strand,
-        is_working, work_company, work_position, work_address
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'student', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_working, work_company, work_position, work_address,
+        curriculum_year
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'student', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await connection.query(studentSql, [
@@ -207,32 +231,15 @@ const registerStudent = async (req, res) => {
       is_working ? 1 : 0,
       work_company || null,
       work_position || null,
-      work_address || null
+      work_address || null,
+      studentCurriculumYear
     ]);
 
     // 5. Insert into enrollments table (status='Pending')
-    // --- FK Safety: Validate program_id and section_id exist before inserting ---
-    let safeProgramId = program_id ? parseInt(program_id, 10) : null;
-    let safeSectionId = section_id ? parseInt(section_id, 10) : null;
-
-    if (safeProgramId) {
-      const [programCheck] = await connection.query(
-        'SELECT id FROM academic_programs WHERE id = ? LIMIT 1', [safeProgramId]
-      );
-      if (programCheck.length === 0) safeProgramId = null;
-    }
-
-    if (safeSectionId) {
-      const [sectionCheck] = await connection.query(
-        'SELECT id FROM sections WHERE id = ? LIMIT 1', [safeSectionId]
-      );
-      if (sectionCheck.length === 0) safeSectionId = null;
-    }
-
     const enrollSql = `
       INSERT INTO enrollments (
-        id, enrollment_id, student_id, school_year, enrollment_type, grade_level, program_id, section_id, payment_plan, status
-      ) VALUES (?, ?, ?, ?, 'New', ?, ?, ?, ?, 'Pending')
+        id, enrollment_id, student_id, school_year, enrollment_type, grade_level, program_id, section_id, payment_plan, status, curriculum_year
+      ) VALUES (?, ?, ?, ?, 'New', ?, ?, ?, ?, 'Pending', ?)
     `;
 
     await connection.query(enrollSql, [
@@ -243,7 +250,8 @@ const registerStudent = async (req, res) => {
       grade_level,
       safeProgramId,
       safeSectionId,
-      payment_plan
+      payment_plan,
+      studentCurriculumYear
     ]);
 
     // 6. Insert default user settings to avoid null settings reference errors

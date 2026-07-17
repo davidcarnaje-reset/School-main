@@ -19,7 +19,8 @@ const AcademicPrograms = () => {
     program_code: '',
     program_description: '',
     major: '',
-    status: 'Active'
+    status: 'Active',
+    curriculum_year: '2024-2025'
   });
 
   useEffect(() => {
@@ -48,7 +49,7 @@ const AcademicPrograms = () => {
       if (res.data.success) {
         alert("Program added successfully!");
         setShowModal(false);
-        setFormData({ department: 'SHS', program_code: '', program_description: '', major: '', status: 'Active' });
+        setFormData({ department: 'SHS', program_code: '', program_description: '', major: '', status: 'Active', curriculum_year: '2024-2025' });
         fetchPrograms();
       } else {
         alert("Error: " + res.data.message);
@@ -131,11 +132,16 @@ const AcademicPrograms = () => {
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                   <td className="p-5 pl-8">
                     <p className="font-bold text-slate-800 text-lg">{p.program_code}</p>
-                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border ${
-                      p.department === 'College' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-blue-50 text-blue-600 border-blue-100'
-                    }`}>
-                      {p.department}
-                    </span>
+                    <div className="flex gap-2 items-center mt-1">
+                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border ${
+                        p.department === 'College' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+                      }`}>
+                        {p.department}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                        Curriculum: {p.curriculum_year || '2024-2025'}
+                      </span>
+                    </div>
                   </td>
                   <td className="p-5">
                     <p className="font-bold text-slate-600">{p.program_description}</p>
@@ -222,6 +228,16 @@ const AcademicPrograms = () => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Description *</label>
                 <input required type="text" placeholder="e.g. Bachelor of Science in Information Technology" value={formData.program_description} onChange={e=>setFormData({...formData, program_description: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 text-sm font-bold text-slate-700" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Curriculum Year *</label>
+                <select value={formData.curriculum_year} onChange={e=>setFormData({...formData, curriculum_year: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 text-sm font-bold text-slate-700">
+                  <option value="2023-2024">2023-2024</option>
+                  <option value="2024-2025">2024-2025</option>
+                  <option value="2025-2026">2025-2026</option>
+                  <option value="2026-2027">2026-2027</option>
+                </select>
               </div>
 
               {formData.department === 'College' && (

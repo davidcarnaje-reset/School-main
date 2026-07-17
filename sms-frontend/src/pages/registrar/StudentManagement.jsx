@@ -338,13 +338,15 @@ const fetchData = async () => {
     if (formData.grade_level === 'Grade 11' || formData.grade_level === 'Grade 12') {
       return programs
         .filter(p => p.department === 'SHS')
-        .map(p => ({ value: p.id, label: `${p.program_code} - ${p.program_description}` }));
+        .map(p => ({ value: p.id, label: `${p.program_code} - ${p.program_description} (Curriculum: ${p.curriculum_year || '2024-2025'})` }));
     } else if (formData.grade_level === 'College') {
       return programs
         .filter(p => p.department === 'College')
         .map(p => ({ 
           value: p.id, 
-          label: p.major ? `${p.program_code} Major in ${p.major}` : `${p.program_code} - ${p.program_description}` 
+          label: p.major 
+            ? `${p.program_code} Major in ${p.major} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
+            : `${p.program_code} - ${p.program_description} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
         }));
     }
     return [];
@@ -468,7 +470,14 @@ const fetchData = async () => {
                     <BookOpen size={14} className="text-blue-500 shrink-0" /> 
                     {s.grade_level} {['Grade 11', 'Grade 12', 'College'].includes(s.grade_level) && s.program_code ? `- ${s.program_code}` : ''}
                   </p>
-                  <p className="text-[10px] text-slate-400 font-medium truncate max-w-[200px]">LRN: {s.lrn || 'NOT PROVIDED'}</p>
+                  <div className="flex gap-2 items-center mt-1">
+                    <span className="text-[10px] text-slate-400 font-medium truncate max-w-[120px]">LRN: {s.lrn || 'NOT PROVIDED'}</span>
+                    {s.curriculum_year && (
+                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 py-0.5 rounded">
+                        Curriculum: {s.curriculum_year}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="p-5">
                   <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1">

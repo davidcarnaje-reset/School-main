@@ -42,7 +42,8 @@ export const addSubject = async (req, res) => {
     units = 0, 
     grade_level_applicable, 
     program_id = null, 
-    semester = 'N/A' 
+    semester = 'N/A',
+    curriculum_year = '2024-2025'
   } = req.body;
 
   if (!subject_code || !subject_description || !level_category) {
@@ -66,9 +67,9 @@ export const addSubject = async (req, res) => {
 
     const sql = `
       INSERT INTO subjects 
-        (id, level_category, subject_type, subject_code, subject_description, units, grade_level_applicable, program_id, semester) 
+        (id, level_category, subject_type, subject_code, subject_description, units, grade_level_applicable, program_id, semester, curriculum_year) 
       VALUES 
-        (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await connection.query(sql, [
@@ -80,7 +81,8 @@ export const addSubject = async (req, res) => {
       parseInt(units, 10),
       grade_level_applicable,
       finalProgramId,
-      finalSemester
+      finalSemester,
+      curriculum_year.trim()
     ]);
 
     await connection.commit();

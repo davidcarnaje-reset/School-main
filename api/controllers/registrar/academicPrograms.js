@@ -3,7 +3,7 @@ import pool from '../../config/db.js';
 export const getAcademicPrograms = async (req, res) => {
   try {
     const sql = `
-      SELECT id, department, program_code, program_description, major, status 
+      SELECT id, department, program_code, program_description, major, status, curriculum_year 
       FROM academic_programs 
       ORDER BY department DESC, program_code ASC
     `;
@@ -16,7 +16,7 @@ export const getAcademicPrograms = async (req, res) => {
 };
 
 export const addAcademicProgram = async (req, res) => {
-  const { department, program_code, program_description, major = null, status = 'Active' } = req.body;
+  const { department, program_code, program_description, major = null, status = 'Active', curriculum_year = '2024-2025' } = req.body;
 
   if (!department || !program_code || !program_description) {
     return res.status(400).json({ success: false, message: "Incomplete data provided. Department, program code, and description are required." });
@@ -31,8 +31,8 @@ export const addAcademicProgram = async (req, res) => {
     const nextId = maxIdRows[0].maxId + 1;
 
     const sql = `
-      INSERT INTO academic_programs (id, department, program_code, program_description, major, status) 
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO academic_programs (id, department, program_code, program_description, major, status, curriculum_year) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     await connection.query(sql, [
       nextId,
@@ -40,7 +40,8 @@ export const addAcademicProgram = async (req, res) => {
       program_code.toUpperCase().trim(),
       program_description.trim(),
       major ? major.trim() : null,
-      status.trim()
+      status.trim(),
+      curriculum_year.trim()
     ]);
 
     await connection.commit();
