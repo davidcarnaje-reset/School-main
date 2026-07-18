@@ -1,6 +1,7 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import s3Client from '../../config/s3Client.js';
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // GET all active promotions (for public landing page)
 export const getPublicPromotions = async (req, res) => {
@@ -74,6 +75,14 @@ export const createPromotion = async (req, res) => {
       [nextId, image_file_url, title, subtitle || '', button_text || null, button_link || '/login', schoolId]
     );
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "CREATE_PROMOTION",
+      `Created marketing banner: ${title}`,
+      req
+    );
+
     return res.json({
       success: true,
       message: "Banner uploaded successfully.",
@@ -95,6 +104,14 @@ export const deletePromotion = async (req, res) => {
 
     const schoolId = req.school_id || 1;
     await pool.query("DELETE FROM landing_promotions WHERE id = ? AND school_id = ?", [id, schoolId]);
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "DELETE_PROMOTION",
+      `Deleted marketing banner ID: ${id}`,
+      req
+    );
 
     return res.json({
       success: true,

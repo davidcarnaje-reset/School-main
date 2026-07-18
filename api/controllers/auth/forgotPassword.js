@@ -1,6 +1,7 @@
 import pool from '../../config/db.js';
 import crypto from 'crypto';
 import { sendPasswordResetEmail, getFrontendUrl } from '../../utils/emailEngine.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const forgotPassword = async (req, res) => {
   try {
@@ -41,12 +42,22 @@ export const forgotPassword = async (req, res) => {
     }
 
     const portalType = userType === 'users' ? 'staff' : 'student';
+    const userId = userType === 'users' ? userRows[0].id : 1;
     const frontendUrl = getFrontendUrl(req);
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&portal=${portalType}`;
 
     // Send email using emailEngine
     try {
       await sendPasswordResetEmail(email, firstName, resetLink);
+
+      await logAuditTrail(
+        userId,
+        portalType,
+        "FORGOT_PASSWORD_REQUEST",
+        `Requested password reset link for email: ${email}`,
+        req
+      );
+
       return res.json({ success: true, message: "A password reset link has been sent to your email." });
     } catch (emailErr) {
       console.error("Forgot password email send error:", emailErr);

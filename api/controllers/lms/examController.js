@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // GET exam details and questions
 export const getExamDetails = async (req, res) => {
@@ -146,6 +147,13 @@ export const submitExam = async (req, res) => {
     );
 
     await connection.commit();
+    await logAuditTrail(
+      1,
+      'student',
+      "SUBMIT_EXAMINATION",
+      `Student ID: ${studentId} submitted answers for Examination ID: ${activityId} (Score: ${totalScore}/${maxScore})`,
+      req
+    );
 
     return res.json({
       status: "success",

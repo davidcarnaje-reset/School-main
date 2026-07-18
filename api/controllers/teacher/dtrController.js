@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // Get timezone-safe dates/times in Manila timezone
 const getManilaDateTime = () => {
@@ -125,6 +126,13 @@ export const logDtr = async (req, res) => {
             [teacherId, today, timeStr]
           );
           await connection.commit();
+          await logAuditTrail(
+            teacherId,
+            'Teacher',
+            "DTR_TIME_IN",
+            `Recorded DTR Time-In: ${timeStr} on date: ${today}`,
+            req
+          );
           return res.json({ status: "success", message: "Time In recorded successfully." });
         } else {
           await connection.rollback();
@@ -138,6 +146,13 @@ export const logDtr = async (req, res) => {
               [timeStr, record.id]
             );
             await connection.commit();
+            await logAuditTrail(
+              teacherId,
+              'Teacher',
+              "DTR_TIME_OUT",
+              `Recorded DTR Time-Out: ${timeStr} on date: ${today}`,
+              req
+            );
             return res.json({ status: "success", message: "Time Out recorded successfully." });
           } else {
             await connection.rollback();

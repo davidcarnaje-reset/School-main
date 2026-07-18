@@ -7,6 +7,7 @@ import { getBranding, updateBranding, getSchoolSettings, saveSchoolSettings } fr
 import { getUsers, createUser, updateUser, deleteUser, updateUserProfile } from '../controllers/admin/user.js';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '../controllers/admin/room.js';
 import { getAdminPromotions, createPromotion, deletePromotion } from '../controllers/admin/promotion.js';
+import { getAuditLogs } from '../controllers/admin/auditLogsController.js';
 
 const router = express.Router();
 
@@ -102,5 +103,9 @@ router.get('/school-settings', getSchoolSettings);
 router.get('/get_school_settings.php', getSchoolSettings);
 router.post('/school-settings', saveSchoolSettings);
 router.post('/save_school_settings.php', saveSchoolSettings);
+
+// System Audit Logs
+router.get('/audit-logs', getAuditLogs);
+router.get('/get_audit_logs.php', getAuditLogs);
 
 export default router;

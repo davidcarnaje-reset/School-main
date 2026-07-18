@@ -67,6 +67,14 @@ export const createUser = async (req, res) => {
       emailErrorMsg = emailErr.message;
     }
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "CREATE_USER",
+      `Created/invited user account: ${fullName} (${role})`,
+      req
+    );
+
     return res.json({
       success: true,
       message: emailSent 
@@ -112,6 +120,14 @@ export const updateUser = async (req, res) => {
       [username, first_name, middle_name || null, last_name, fullName, email, birthday || null, phone_number || null, role, id, schoolId]
     );
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "UPDATE_USER",
+      `Updated user account: ${fullName} (${role})`,
+      req
+    );
+
     return res.json({
       success: true,
       message: "User updated successfully."
@@ -132,6 +148,14 @@ export const deleteUser = async (req, res) => {
 
     const schoolId = req.school_id || 1;
     await pool.query("DELETE FROM users WHERE id = ? AND school_id = ?", [id, schoolId]);
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "DELETE_USER",
+      `Deleted user account ID: ${id}`,
+      req
+    );
 
     return res.json({
       success: true,

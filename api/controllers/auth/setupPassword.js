@@ -1,5 +1,6 @@
 import pool from '../../config/db.js';
 import bcrypt from 'bcryptjs';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const setupPassword = async (req, res) => {
   try {
@@ -27,6 +28,14 @@ export const setupPassword = async (req, res) => {
         "UPDATE users SET password = ?, is_verified = 1, verification_token = NULL WHERE email = ?",
         [hashedPassword, trimmedEmail]
       );
+      await logAuditTrail(
+        userRows[0].id,
+        'staff',
+        "VERIFY_ACCOUNT",
+        `Staff account verified for email: ${trimmedEmail}`,
+        req
+      );
+
       return res.status(200).json({
         success: true,
         message: "Staff account verified successfully!",
@@ -45,6 +54,14 @@ export const setupPassword = async (req, res) => {
         "UPDATE students SET password = ?, is_verified = 1, verification_token = NULL WHERE email = ?",
         [hashedPassword, trimmedEmail]
       );
+      await logAuditTrail(
+        1,
+        'student',
+        "VERIFY_ACCOUNT",
+        `Student account verified for email: ${trimmedEmail} (Student ID: ${studentRows[0].student_id})`,
+        req
+      );
+
       return res.status(200).json({
         success: true,
         message: "Student account verified successfully!",

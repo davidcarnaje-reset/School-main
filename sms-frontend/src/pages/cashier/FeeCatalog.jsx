@@ -12,6 +12,7 @@ import {
   Filter,
   CheckCircle2,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { SectionHeader } from "../../components/cashier/CashierComponents";
@@ -23,6 +24,12 @@ const FeeCatalog = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [loading, setLoading] = useState(false);
+
+  const [programs, setPrograms] = useState([]);
+  const [targetType, setTargetType] = useState("All");
+  const [subTarget, setSubTarget] = useState("");
+  const [deleteModal, setDeleteModal] = useState({ show: false, fee: null });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     item_name: "",
@@ -43,9 +50,82 @@ const FeeCatalog = () => {
     }
   };
 
+  const fetchPrograms = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/registrar/get_academic_programs.php`);
+      if (Array.isArray(res.data)) {
+        setPrograms(res.data.filter(p => p.status === 'Active'));
+      }
+    } catch (err) {
+      console.error("Error fetching programs:", err);
+    }
+  };
+
   useEffect(() => {
     fetchFees();
+    fetchPrograms();
   }, []);
+
+  const handleTargetTypeChange = (val) => {
+    setTargetType(val);
+    setSubTarget("");
+    setFormData(prev => ({ ...prev, applicable_to: val }));
+  };
+
+  const handleSubTargetChange = (val) => {
+    setSubTarget(val);
+    setFormData(prev => ({ ...prev, applicable_to: val || targetType }));
+  };
+
+  const handleEditClick = (fee) => {
+    const prog = programs.find(p => p.program_code === fee.applicable_to);
+    let derivedTargetType = fee.applicable_to;
+    let derivedSubTarget = "";
+    
+    if (prog) {
+      derivedTargetType = prog.department; 
+      derivedSubTarget = fee.applicable_to;
+    } else if (fee.applicable_to !== "All" && fee.applicable_to !== "Elementary" && fee.applicable_to !== "High School" && fee.applicable_to !== "SHS" && fee.applicable_to !== "College") {
+      derivedTargetType = "College";
+      derivedSubTarget = fee.applicable_to;
+    }
+    
+    setTargetType(derivedTargetType);
+    setSubTarget(derivedSubTarget);
+    setFormData({
+      id: fee.id,
+      item_name: fee.item_name,
+      amount: fee.amount.toString(),
+      category: fee.category,
+      applicable_to: fee.applicable_to
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (fee) => {
+    setDeleteModal({ show: true, fee });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.fee) return;
+    setIsDeleting(true);
+    try {
+      const res = await axios.delete(`${API_BASE_URL}/cashier/manage_fees.php`, {
+        params: { id: deleteModal.fee.id }
+      });
+      if (res.data.status === "success") {
+        setDeleteModal({ show: false, fee: null });
+        fetchFees();
+      } else {
+        alert("Error: " + res.data.message);
+      }
+    } catch (err) {
+      console.error("Error deleting fee:", err);
+      alert("Server error while deleting.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,6 +142,8 @@ const FeeCatalog = () => {
           category: "Mandatory",
           applicable_to: "All",
         });
+        setTargetType("All");
+        setSubTarget("");
         fetchFees();
       }
     } catch (err) {
@@ -92,7 +174,17 @@ const FeeCatalog = () => {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setFormData({
+              item_name: "",
+              amount: "",
+              category: "Mandatory",
+              applicable_to: "All",
+            });
+            setTargetType("All");
+            setSubTarget("");
+            setIsModalOpen(true);
+          }}
           className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg active:scale-95"
         >
           <Plus size={18} /> New Fee Item
@@ -178,10 +270,18 @@ const FeeCatalog = () => {
                   </td>
                   <td className="py-5 px-2 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+                      <button 
+                        onClick={() => handleEditClick(fee)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        title="Edit Fee"
+                      >
                         <Edit2 size={14} />
                       </button>
-                      <button className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                      <button 
+                        onClick={() => handleDeleteClick(fee)}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                        title="Delete Fee"
+                      >
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -216,14 +316,14 @@ const FeeCatalog = () => {
 
             <div className="flex items-center gap-3 mb-8">
               <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                <Plus size={24} />
+                {formData.id ? <Edit2 size={24} /> : <Plus size={24} />}
               </div>
               <div>
                 <h2 className="text-xl font-black text-slate-800 uppercase italic leading-none">
-                  New Fee Item
+                  {formData.id ? "Edit Fee Item" : "New Fee Item"}
                 </h2>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                  Add to Billing Catalog
+                  {formData.id ? "Update Billing Catalog" : "Add to Billing Catalog"}
                 </p>
               </div>
             </div>
@@ -286,25 +386,97 @@ const FeeCatalog = () => {
                 </label>
                 <select
                   className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-[10px] uppercase outline-none focus:border-indigo-500 focus:bg-white transition-all"
-                  value={formData.applicable_to}
-                  onChange={(e) =>
-                    setFormData({ ...formData, applicable_to: e.target.value })
-                  }
+                  value={targetType}
+                  onChange={(e) => handleTargetTypeChange(e.target.value)}
                 >
                   <option value="All">All Students</option>
                   <option value="Elementary">Elementary Only</option>
                   <option value="High School">High School Only</option>
+                  <option value="SHS">Senior High (SHS) Only</option>
                   <option value="College">College Only</option>
                 </select>
               </div>
+
+              {formData.category === "Tuition" && targetType === "SHS" && (
+                <div className="space-y-1.5 animate-in slide-in-from-top-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2">
+                    Select Strand (Optional)
+                  </label>
+                  <select
+                    className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-[10px] uppercase outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                    value={subTarget}
+                    onChange={(e) => handleSubTargetChange(e.target.value)}
+                  >
+                    <option value="">All SHS Strands</option>
+                    {programs.filter(p => p.department === "SHS").map(p => (
+                      <option key={p.id} value={p.program_code}>{p.program_code} - {p.program_description}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formData.category === "Tuition" && targetType === "College" && (
+                <div className="space-y-1.5 animate-in slide-in-from-top-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2">
+                    Select Course (Optional)
+                  </label>
+                  <select
+                    className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-[10px] uppercase outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                    value={subTarget}
+                    onChange={(e) => handleSubTargetChange(e.target.value)}
+                  >
+                    <option value="">All College Courses</option>
+                    {programs.filter(p => p.department === "College").map(p => (
+                      <option key={p.id} value={p.program_code}>{p.program_code} - {p.program_description}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <button
                 type="submit"
                 className="w-full bg-slate-900 text-white font-black py-5 rounded-[2rem] uppercase text-[11px] tracking-[0.2em] mt-4 hover:bg-indigo-600 transition-all shadow-xl active:scale-95"
               >
-                Save Fee Configuration
+                {formData.id ? "Update Fee Configuration" : "Save Fee Configuration"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM DELETE CONFIRMATION MODAL */}
+      {deleteModal.show && deleteModal.fee && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[550] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertCircle size={32} />
+            </div>
+            <h3 className="text-2xl font-black text-center text-slate-800 uppercase tracking-tighter mb-2">Delete Fee Item?</h3>
+            <p className="text-center font-bold text-slate-500 text-sm mb-6">
+              Are you sure you want to delete <span className="text-red-500 font-black">{deleteModal.fee.item_name}</span>?
+            </p>
+            <div className="bg-red-50 p-4 rounded-2xl border border-red-100 mb-8 text-center">
+              <p className="text-[10px] font-black text-red-600 uppercase tracking-widest leading-relaxed">
+                Warning: This will permanently delete this fee item configuration. Existing student bills referencing this catalog item will remain, but new assessments will not be able to select it.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setDeleteModal({ show: false, fee: null })} 
+                disabled={isDeleting} 
+                className="flex-1 py-4 rounded-2xl font-black text-slate-500 uppercase text-xs tracking-widest hover:bg-slate-100 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                disabled={isDeleting} 
+                className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg hover:bg-red-600 transition-all flex justify-center items-center gap-2"
+              >
+                {isDeleting ? <RefreshCw className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                Yes, Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

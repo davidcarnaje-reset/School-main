@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // GET calendar notes for current month
 export const getCalendarNotes = async (req, res) => {
@@ -39,6 +40,14 @@ export const saveCalendarNote = async (req, res) => {
     const query = "INSERT INTO student_calendar_notes (student_id, note_date, note_text) VALUES (?, ?, ?)";
     const [result] = await pool.query(query, [studentId, noteDate, noteText]);
 
+    await logAuditTrail(
+      1,
+      'student',
+      "ADD_CALENDAR_NOTE",
+      `Added student calendar note on date: ${noteDate}`,
+      req
+    );
+
     return res.json({ status: 'success', id: result.insertId });
 
   } catch (error) {
@@ -58,6 +67,14 @@ export const deleteCalendarNote = async (req, res) => {
   try {
     const query = "DELETE FROM student_calendar_notes WHERE id = ? AND student_id = ?";
     await pool.query(query, [id, studentId]);
+
+    await logAuditTrail(
+      1,
+      'student',
+      "DELETE_CALENDAR_NOTE",
+      `Deleted student calendar note ID: ${id}`,
+      req
+    );
 
     return res.json({ status: 'success' });
 

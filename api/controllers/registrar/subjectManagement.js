@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const getSubjectDetails = async (req, res) => {
   const { subject_id } = req.query;
@@ -86,6 +87,13 @@ export const addSubject = async (req, res) => {
     ]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "ADD_SUBJECT",
+      `Added subject: ${subject_code} - ${subject_description}`,
+      req
+    );
     return res.status(201).json({ success: true, message: "Subject successfully added to curriculum!" });
   } catch (error) {
     await connection.rollback();
@@ -125,6 +133,13 @@ export const deleteSubject = async (req, res) => {
     await connection.query("DELETE FROM subjects WHERE id = ?", [parseInt(subject_id, 10)]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "DELETE_SUBJECT",
+      `Deleted subject ID: ${subject_id}`,
+      req
+    );
     return res.status(200).json({ success: true, message: "Subject and all connected records successfully deleted!" });
   } catch (error) {
     await connection.rollback();

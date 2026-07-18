@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 const processBillingPayment = async (req, res) => {
   const { student_id, allocations, mark_as_enrolled } = req.body;
@@ -79,6 +80,13 @@ const processBillingPayment = async (req, res) => {
     }
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Cashier',
+      "PROCESS_PAYMENT",
+      `Processed student payment transaction for student ID: ${student_id}. Enrolled status marked: ${mark_as_enrolled}`,
+      req
+    );
 
     return res.json({
       status: "success",

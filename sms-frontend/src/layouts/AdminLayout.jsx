@@ -98,6 +98,7 @@ const AdminLayout = () => {
       { icon: <Image size={20} />, label: 'Landing Banners', path: '/admin/promotions' },
       { icon: <MapPin size={20} />, label: 'Room Management', path: '/admin/rooms' },
       { icon: <Sliders size={20} />, label: 'Module Settings', path: '/admin/permissions' },
+      { icon: <History size={20} />, label: 'Audit Trail Logs', path: '/admin/audit-logs' },
     ],
     registrar: [
         { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/registrar/dashboard' },

@@ -1,5 +1,6 @@
 import pool from '../../config/db.js';
 import bcrypt from 'bcryptjs';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const resetPassword = async (req, res) => {
   try {
@@ -17,6 +18,15 @@ export const resetPassword = async (req, res) => {
       const [rows] = await pool.query("SELECT student_id FROM students WHERE reset_token = ?", [trimmedToken]);
       if (rows.length > 0) {
         await pool.query("UPDATE students SET password = ?, reset_token = NULL WHERE reset_token = ?", [hashedPassword, trimmedToken]);
+        
+        await logAuditTrail(
+          1,
+          'student',
+          "RESET_PASSWORD",
+          `Student password reset successfully for student: ${rows[0].student_id}`,
+          req
+        );
+
         return res.json({ success: true, message: "Student password successfully updated!" });
       } else {
         return res.status(400).json({ success: false, message: "Invalid or expired reset link." });
@@ -25,6 +35,15 @@ export const resetPassword = async (req, res) => {
       const [rows] = await pool.query("SELECT id FROM users WHERE reset_token = ?", [trimmedToken]);
       if (rows.length > 0) {
         await pool.query("UPDATE users SET password = ?, reset_token = NULL WHERE reset_token = ?", [hashedPassword, trimmedToken]);
+
+        await logAuditTrail(
+          rows[0].id,
+          'staff',
+          "RESET_PASSWORD",
+          `Staff/Admin password reset successfully for user ID: ${rows[0].id}`,
+          req
+        );
+
         return res.json({ success: true, message: "Staff password successfully updated!" });
       } else {
         return res.status(400).json({ success: false, message: "Invalid or expired reset link." });

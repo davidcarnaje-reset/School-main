@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // GET all rooms
 export const getRooms = async (req, res) => {
@@ -34,6 +35,14 @@ export const createRoom = async (req, res) => {
       [nextId, room_name, room_type || 'Physical', capacity, status || 'Active', schoolId]
     );
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "CREATE_ROOM",
+      `Created room: ${room_name} (Capacity: ${capacity})`,
+      req
+    );
+
     return res.json({
       status: 'success',
       message: "Room created successfully.",
@@ -61,6 +70,14 @@ export const updateRoom = async (req, res) => {
       [room_name, room_type || 'Physical', capacity, status || 'Active', id, schoolId]
     );
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "UPDATE_ROOM",
+      `Updated room ID: ${id} to name: ${room_name} (Capacity: ${capacity})`,
+      req
+    );
+
     return res.json({
       status: 'success',
       message: "Room updated successfully."
@@ -81,6 +98,14 @@ export const deleteRoom = async (req, res) => {
 
     const schoolId = req.school_id || 1;
     await pool.query("DELETE FROM rooms WHERE id = ? AND school_id = ?", [id, schoolId]);
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "DELETE_ROOM",
+      `Deleted room ID: ${id}`,
+      req
+    );
 
     return res.json({
       status: 'success',

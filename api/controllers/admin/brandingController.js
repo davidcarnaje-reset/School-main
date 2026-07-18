@@ -1,6 +1,7 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import s3Client from '../../config/s3Client.js';
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 /**
  * GET current system branding settings.
@@ -81,6 +82,14 @@ export const updateBranding = async (req, res) => {
     // Retrieve updated config row
     const [updatedRows] = await pool.query("SELECT * FROM school_settings WHERE id = ?", [schoolId]);
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "UPDATE_BRANDING",
+      `Updated school branding details to school_name: ${school_name}`,
+      req
+    );
+
     return res.status(200).json({
       status: 'success',
       message: 'Branding engine synchronized to the cloud network layer.',
@@ -146,6 +155,14 @@ export const saveSchoolSettings = async (req, res) => {
          college_finals_weight = ?
        WHERE id = ?`,
       [scale, prelim, midterm, finals, schoolId]
+    );
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "UPDATE_GRADING_SETTINGS",
+      `Updated college grading scale settings: scale=${scale}, prelim=${prelim}%, midterm=${midterm}%, finals=${finals}%`,
+      req
     );
 
     return res.json({ status: "success", message: "College grading settings saved" });

@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const getClassAssignData = async (req, res) => {
   try {
@@ -150,6 +151,13 @@ export const addClassAssign = async (req, res) => {
     ]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "ADD_CLASS_ASSIGNMENT",
+      `Created class assignment for subject ID: ${subject_id}, section ID: ${section_id}`,
+      req
+    );
     return res.status(201).json({ success: true, message: "Class assignment saved successfully!" });
   } catch (error) {
     await connection.rollback();
@@ -192,6 +200,13 @@ export const updateClassAssign = async (req, res) => {
       parseInt(id, 10)
     ]);
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "UPDATE_CLASS_ASSIGNMENT",
+      `Updated class assignment ID: ${id} (Subject ID: ${subject_id}, Section ID: ${section_id})`,
+      req
+    );
     return res.status(200).json({ success: true, message: "Class assignment updated successfully." });
   } catch (error) {
     console.error("updateClassAssign error:", error);
@@ -217,6 +232,13 @@ export const deleteClassAssign = async (req, res) => {
     await connection.query("DELETE FROM class_assignments WHERE id = ?", [parseInt(id, 10)]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "DELETE_CLASS_ASSIGNMENT",
+      `Deleted class assignment ID: ${id}`,
+      req
+    );
     return res.status(200).json({ success: true, message: "Class Schedule and related enrollments deleted!" });
   } catch (error) {
     await connection.rollback();
@@ -332,6 +354,13 @@ export const bulkAddClassAssign = async (req, res) => {
     }
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "BULK_ADD_CLASS_ASSIGNMENT",
+      `Assigned ${drafts.length} classes for Section ID: ${section_id}`,
+      req
+    );
     return res.status(200).json({ success: true, message: "All curriculum subjects successfully assigned!" });
   } catch (error) {
     await connection.rollback();
@@ -352,6 +381,13 @@ export const deleteAssignment = async (req, res) => {
   try {
     const sql = "UPDATE teacher_assignments SET is_active = 0 WHERE id = ?";
     await pool.query(sql, [parseInt(id, 10)]);
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "DEACTIVATE_CLASS_ASSIGNMENT",
+      `Deactivated class assignment ID: ${id}`,
+      req
+    );
     return res.status(200).json({ success: true, message: "Class assignment has been successfully deactivated." });
   } catch (error) {
     console.error("deleteAssignment error:", error);

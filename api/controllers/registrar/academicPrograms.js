@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const getAcademicPrograms = async (req, res) => {
   try {
@@ -45,6 +46,13 @@ export const addAcademicProgram = async (req, res) => {
     ]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "ADD_PROGRAM",
+      `Added academic program: ${program_code} - ${program_description}`,
+      req
+    );
     return res.status(201).json({ success: true, message: "Program successfully added." });
   } catch (error) {
     await connection.rollback();
@@ -70,6 +78,13 @@ export const deleteAcademicProgram = async (req, res) => {
     const [result] = await pool.query(sql, [parseInt(id, 10)]);
 
     if (result.affectedRows > 0) {
+      await logAuditTrail(
+        req.user?.id || 1,
+        req.user?.role || 'Registrar',
+        "DELETE_PROGRAM",
+        `Deleted academic program ID: ${id}`,
+        req
+      );
       return res.status(200).json({ success: true, message: "Program deleted successfully." });
     } else {
       return res.status(400).json({ success: false, message: "Failed to delete program or program not found." });

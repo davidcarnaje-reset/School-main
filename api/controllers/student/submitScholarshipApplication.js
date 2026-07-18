@@ -1,5 +1,6 @@
 import pool from '../../config/db.js';
 import { uploadToR2 } from '../../utils/storageEngine.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 const submitScholarshipApplication = async (req, res) => {
   const { email, scholarship_id } = req.body;
@@ -82,6 +83,14 @@ const submitScholarshipApplication = async (req, res) => {
     ]);
 
     await connection.commit();
+    await logAuditTrail(
+      1,
+      'student',
+      "SUBMIT_SCHOLARSHIP_APPLICATION",
+      `Student ID: ${student_id} submitted scholarship application for scholarship ID: ${scholarship_id}`,
+      req
+    );
+
     return res.status(201).json({
       status: "success",
       message: "Application submitted successfully! Please wait for registrar verification."

@@ -1,6 +1,7 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import s3Client from '../config/s3Client.js';
 import pool from '../config/db.js';
+import { logAuditTrail } from '../utils/auditLogger.js';
 
 // GET all schools (Super Admin dashboard)
 export const getSchools = async (req, res) => {
@@ -62,6 +63,14 @@ export const createSchool = async (req, res) => {
       [newSchoolId, name, logo_url, theme_color || '#2563eb']
     );
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "CREATE_SCHOOL",
+      `Created school/campus name: ${name}`,
+      req
+    );
+
     return res.json({
       success: true,
       message: "School created successfully.",
@@ -118,6 +127,14 @@ export const updateSchool = async (req, res) => {
       [finalName, logo_url, finalTheme, id]
     );
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "UPDATE_SCHOOL",
+      `Updated school/campus ID: ${id} to name: ${finalName}, status: ${finalStatus}`,
+      req
+    );
+
     return res.json({
       success: true,
       message: "School updated successfully."
@@ -140,6 +157,14 @@ export const deleteSchool = async (req, res) => {
 
     await pool.query("DELETE FROM schools WHERE id = ?", [id]);
     await pool.query("DELETE FROM school_settings WHERE id = ?", [id]);
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "DELETE_SCHOOL",
+      `Deleted school/campus ID: ${id}`,
+      req
+    );
 
     return res.json({
       success: true,

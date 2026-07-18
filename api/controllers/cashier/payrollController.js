@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const getEmployees = async (req, res) => {
   try {
@@ -44,6 +45,13 @@ export const addEmployee = async (req, res) => {
     ]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Cashier',
+      "ADD_EMPLOYEE_PAYROLL",
+      `Added employee to payroll list: ${first_name} ${last_name} (ID: ${employee_id})`,
+      req
+    );
     return res.json({ status: "success" });
   } catch (error) {
     await connection.rollback();
@@ -83,6 +91,13 @@ export const updateEmployee = async (req, res) => {
       status ? status.trim() : 'Active',
       parseInt(id, 10)
     ]);
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Cashier',
+      "UPDATE_EMPLOYEE_PAYROLL",
+      `Updated payroll data for employee: ${first_name} ${last_name} (ID: ${employee_id})`,
+      req
+    );
     return res.json({ status: "success" });
   } catch (error) {
     console.error("updateEmployee error:", error);
@@ -123,6 +138,13 @@ export const addPeriod = async (req, res) => {
     ]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Cashier',
+      "CREATE_PAYROLL_PERIOD",
+      `Created payroll period: ${period_name} (${start_date} to ${end_date})`,
+      req
+    );
     return res.json({ status: "success" });
   } catch (error) {
     await connection.rollback();
@@ -295,6 +317,13 @@ export const savePayroll = async (req, res) => {
     }
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Cashier',
+      "SAVE_PAYROLL",
+      `Saved payroll entries for Period ID: ${period_id}. Status: ${finalStatusVal}`,
+      req
+    );
     return res.json({ status: "success", message: "Payroll updated successfully!" });
   } catch (error) {
     await connection.rollback();

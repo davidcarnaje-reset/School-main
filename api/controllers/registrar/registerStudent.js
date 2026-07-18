@@ -4,6 +4,7 @@ import s3Client from '../../config/s3Client.js';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { sendStudentWelcomeEmail } from '../../utils/emailEngine.js';
 import bcrypt from 'bcryptjs';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 /**
  * Registers a new student using a secure database transaction, calculating next sequential ID,
@@ -267,6 +268,13 @@ const registerStudent = async (req, res) => {
     ]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "REGISTER_STUDENT",
+      `Registered student ${first_name} ${last_name} with ID: ${student_id}`,
+      req
+    );
 
     // Build the full name
     const full_name = `${first_name} ${middle_name ? middle_name + ' ' : ''}${last_name}${suffix ? ' ' + suffix : ''}`.trim();

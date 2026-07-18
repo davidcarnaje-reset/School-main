@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const manageFees = async (req, res) => {
   const method = req.method;
@@ -27,6 +28,13 @@ export const manageFees = async (req, res) => {
           // UPDATE Logic
           const sql = "UPDATE fees_catalog SET item_name = ?, amount = ?, category = ?, applicable_to = ? WHERE id = ?";
           await pool.query(sql, [item_name.trim(), amt, category.trim(), applicable_to.trim(), parseInt(id, 10)]);
+          await logAuditTrail(
+            req.user?.id || 1,
+            req.user?.role || 'Cashier',
+            "UPDATE_FEE",
+            `Updated fee configuration item ID: ${id} to name: ${item_name} (Category: ${category}, Amount: ₱${amt})`,
+            req
+          );
           return res.json({ status: "success", message: "Item saved successfully!" });
         } else {
           // INSERT Logic
@@ -41,6 +49,13 @@ export const manageFees = async (req, res) => {
             await connection.query(sql, [nextId, item_name.trim(), amt, category.trim(), applicable_to.trim()]);
 
             await connection.commit();
+            await logAuditTrail(
+              req.user?.id || 1,
+              req.user?.role || 'Cashier',
+              "ADD_FEE",
+              `Added fee configuration item: ${item_name} (Category: ${category}, Amount: ₱${amt})`,
+              req
+            );
             return res.json({ status: "success", message: "Item saved successfully!" });
           } catch (e) {
             await connection.rollback();
@@ -59,6 +74,13 @@ export const manageFees = async (req, res) => {
 
         const sql = "DELETE FROM fees_catalog WHERE id = ?";
         await pool.query(sql, [parseInt(id, 10)]);
+        await logAuditTrail(
+          req.user?.id || 1,
+          req.user?.role || 'Cashier',
+          "DELETE_FEE",
+          `Deleted fee configuration item ID: ${id}`,
+          req
+        );
         return res.json({ status: "success" });
       }
       

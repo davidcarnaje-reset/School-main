@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const getSections = async (req, res) => {
   try {
@@ -61,6 +62,13 @@ export const createSection = async (req, res) => {
     ]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "CREATE_SECTION",
+      `Created section: ${section_name} (Grade: ${grade_level}, Max Capacity: ${max_capacity})`,
+      req
+    );
     return res.status(201).json({ status: "success", message: "Section created!" });
   } catch (error) {
     await connection.rollback();
@@ -192,6 +200,13 @@ export const updateSection = async (req, res) => {
       parseInt(id, 10)
     ]);
 
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "UPDATE_SECTION",
+      `Updated section ID: ${id} to name: ${section_name} (Grade: ${grade_level}, Max Capacity: ${max_capacity})`,
+      req
+    );
     return res.status(200).json({ status: "success", message: "Section updated successfully!" });
   } catch (error) {
     console.error("updateSection error:", error);
@@ -211,6 +226,13 @@ export const deleteSection = async (req, res) => {
     const [result] = await pool.query(sql, [parseInt(id, 10)]);
 
     if (result.affectedRows > 0) {
+      await logAuditTrail(
+        req.user?.id || 1,
+        req.user?.role || 'Registrar',
+        "DELETE_SECTION",
+        `Deleted section ID: ${id}`,
+        req
+      );
       return res.status(200).json({ status: "success", message: "Section deleted successfully." });
     } else {
       return res.status(400).json({ status: "error", message: "Failed to delete section or section not found." });

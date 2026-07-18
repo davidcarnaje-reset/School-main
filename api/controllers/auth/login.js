@@ -1,6 +1,7 @@
 import pool from '../../config/db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const login = async (req, res) => {
   try {
@@ -44,6 +45,14 @@ export const login = async (req, res) => {
         { username: student.student_id, role: 'student', name: displayName, school_id: student.school_id },
         process.env.JWT_SECRET || 'sms_super_secret_key_2026',
         { expiresIn: '24h' }
+      );
+
+      await logAuditTrail(
+        1,
+        'student',
+        'LOGIN',
+        `Student ID ${student.student_id} (${displayName}) logged in successfully.`,
+        req
       );
 
       return res.status(200).json({
@@ -117,6 +126,14 @@ export const login = async (req, res) => {
       { username: user.username, role: assignedRole, name: displayName, school_id: user.school_id },
       process.env.JWT_SECRET || 'sms_super_secret_key_2026',
       { expiresIn: '24h' }
+    );
+
+    await logAuditTrail(
+      user.id,
+      assignedRole,
+      'LOGIN',
+      `User ${user.username} (${displayName}) logged in successfully via ${portal} portal.`,
+      req
     );
 
     return res.status(200).json({

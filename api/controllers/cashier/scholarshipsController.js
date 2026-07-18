@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const fetchScholarships = async (req, res) => {
   try {
@@ -56,6 +57,13 @@ export const manageScholarships = async (req, res) => {
             await connection.query(sql, [nextId, code.trim(), name.trim(), discount_type.trim(), val, description]);
 
             await connection.commit();
+            await logAuditTrail(
+              req.user?.id || 1,
+              req.user?.role || 'Cashier',
+              "CREATE_SCHOLARSHIP",
+              `Created scholarship: ${name} (Code: ${code}, Discount: ${val} ${discount_type})`,
+              req
+            );
             return res.json({ status: "success", message: "Scholarship created!" });
           } catch (e) {
             await connection.rollback();
@@ -73,6 +81,13 @@ export const manageScholarships = async (req, res) => {
             WHERE id = ?
           `;
           await pool.query(sql, [code.trim(), name.trim(), discount_type.trim(), val, description, parseInt(id, 10)]);
+          await logAuditTrail(
+            req.user?.id || 1,
+            req.user?.role || 'Cashier',
+            "UPDATE_SCHOLARSHIP",
+            `Updated scholarship ID: ${id} to name: ${name} (Code: ${code}, Discount: ${val} ${discount_type})`,
+            req
+          );
           return res.json({ status: "success", message: "Scholarship updated!" });
         }
       }
@@ -82,6 +97,13 @@ export const manageScholarships = async (req, res) => {
           return res.status(400).json({ status: "error", message: "Scholarship ID is required for deactivation." });
         }
         await pool.query("UPDATE scholarships_catalog SET status = 'Inactive' WHERE id = ?", [parseInt(id, 10)]);
+        await logAuditTrail(
+          req.user?.id || 1,
+          req.user?.role || 'Cashier',
+          "DELETE_SCHOLARSHIP",
+          `Deactivated/deleted scholarship ID: ${id}`,
+          req
+        );
         return res.json({ status: "success", message: "Scholarship deactivated!" });
       }
     }
@@ -252,6 +274,13 @@ export const applyScholarshipToBilling = async (req, res) => {
     await connection.query("UPDATE scholarship_applications SET status = 'Applied' WHERE id = ?", [parseInt(application_id, 10)]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Cashier',
+      "APPLY_SCHOLARSHIP_BILLING",
+      `Applied scholarship: ${scholarship_name} to student ID: ${student_id}. Deducted amount: ₱${total_grant_used}`,
+      req
+    );
 
     return res.json({
       status: "success",

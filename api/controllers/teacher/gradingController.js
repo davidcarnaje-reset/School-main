@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // GET ACTIVITY SCORES & SUBMISSIONS FOR CLASS
 export const getActivityScores = async (req, res) => {
@@ -265,6 +266,13 @@ export const saveActivityScores = async (req, res) => {
     }
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Teacher',
+      "SAVE_ACTIVITY_SCORE",
+      `Saved score for Student: ${studentId} on Activity ID: ${activityId} (Score: ${score})`,
+      req
+    );
 
     return res.json({
       status: "success",

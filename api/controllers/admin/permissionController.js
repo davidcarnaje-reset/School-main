@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const getSchoolPermissions = async (req, res) => {
   try {
@@ -47,6 +48,13 @@ export const updateSchoolPermissions = async (req, res) => {
     }
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "UPDATE_SCHOOL_PERMISSIONS",
+      `Updated module role permissions for School ID: ${school_id}`,
+      req
+    );
 
     res.status(200).json({
       success: true,

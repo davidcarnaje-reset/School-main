@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 /**
  * Encodes subjects for a student's enrollment record by bulk inserting them into the student_subjects table.
@@ -35,6 +36,13 @@ const encodeSubjects = async (req, res) => {
     await connection.query(sql, [insertValues]);
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Registrar',
+      "ENCODE_SUBJECTS",
+      `Encoded ${subject_ids.length} subjects for Student ID: ${student_id}, Enrollment ID: ${enrollment_id}`,
+      req
+    );
 
     return res.json({
       success: true,

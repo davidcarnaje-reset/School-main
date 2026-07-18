@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // GET STUDENT FULL NAME BY ID
 export const getStudentName = async (req, res) => {
@@ -67,6 +68,13 @@ export const updateStudent = async (req, res) => {
     const [result] = await pool.query(query, params);
 
     if (result.affectedRows > 0) {
+      await logAuditTrail(
+        1,
+        'student',
+        "UPDATE_STUDENT_PROFILE",
+        `Student ID ${studentId} updated contact details (email, mobile, address)`,
+        req
+      );
       return res.json({ success: true, message: "Profile updated successfully!" });
     } else {
       return res.status(404).json({ success: false, message: "Student record not found." });

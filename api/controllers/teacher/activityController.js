@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // CREATE STANDARD CLASSROOM ACTIVITY
 export const createActivity = async (req, res) => {
@@ -44,6 +45,13 @@ export const createActivity = async (req, res) => {
     }
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || teacher_id || 1,
+      req.user?.role || 'Teacher',
+      "CREATE_ACTIVITY",
+      `Created standard activity: ${title} for Class ID: ${class_id}`,
+      req
+    );
 
     return res.json({
       status: "success",
@@ -139,6 +147,13 @@ export const createExam = async (req, res) => {
     }
 
     await connection.commit();
+    await logAuditTrail(
+      req.user?.id || teacher_id || 1,
+      req.user?.role || 'Teacher',
+      "CREATE_EXAMINATION",
+      `Created exam: ${exam_details.title} for Class ID: ${exam_details.class_id}`,
+      req
+    );
 
     return res.json({
       status: "success",

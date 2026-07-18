@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { logAuditTrail } from '../../utils/auditLogger.js';
 
 // GET USER CONFIG SETTINGS
 export const getSettings = async (req, res) => {
@@ -64,6 +65,14 @@ export const updateSettings = async (req, res) => {
     `;
 
     await pool.query(query, [uid, urole, value, value]);
+
+    await logAuditTrail(
+      parseInt(uid, 10),
+      urole,
+      "UPDATE_USER_SETTINGS",
+      `Updated personal setting: ${key} to ${value}`,
+      req
+    );
 
     return res.json({ status: "success", message: "Setting updated" });
 

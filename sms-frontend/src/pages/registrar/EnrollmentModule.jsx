@@ -110,7 +110,24 @@ const handleOpenSubjectPicker = () => {
 
     const matchedFees = feesCatalog.filter(f => {
         const isMandatory = f.category === 'Mandatory';
-        const isCorrectTuition = f.category === 'Tuition' && f.item_name.toLowerCase().includes(student.grade_level.toLowerCase());
+        
+        let isCorrectTuition = false;
+        if (f.category === 'Tuition') {
+            const lowerGrade = student.grade_level.toLowerCase();
+            const isCollege = lowerGrade.includes('college') || lowerGrade.includes('year');
+            const isSHS = ['grade 11', 'grade 12'].includes(lowerGrade);
+            
+            if (isCollege) {
+                // Match student's program code (e.g. BSCS) or generic "College"
+                isCorrectTuition = f.applicable_to === student.program_code || f.applicable_to === 'College';
+            } else if (isSHS) {
+                // Match student's program/strand code (e.g. STEM) or generic "SHS"
+                isCorrectTuition = f.applicable_to === student.program_code || f.applicable_to === 'SHS';
+            } else {
+                // For Elementary and JHS: match grade level name in fee item name
+                isCorrectTuition = f.item_name.toLowerCase().includes(lowerGrade);
+            }
+        }
         return isMandatory || isCorrectTuition;
     }).map(f => f.id);
 

@@ -91,6 +91,7 @@ import CashierLayout from './layouts/CashierLayout';
 import LandingPromotions from './pages/admin/LandingPromotions';
 import SchoolManagement from './pages/admin/SchoolManagement';
 import SchoolPermissions from './pages/admin/SchoolPermissions';
+import AdminAuditLogs from './pages/admin/AdminAuditLogs';
 
 // IT Pages
 import ItDashboard from './pages/it/ItDashboard';
@@ -261,6 +262,7 @@ function App() {
             <Route path="promotions" element={<LandingPromotions />} />
             <Route path="schools" element={<SchoolManagement />} />
             <Route path="permissions" element={<SchoolPermissions />} />
+            <Route path="audit-logs" element={<AdminAuditLogs />} />
           </Route>
 
           {/* 4. CASHIER ROUTES */}
