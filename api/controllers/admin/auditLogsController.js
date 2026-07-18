@@ -6,18 +6,18 @@ export const getAuditLogs = async (req, res) => {
     
     let query = `
       SELECT 
-        al.id, 
+        al.log_id as id, 
         al.user_id, 
         al.user_role, 
         al.action_type, 
         al.description, 
         al.ip_address, 
-        al.timestamp,
+        al.created_at as timestamp,
         CASE 
           WHEN al.user_role = 'student' THEN (
             SELECT CONCAT(first_name, ' ', last_name) 
             FROM students 
-            WHERE student_id = CAST(al.user_id AS CHAR) OR student_id = al.user_id 
+            WHERE student_id COLLATE utf8mb4_general_ci = CAST(al.user_id AS CHAR) COLLATE utf8mb4_general_ci
             LIMIT 1
           )
           ELSE (
@@ -48,7 +48,7 @@ export const getAuditLogs = async (req, res) => {
       params.push(searchWildcard, searchWildcard, searchWildcard);
     }
 
-    query += " ORDER BY al.timestamp DESC LIMIT 1000";
+    query += " ORDER BY al.created_at DESC LIMIT 1000";
 
     const [rows] = await pool.query(query, params);
 
