@@ -87,6 +87,7 @@ import Login from './pages/auth/Login';
 import UserManagement from './pages/admin/UserManagement';
 import BrandingSettings from './pages/admin/BrandingSettings';
 import RoomManagement from './pages/admin/RoomManagement';
+import SchoolSetup from './pages/admin/SchoolSetup';
 import CashierLayout from './layouts/CashierLayout';
 import LandingPromotions from './pages/admin/LandingPromotions';
 import SchoolManagement from './pages/admin/SchoolManagement';
@@ -257,6 +258,7 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<UserManagement />} />
+            <Route path="school-setup" element={<SchoolSetup />} />
             <Route path="branding" element={<BrandingSettings />} />
             <Route path="rooms" element={<RoomManagement />} />
             <Route path="promotions" element={<LandingPromotions />} />

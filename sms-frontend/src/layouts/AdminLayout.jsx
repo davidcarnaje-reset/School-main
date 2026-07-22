@@ -93,6 +93,7 @@ const AdminLayout = () => {
     ],
     admin: [
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/admin/dashboard' },
+      { icon: <School size={20} />, label: 'School Setup', path: '/admin/school-setup' },
       { icon: <Users size={20} />, label: 'User Management', path: '/admin/users' },
       { icon: <Settings size={20} />, label: 'Branding Engine', path: '/admin/branding' },
       { icon: <Image size={20} />, label: 'Landing Banners', path: '/admin/promotions' },

@@ -8,6 +8,21 @@ import { getUsers, createUser, updateUser, deleteUser, updateUserProfile } from 
 import { getRooms, createRoom, updateRoom, deleteRoom } from '../controllers/admin/room.js';
 import { getAdminPromotions, createPromotion, deletePromotion } from '../controllers/admin/promotion.js';
 import { getAuditLogs } from '../controllers/admin/auditLogsController.js';
+import {
+  getSchoolProfile,
+  updateSchoolProfile,
+  getSchoolYears,
+  createSchoolYear,
+  updateSchoolYear,
+  deleteSchoolYear,
+  getBuildings,
+  createBuilding,
+  updateBuilding,
+  deleteBuilding,
+  getRoomsExtended,
+  createRoomExtended,
+  updateRoomExtended
+} from '../controllers/admin/schoolSetupController.js';
 
 const router = express.Router();
 
@@ -37,14 +52,27 @@ const profileStorage = multer.diskStorage({
 });
 const uploadProfile = multer({ storage: profileStorage });
 
-// Branding Endpoints
+// Branding & School Profile Endpoints
 router.get('/branding', getBranding);
 router.post('/branding', upload.single('school_logo'), updateBranding);
+router.get('/school-profile', getSchoolProfile);
+router.post('/school-profile', upload.single('school_logo'), updateSchoolProfile);
 
 // Legacy Branding routing alias
 router.get('/branding.php', getBranding);
 router.post('/branding.php', upload.single('school_logo'), updateBranding);
 
+// School Year Endpoints
+router.get('/school-years', getSchoolYears);
+router.post('/school-years', createSchoolYear);
+router.put('/school-years/:id', updateSchoolYear);
+router.delete('/school-years/:id', deleteSchoolYear);
+
+// Building Endpoints
+router.get('/buildings', getBuildings);
+router.post('/buildings', createBuilding);
+router.put('/buildings/:id', updateBuilding);
+router.delete('/buildings/:id', deleteBuilding);
 
 // User Management RESTful Endpoints
 router.get('/users', getUsers);
@@ -65,17 +93,17 @@ router.post('/delete_user.php', (req, res) => {
 });
 
 // Room Management RESTful Endpoints
-router.get('/rooms', getRooms);
-router.post('/rooms', createRoom);
-router.put('/rooms/:id', updateRoom);
+router.get('/rooms', getRoomsExtended);
+router.post('/rooms', createRoomExtended);
+router.put('/rooms/:id', updateRoomExtended);
 router.delete('/rooms/:id', deleteRoom);
 
 // Legacy Room Management routing alias
-router.get('/get_rooms.php', getRooms);
-router.post('/create_room.php', createRoom);
+router.get('/get_rooms.php', getRoomsExtended);
+router.post('/create_room.php', createRoomExtended);
 router.post('/update_room.php', (req, res) => {
   req.params.id = req.body.id;
-  updateRoom(req, res);
+  updateRoomExtended(req, res);
 });
 router.post('/delete_room.php', (req, res) => {
   req.params.id = req.body.id;

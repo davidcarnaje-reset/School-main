@@ -78,9 +78,21 @@ const registerStudent = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. Compute next sequential student_id (format: YYYY-XXXX)
+    // 1. Compute next sequential student_id with custom prefix indicator (K-12 vs College)
+    const schoolId = req.body.school_id || 1;
+    const [settingsRows] = await connection.query(
+      "SELECT prefix_k12, prefix_college FROM school_settings WHERE id = ?",
+      [schoolId]
+    );
+
+    const k12Prefix = (settingsRows.length > 0 && settingsRows[0].prefix_k12) ? settingsRows[0].prefix_k12 : '';
+    const collegePrefix = (settingsRows.length > 0 && settingsRows[0].prefix_college) ? settingsRows[0].prefix_college : '';
+
+    const isCollege = grade_level === 'College';
+    const customPrefix = isCollege ? collegePrefix : k12Prefix;
+
     const currentYear = new Date().getFullYear();
-    const idPrefix = `${currentYear}-`;
+    const idPrefix = `${customPrefix}${currentYear}-`;
 
     const [lastStudentRows] = await connection.query(
       "SELECT student_id FROM students WHERE student_id LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE",
@@ -91,7 +103,9 @@ const registerStudent = async (req, res) => {
     if (lastStudentRows.length > 0) {
       const lastStudentId = lastStudentRows[0].student_id;
       const lastNum = parseInt(lastStudentId.substring(idPrefix.length), 10);
-      newNum = String(lastNum + 1).padStart(4, '0');
+      if (!isNaN(lastNum)) {
+        newNum = String(lastNum + 1).padStart(4, '0');
+      }
     }
     const student_id = `${idPrefix}${newNum}`;
 
