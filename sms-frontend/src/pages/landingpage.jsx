@@ -170,16 +170,24 @@ const LandingPage = () => {
   const getGuardianName = (f) => `${f.guardian_first_name || ''} ${f.guardian_middle_name || ''} ${f.guardian_last_name || ''}`.replace(/\s+/g, ' ').trim() || '---';
 
   const getProgramOptions = () => {
-    let typeFilter = null;
-    if (['Grade 11', 'Grade 12'].includes(formData.grade_level)) {
-      typeFilter = 'SHS';
+    if (formData.grade_level === 'Grade 11' || formData.grade_level === 'Grade 12') {
+      return programs
+        .filter(p => p.department === 'SHS')
+        .map(p => ({ 
+          value: p.id, 
+          label: `${p.program_code} - ${p.program_description} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
+        }));
     } else if (formData.grade_level === 'College') {
-      typeFilter = 'College';
+      return programs
+        .filter(p => p.department === 'College')
+        .map(p => ({ 
+          value: p.id, 
+          label: p.major 
+            ? `${p.program_code} Major in ${p.major} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
+            : `${p.program_code} - ${p.program_description} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
+        }));
     }
-    if (!typeFilter) return [];
-    return programs
-      .filter(p => p.program_type === typeFilter)
-      .map(p => ({ value: p.id, label: `${p.code} - ${p.name}` }));
+    return [];
   };
 
   const isStepValid = () => {
@@ -441,6 +449,7 @@ const LandingPage = () => {
     setSelectedSchoolId(school.id);
     fetchBranding(school.id);
     fetchPromotions(school.id);
+    fetchActivePrograms(school.id);
   };
 
   const handleChangeCampus = () => {
@@ -761,6 +770,7 @@ const LandingPage = () => {
               <button 
                 onClick={() => {
                   setShowAdmissionsModal(false);
+                  fetchActivePrograms(selectedSchoolId);
                   setShowRegisterWizard(true);
                   setCurrentStep(1);
                 }} 
