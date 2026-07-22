@@ -9,7 +9,11 @@ import {
 import { useAuth } from '../../context/AuthContext';
 
 const SchoolSetup = () => {
-  const { API_BASE_URL, getLogoUrl } = useAuth();
+  const { API_BASE_URL, getLogoUrl, user, fetchBranding } = useAuth();
+
+  const activeSchoolId = user?.role === 'super_admin'
+    ? (localStorage.getItem('selected_school_id') || 1)
+    : (user?.school_id || localStorage.getItem('selected_school_id') || 1);
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'schoolyear', 'buildings', 'rooms'
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
@@ -83,7 +87,7 @@ const SchoolSetup = () => {
     fetchSchoolYears();
     fetchBuildings();
     fetchRooms();
-  }, []);
+  }, [activeSchoolId]);
 
   const showToast = (message, type = 'success') => {
     setNotification({ show: true, message, type });
@@ -97,7 +101,8 @@ const SchoolSetup = () => {
   // -------------------------------------------------------------
   const fetchProfile = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/admin/school-profile`);
+      const targetId = activeSchoolId || localStorage.getItem('selected_school_id') || 1;
+      const res = await axios.get(`${API_BASE_URL}/admin/school-profile?school_id=${targetId}`);
       if (res.data?.data) {
         setProfile({
           school_name: res.data.data.school_name || '',
@@ -128,6 +133,7 @@ const SchoolSetup = () => {
     e.preventDefault();
     setLoading(true);
 
+    const targetId = activeSchoolId || localStorage.getItem('selected_school_id') || 1;
     const formData = new FormData();
     Object.keys(profile).forEach(key => {
       if (key !== 'school_logo') {
@@ -135,17 +141,20 @@ const SchoolSetup = () => {
       }
     });
 
+    formData.append('school_id', targetId);
+
     if (selectedLogoFile) {
       formData.append('school_logo', selectedLogoFile);
     }
 
     try {
-      const res = await axios.post(`${API_BASE_URL}/admin/school-profile`, formData, {
+      const res = await axios.post(`${API_BASE_URL}/admin/school-profile?school_id=${targetId}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       if (res.data?.status === 'success') {
         showToast("School Profile & Prefixes updated successfully!", "success");
         fetchProfile();
+        if (fetchBranding) fetchBranding(targetId);
       } else {
         showToast(res.data?.message || "Failed to update profile.", "error");
       }
@@ -1053,26 +1062,51 @@ const SchoolSetup = () => {
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Building</label>
                   <select
                     value={roomForm.building_id}
-                    onChange={(e) => setRoomForm({ ...roomForm, building_id: e.target.value })}
+                    onChange={(e) => {
+                      const bId = e.target.value;
+                      const bObj = buildings.find(b => String(b.id) === String(bId));
+                      const maxF = bObj ? (parseInt(bObj.floors, 10) || 1) : 1;
+                      const currentF = parseInt(roomForm.floor_number, 10) || 1;
+                      const newFloor = currentF > maxF ? 1 : currentF;
+                      setRoomForm({ ...roomForm, building_id: bId, floor_number: newFloor });
+                    }}
                     className="w-full p-3.5 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 text-sm font-bold"
                   >
                     <option value="">-- Select Building --</option>
                     {buildings.map((b) => (
-                      <option key={b.id} value={b.id}>{b.building_name}</option>
+                      <option key={b.id} value={b.id}>{b.building_name} ({b.floors} {b.floors === 1 ? 'Floor' : 'Floors'})</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Floor #</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={roomForm.floor_number}
-                    onChange={(e) => setRoomForm({ ...roomForm, floor_number: e.target.value })}
-                    className="w-full p-3.5 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 text-sm font-bold"
-                  />
+                  {(() => {
+                    const selBuilding = buildings.find(b => String(b.id) === String(roomForm.building_id));
+                    const maxFloors = selBuilding ? (parseInt(selBuilding.floors, 10) || 1) : 1;
+                    return (
+                      <>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                          Floor # {selBuilding && <span className="text-blue-600 font-bold">(Max: {maxFloors})</span>}
+                        </label>
+                        <select
+                          value={roomForm.floor_number}
+                          onChange={(e) => setRoomForm({ ...roomForm, floor_number: parseInt(e.target.value, 10) || 1 })}
+                          className="w-full p-3.5 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 text-sm font-bold disabled:bg-slate-50 disabled:text-slate-400"
+                          disabled={!roomForm.building_id}
+                        >
+                          {!roomForm.building_id ? (
+                            <option value="1">-- Select Building First --</option>
+                          ) : (
+                            Array.from({ length: maxFloors }, (_, i) => i + 1).map((fNum) => (
+                              <option key={fNum} value={fNum}>
+                                Floor {fNum}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 

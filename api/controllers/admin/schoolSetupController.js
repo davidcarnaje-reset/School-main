@@ -10,15 +10,31 @@ export const getSchoolProfile = async (req, res) => {
   try {
     const schoolId = req.query.school_id || req.school_id || 1;
     const [rows] = await pool.query(
-      `SELECT id, school_name, school_logo, theme_color, 
-              school_address, website_link, fb_page, contact_number, 
-              prefix_k12, prefix_college 
-       FROM school_settings WHERE id = ?`, 
+      `SELECT 
+         s.id, 
+         COALESCE(ss.school_name, s.name) AS school_name, 
+         COALESCE(ss.school_logo, s.logo) AS school_logo, 
+         COALESCE(ss.theme_color, s.theme_color, '#2563eb') AS theme_color, 
+         ss.school_address, 
+         ss.website_link, 
+         ss.fb_page, 
+         ss.contact_number, 
+         COALESCE(ss.prefix_k12, 'K12-') AS prefix_k12, 
+         COALESCE(ss.prefix_college, 'COL-') AS prefix_college 
+       FROM schools s
+       LEFT JOIN school_settings ss ON s.id = ss.id
+       WHERE s.id = ?`, 
       [schoolId]
     );
 
     if (rows.length > 0) {
       return res.json({ status: 'success', data: rows[0] });
+    }
+
+    // Fallback if even schools table row was not found
+    const [ssRows] = await pool.query("SELECT * FROM school_settings WHERE id = ?", [schoolId]);
+    if (ssRows.length > 0) {
+      return res.json({ status: 'success', data: ssRows[0] });
     }
 
     return res.json({
@@ -55,6 +71,7 @@ export const updateSchoolProfile = async (req, res) => {
       prefix_college
     } = req.body;
 
+    const schoolId = req.query.school_id || req.school_id || 1;
     let school_logo_url = null;
 
     if (req.file) {
@@ -74,8 +91,7 @@ export const updateSchoolProfile = async (req, res) => {
       school_logo_url = `${publicUrl}/branding/${uniqueFileName}`;
     }
 
-    const schoolId = req.school_id || 1;
-
+    // 1. Upsert into school_settings
     await pool.query(
       `INSERT INTO school_settings (
         id, school_name, theme_color, school_logo, 
@@ -102,7 +118,36 @@ export const updateSchoolProfile = async (req, res) => {
       ]
     );
 
-    const [updated] = await pool.query("SELECT * FROM school_settings WHERE id = ?", [schoolId]);
+    // 2. Sync to schools table as well
+    if (school_logo_url) {
+      await pool.query(
+        "UPDATE schools SET name = COALESCE(?, name), theme_color = COALESCE(?, theme_color), logo = ? WHERE id = ?",
+        [school_name, theme_color, school_logo_url, schoolId]
+      );
+    } else {
+      await pool.query(
+        "UPDATE schools SET name = COALESCE(?, name), theme_color = COALESCE(?, theme_color) WHERE id = ?",
+        [school_name, theme_color, schoolId]
+      );
+    }
+
+    const [updated] = await pool.query(
+      `SELECT 
+         s.id, 
+         COALESCE(ss.school_name, s.name) AS school_name, 
+         COALESCE(ss.school_logo, s.logo) AS school_logo, 
+         COALESCE(ss.theme_color, s.theme_color, '#2563eb') AS theme_color, 
+         ss.school_address, 
+         ss.website_link, 
+         ss.fb_page, 
+         ss.contact_number, 
+         COALESCE(ss.prefix_k12, 'K12-') AS prefix_k12, 
+         COALESCE(ss.prefix_college, 'COL-') AS prefix_college 
+       FROM schools s
+       LEFT JOIN school_settings ss ON s.id = ss.id
+       WHERE s.id = ?`,
+      [schoolId]
+    );
 
     await logAuditTrail(
       req.user?.id || 1,
@@ -371,6 +416,18 @@ export const createRoomExtended = async (req, res) => {
     }
 
     const schoolId = req.school_id || 1;
+    let finalFloor = parseInt(floor_number, 10) || 1;
+
+    if (building_id) {
+      const [bldgRows] = await pool.query("SELECT floors FROM buildings WHERE id = ?", [building_id]);
+      if (bldgRows.length > 0) {
+        const maxFloors = bldgRows[0].floors || 1;
+        if (finalFloor > maxFloors) {
+          finalFloor = maxFloors;
+        }
+      }
+    }
+
     const [maxIdRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM rooms");
     const nextId = maxIdRows[0].maxId + 1;
 
@@ -384,7 +441,7 @@ export const createRoomExtended = async (req, res) => {
         room_name.trim(),
         room_number ? room_number.trim() : null,
         building_id ? parseInt(building_id, 10) : null,
-        parseInt(floor_number, 10) || 1,
+        finalFloor,
         category || 'Lecture',
         room_type || 'Physical',
         parseInt(capacity, 10) || 40,
@@ -418,6 +475,17 @@ export const updateRoomExtended = async (req, res) => {
       return res.status(400).json({ status: 'error', message: "Room name and capacity are required." });
     }
 
+    let finalFloor = parseInt(floor_number, 10) || 1;
+    if (building_id) {
+      const [bldgRows] = await pool.query("SELECT floors FROM buildings WHERE id = ?", [building_id]);
+      if (bldgRows.length > 0) {
+        const maxFloors = bldgRows[0].floors || 1;
+        if (finalFloor > maxFloors) {
+          finalFloor = maxFloors;
+        }
+      }
+    }
+
     await pool.query(
       `UPDATE rooms SET 
          room_name = ?, 
@@ -433,7 +501,7 @@ export const updateRoomExtended = async (req, res) => {
         room_name.trim(),
         room_number ? room_number.trim() : null,
         building_id ? parseInt(building_id, 10) : null,
-        parseInt(floor_number, 10) || 1,
+        finalFloor,
         category || 'Lecture',
         room_type || 'Physical',
         parseInt(capacity, 10) || 40,

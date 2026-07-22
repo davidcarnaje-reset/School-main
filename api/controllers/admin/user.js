@@ -138,15 +138,37 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// DELETE a user
+// DELETE a user or student
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
+    const isStudent = req.query.is_student === 'true' || req.body?.is_student;
+
     if (!id) {
       return res.status(400).json({ success: false, message: "User ID is required." });
     }
 
     const schoolId = req.school_id || 1;
+
+    if (isStudent) {
+      const [stdRows] = await pool.query("SELECT student_id FROM students WHERE id = ? OR student_id = ?", [id, id]);
+      const targetStudentId = stdRows.length > 0 ? stdRows[0].student_id : id;
+
+      await pool.query("DELETE FROM enrollments WHERE student_id = ?", [targetStudentId]);
+      await pool.query("DELETE FROM user_settings WHERE user_id = ? AND user_role = 'student'", [targetStudentId]);
+      await pool.query("DELETE FROM students WHERE id = ? OR student_id = ?", [id, targetStudentId]);
+
+      await logAuditTrail(
+        req.user?.id || 1,
+        req.user?.role || 'Admin',
+        "DELETE_STUDENT",
+        `Deleted student account ID: ${targetStudentId}`,
+        req
+      );
+
+      return res.json({ success: true, message: "Student account deleted successfully." });
+    }
+
     await pool.query("DELETE FROM users WHERE id = ? AND school_id = ?", [id, schoolId]);
 
     await logAuditTrail(

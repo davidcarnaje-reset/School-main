@@ -259,8 +259,8 @@ function App() {
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="school-setup" element={<SchoolSetup />} />
-            <Route path="branding" element={<BrandingSettings />} />
-            <Route path="rooms" element={<RoomManagement />} />
+            <Route path="branding" element={<Navigate to="../school-setup" replace />} />
+            <Route path="rooms" element={<Navigate to="../school-setup" replace />} />
             <Route path="promotions" element={<LandingPromotions />} />
             <Route path="schools" element={<SchoolManagement />} />
             <Route path="permissions" element={<SchoolPermissions />} />
