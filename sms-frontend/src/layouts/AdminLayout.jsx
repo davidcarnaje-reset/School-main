@@ -101,6 +101,7 @@ const AdminLayout = () => {
     ],
     registrar: [
         { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/registrar/dashboard' },
+        { icon: <Sliders size={20} />, label: 'Registrar Setup', path: '/registrar/setup', module: 'setup' },
         { icon: <UserCircle size={20} />, label: 'Student Masterlist', path: '/registrar/students', module: 'students' },
         { type: 'header', label: 'Academics' }, 
         { icon: <Library size={20} />, label: 'Academic Programs', path: '/registrar/programs', module: 'programs' }, 

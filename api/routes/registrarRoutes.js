@@ -17,6 +17,12 @@ import { getRegistrarRequests, getFeesCatalog, searchStudents, addRequest, cance
 import { getStudentRecords, getStudentDocuments, unlockGrades } from '../controllers/registrar/studentRecords.js';
 import { getScholarshipApplications, evaluateScholarship, readImage } from '../controllers/registrar/scholarshipManagement.js';
 import { getStudentsByStatus, getAvailableClasses } from '../controllers/registrar/enrollmentHelper.js';
+import { 
+  getStudentTOR, 
+  getGradeTemplates, saveGradeTemplate, deleteGradeTemplate,
+  getGradeReleaseSettings, toggleGradeRelease,
+  getCertificateTemplates, saveCertificateTemplate, deleteCertificateTemplate, generateCertificate
+} from '../controllers/registrar/registrarSetupController.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -68,6 +74,21 @@ router.get('/read-image', readImage);
 
 router.get('/students-by-status', getStudentsByStatus);
 router.get('/available-classes', getAvailableClasses);
+
+// Registrar Setup & Governance Routes
+router.get('/tor', getStudentTOR);
+
+router.get('/grade-templates', getGradeTemplates);
+router.post('/grade-templates', saveGradeTemplate);
+router.delete('/grade-templates/:id', deleteGradeTemplate);
+
+router.get('/grade-release-settings', getGradeReleaseSettings);
+router.post('/toggle-grade-release', toggleGradeRelease);
+
+router.get('/certificate-templates', getCertificateTemplates);
+router.post('/certificate-templates', saveCertificateTemplate);
+router.delete('/certificate-templates/:id', deleteCertificateTemplate);
+router.post('/generate-certificate', generateCertificate);
 
 
 // Legacy compatibility endpoints

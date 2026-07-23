@@ -23,6 +23,7 @@ import ScholarshipApplications from './pages/registrar/ScholarshipApplications';
 import RegistrarSubjects from './pages/registrar/RegistrarSubjects';
 import SectionManagement from './pages/registrar/SectionManagement';
 import StudentGradesView from './pages/registrar/StudentGradesView';
+import RegistrarSetup from './pages/registrar/RegistrarSetup';
 
 // ==========================================
 // STUDENT PAGES
@@ -340,6 +341,7 @@ function App() {
             <Route path="subjects" element={<RegistrarSubjects />} />
             <Route path="sections" element={<SectionManagement />} />
             <Route path="grades" element={<StudentGradesView />} />
+            <Route path="setup" element={<RegistrarSetup />} />
           </Route>
 
           {/* =======================================================
