@@ -64,4 +64,13 @@ if (host.includes('tidbcloud.com') || process.env.DB_SSL_CA) {
 
 const pool = mysql.createPool(poolConfig);
 
+// Auto-patch schema for category column truncation
+(async () => {
+  try {
+    await pool.query("ALTER TABLE fees_catalog MODIFY COLUMN category VARCHAR(100) NOT NULL DEFAULT 'Other'");
+  } catch (err) {
+    // Ignore if table doesn't exist yet or already altered
+  }
+})();
+
 export default pool;

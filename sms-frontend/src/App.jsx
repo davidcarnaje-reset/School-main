@@ -24,6 +24,7 @@ import RegistrarSubjects from './pages/registrar/RegistrarSubjects';
 import SectionManagement from './pages/registrar/SectionManagement';
 import StudentGradesView from './pages/registrar/StudentGradesView';
 import RegistrarSetup from './pages/registrar/RegistrarSetup';
+import DepEdReportsModule from './pages/registrar/DepEdReportsModule';
 
 // ==========================================
 // STUDENT PAGES
@@ -341,6 +342,7 @@ function App() {
             <Route path="subjects" element={<RegistrarSubjects />} />
             <Route path="sections" element={<SectionManagement />} />
             <Route path="grades" element={<StudentGradesView />} />
+            <Route path="deped-reports" element={<DepEdReportsModule />} />
             <Route path="setup" element={<RegistrarSetup />} />
           </Route>
 

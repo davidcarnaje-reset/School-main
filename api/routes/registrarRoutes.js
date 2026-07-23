@@ -23,6 +23,14 @@ import {
   getGradeReleaseSettings, toggleGradeRelease,
   getCertificateTemplates, saveCertificateTemplate, deleteCertificateTemplate, generateCertificate
 } from '../controllers/registrar/registrarSetupController.js';
+import { 
+  getSF1Report, 
+  getSF5Report, 
+  getForm138ReportCard, 
+  getCertificateOfEnrollment, 
+  getHonorStudents, 
+  promoteStudentsBatch 
+} from '../controllers/registrar/depedReportsController.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -141,5 +149,20 @@ router.get('/read_image.php', readImage);
 
 router.get('/get_students_by_status.php', getStudentsByStatus);
 router.get('/get_available_classes.php', getAvailableClasses);
+
+// DepEd / CHED Official Forms & Reports Endpoints
+router.get('/sf1-report', getSF1Report);
+router.get('/sf5-report', getSF5Report);
+router.get('/form138-card', getForm138ReportCard);
+router.get('/certificate-enrollment', getCertificateOfEnrollment);
+router.get('/honor-students', getHonorStudents);
+router.post('/promote-students-batch', promoteStudentsBatch);
+
+router.get('/get_sf1_report.php', getSF1Report);
+router.get('/get_sf5_report.php', getSF5Report);
+router.get('/get_form138_card.php', getForm138ReportCard);
+router.get('/get_certificate_enrollment.php', getCertificateOfEnrollment);
+router.get('/get_honor_students.php', getHonorStudents);
+router.post('/promote_students_batch.php', promoteStudentsBatch);
 
 export default router;

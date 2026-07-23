@@ -54,8 +54,8 @@ const UserProfileModal = ({ isOpen, onClose, user, branding, logout }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 z-[90] flex items-center justify-center p-4 backdrop-blur-sm">
-      <form onSubmit={submitProfileUpdate} className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl flex flex-col animate-in zoom-in duration-200">
+    <div className="fixed inset-0 bg-slate-900/60 z-[90] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+      <form onSubmit={submitProfileUpdate} className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto animate-in zoom-in duration-200">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Settings size={20} className="text-blue-500" /> Account Settings

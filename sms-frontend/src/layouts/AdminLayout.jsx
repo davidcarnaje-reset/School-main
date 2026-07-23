@@ -10,12 +10,13 @@ import {
   Server, Shield, LifeBuoy, Zap, FileSpreadsheet, Building, Package, Wrench, Key, Sliders,
   Laptop, HelpCircle, BarChart2, Activity, ShieldAlert,
   UserCheck, FolderOpen, AlertCircle, CheckCircle2, Heart, Trash2,
-  Calendar, Clock
+  Calendar, Clock, Sparkles, Printer
 } from 'lucide-react'; 
 import { useAuth } from '../context/AuthContext';
 import UserProfileModal from '../components/admin/UserProfileModal'; 
 import CreateAnnouncementModal from '../components/shared/CreateAnnouncementModal';
 import ReadNotificationModal from '../components/shared/ReadNotificationModal';
+import HelpTutorialModal from '../components/shared/HelpTutorialModal';
 
 const AdminLayout = () => {
   const { logout, user, branding, activePermissions, API_BASE_URL, getLogoUrl } = useAuth();
@@ -23,6 +24,7 @@ const AdminLayout = () => {
   const [isCollapsed, setIsCollapsed] = useState(false); 
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   // ==========================================
   // 🚀 NOTIFICATION STATES
@@ -113,6 +115,7 @@ const AdminLayout = () => {
         { icon: <Award size={20} />, label: 'Scholarship Applications', path: '/registrar/scholarships', module: 'scholarships' },
         { icon: <Layers size={20} />, label: 'Section Management', path: '/registrar/sections', module: 'sections' },
         { icon: <FileCheck2 size={20} />, label: 'Student Grades', path: '/registrar/grades', module: 'grades' },
+        { icon: <Printer size={20} />, label: 'DepEd / CHED Reports', path: '/registrar/deped-reports', module: 'deped_reports' },
     ],
     hr: [
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/hr/dashboard' },
@@ -324,42 +327,51 @@ const AdminLayout = () => {
 
       {/* 3. MAIN CONTENT */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto z-10">
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-30 shrink-0 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <button className="p-2 lg:hidden text-slate-600" onClick={() => setIsSidebarOpen(true)}><Menu size={20} /></button>
-            <h2 className="text-slate-800 font-black text-lg lg:text-xl capitalize">{location.pathname.split('/').pop()?.replace('-', ' ')}</h2>
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-3 sm:px-6 lg:px-10 sticky top-0 z-30 shrink-0 shadow-sm">
+          <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
+            <button className="p-2 lg:hidden text-slate-600 shrink-0" onClick={() => setIsSidebarOpen(true)}><Menu size={20} /></button>
+            <h2 className="text-slate-800 font-black text-sm sm:text-lg lg:text-xl capitalize truncate">{location.pathname.split('/').pop()?.replace('-', ' ')}</h2>
             {activeSchoolId ? (
-              <span className="hidden sm:inline-block px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+              <span className="hidden md:inline-block px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
                 🏫 {branding.school_name}
               </span>
             ) : user?.role === 'super_admin' && (
-              <span className="hidden sm:inline-block px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+              <span className="hidden md:inline-block px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
                 🌐 Global Control
               </span>
             )}
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-center shrink-0">
             
-            {/* NOTIFICATION SECTION */}
-            <div className="flex items-center space-x-2 mr-6 pr-6 border-r border-slate-200 relative">
+            {/* SYSTEM GUIDE & NOTIFICATION SECTION */}
+            <div className="flex items-center space-x-1 sm:space-x-2 mr-2 pr-2 sm:mr-6 sm:pr-6 border-r border-slate-200 relative shrink-0">
+              <button 
+                onClick={() => setIsHelpModalOpen(true)}
+                className="p-2 sm:px-3.5 sm:py-2 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-2xl transition-all flex items-center gap-1.5 font-black text-xs shadow-sm cursor-pointer active:scale-95 shrink-0"
+                title="System Help & Page Guide"
+              >
+                <Sparkles size={16} className="text-amber-500" />
+                <span className="hidden md:inline">Guide & Tips</span>
+              </button>
+
               {user?.role !== 'student' && (
-                <button onClick={() => setIsCreateNotifModalOpen(true)} className="p-2.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all">
-                    <Megaphone size={20} />
+                <button onClick={() => setIsCreateNotifModalOpen(true)} className="p-2 sm:p-2.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all shrink-0">
+                    <Megaphone size={18} />
                 </button>
               )}
-              <div className="relative">
-                <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`p-2.5 rounded-full transition-all relative ${isNotifOpen ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100'}`}>
-                  <Bell size={20} />
+              <div className="relative shrink-0">
+                <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`p-2 sm:p-2.5 rounded-full transition-all relative ${isNotifOpen ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100'}`}>
+                  <Bell size={18} />
                   {unreadCount > 0 && (
-                    <span className="absolute top-2 right-2 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                    <span className="absolute top-1.5 right-1.5 w-4 h-4 sm:w-5 sm:h-5 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce">
                         {unreadCount}
                     </span>
                   )}
                 </button>
 
                 {isNotifOpen && (
-                  <div className="absolute top-full right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50">
+                  <div className="absolute top-full right-0 mt-3 w-72 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50">
                     <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                       <h3 className="font-bold text-slate-800">Notifications</h3>
                       <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-bold">{unreadCount} New</span>
@@ -407,13 +419,13 @@ const AdminLayout = () => {
             </div>
 
             {/* USER PROFILE */}
-            <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setIsProfileOpen(true)}>
+            <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer shrink-0" onClick={() => setIsProfileOpen(true)} title="Account Settings & Profile">
               <div className="hidden sm:block text-right">
-                  <p className="text-sm font-black text-slate-800">{user?.full_name}</p>
+                  <p className="text-sm font-black text-slate-800 leading-tight">{user?.full_name}</p>
                   <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: branding.theme_color }}>{user?.role}</p>
               </div>
-              <div className="w-11 h-11 bg-slate-200 rounded-2xl overflow-hidden shadow-sm border-2 border-white ring-1 ring-slate-100">
-                 {user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">{user?.full_name?.charAt(0) || user?.name?.charAt(0) || 'U'}</div>}
+              <div className="w-9 h-9 sm:w-11 sm:h-11 bg-slate-200 rounded-2xl overflow-hidden shadow-sm border-2 border-white ring-1 ring-slate-100 shrink-0">
+                 {user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400 text-sm sm:text-base">{user?.full_name?.charAt(0) || user?.name?.charAt(0) || 'U'}</div>}
               </div>
             </div>
           </div>
@@ -470,6 +482,11 @@ const AdminLayout = () => {
         isOpen={!!selectedNotification} 
         onClose={() => setSelectedNotification(null)} 
         notification={selectedNotification}
+      />
+
+      <HelpTutorialModal 
+        isOpen={isHelpModalOpen} 
+        onClose={() => setIsHelpModalOpen(false)} 
       />
     </div>
   );

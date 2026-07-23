@@ -3,9 +3,165 @@ import axios from 'axios';
 import { 
   UserPlus, X, Mail, RefreshCw, Calendar, Phone, GraduationCap, 
   BookOpen, User, Users, CreditCard, ChevronRight, ChevronLeft, Check, MapPin, Camera,
-  Search, Filter, Printer, Briefcase
+  Search, Filter, Printer, Briefcase, Sparkles, HelpCircle
 } from 'lucide-react'; 
 import { useAuth } from '../../context/AuthContext';
+import HelpTutorialModal from '../../components/shared/HelpTutorialModal';
+
+// Reusable Components WITH SUPPORT FOR MAX AND MAXLENGTH
+function Input({ label, type="text", value, onChange, placeholder, required=false, max, maxLength }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">{label} {required && '*'}</label>
+      <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required} max={max} maxLength={maxLength}
+             className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm" />
+    </div>
+  );
+}
+
+function DatePicker({ label, value, onChange, required=false }) {
+  const parts = value ? value.split('-') : ['', '', ''];
+  const selYear = parts[0] || '';
+  const selMonth = parts[1] || '';
+  const selDay = parts[2] || '';
+
+  const months = [
+    { num: '01', name: 'January' },
+    { num: '02', name: 'February' },
+    { num: '03', name: 'March' },
+    { num: '04', name: 'April' },
+    { num: '05', name: 'May' },
+    { num: '06', name: 'June' },
+    { num: '07', name: 'July' },
+    { num: '08', name: 'August' },
+    { num: '09', name: 'September' },
+    { num: '10', name: 'October' },
+    { num: '11', name: 'November' },
+    { num: '12', name: 'December' }
+  ];
+
+  const getDaysInMonth = (m, y) => {
+    if (!m) return 31;
+    const year = parseInt(y) || 2024;
+    const month = parseInt(m);
+    return new Date(year, month, 0).getDate();
+  };
+
+  const daysCount = getDaysInMonth(selMonth, selYear);
+  const days = Array.from({ length: daysCount }, (_, i) => (i + 1).toString().padStart(2, '0'));
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 85 }, (_, i) => (currentYear - i).toString());
+
+  const handleUpdate = (type, val) => {
+    let y = selYear;
+    let m = selMonth;
+    let d = selDay;
+
+    if (type === 'year') y = val;
+    if (type === 'month') m = val;
+    if (type === 'day') d = val;
+
+    if (y && m && d) {
+      const maxD = getDaysInMonth(m, y);
+      if (parseInt(d) > maxD) d = maxD.toString().padStart(2, '0');
+      onChange(`${y}-${m}-${d}`);
+    } else if (y || m || d) {
+      const defaultY = y || currentYear.toString();
+      const defaultM = m || '01';
+      const defaultD = d || '01';
+      onChange(`${defaultY}-${defaultM}-${defaultD}`);
+    } else {
+      onChange('');
+    }
+  };
+
+  return (
+    <div className="md:col-span-3 bg-slate-50/80 p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-2.5">
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+          <Calendar size={14} className="text-blue-600" />
+          {label} {required && '*'}
+        </label>
+        {value ? (
+          <span className="text-xs font-black text-blue-700 bg-blue-100/70 px-3 py-1 rounded-full border border-blue-200 shadow-sm flex items-center gap-1">
+            <Check size={12} />
+            {new Date(value + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </span>
+        ) : (
+          <span className="text-[10px] font-bold text-slate-400 italic">Select Month, Day, & Year</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {/* MONTH */}
+        <div className="space-y-1">
+          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider ml-1">Month</label>
+          <select 
+            value={selMonth} 
+            onChange={e => handleUpdate('month', e.target.value)} 
+            required={required}
+            className="w-full p-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 transition-all text-xs font-bold text-slate-700 shadow-sm cursor-pointer"
+          >
+            <option value="">-- Month --</option>
+            {months.map(m => <option key={m.num} value={m.num}>{m.num} - {m.name}</option>)}
+          </select>
+        </div>
+
+        {/* DAY */}
+        <div className="space-y-1">
+          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider ml-1">Day</label>
+          <select 
+            value={selDay} 
+            onChange={e => handleUpdate('day', e.target.value)} 
+            required={required}
+            className="w-full p-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 transition-all text-xs font-bold text-slate-700 shadow-sm cursor-pointer"
+          >
+            <option value="">-- Day --</option>
+            {days.map(d => <option key={d} value={d}>{parseInt(d)}</option>)}
+          </select>
+        </div>
+
+        {/* YEAR */}
+        <div className="space-y-1">
+          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider ml-1">Year</label>
+          <select 
+            value={selYear} 
+            onChange={e => handleUpdate('year', e.target.value)} 
+            required={required}
+            className="w-full p-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 transition-all text-xs font-bold text-slate-700 shadow-sm cursor-pointer"
+          >
+            <option value="">-- Year --</option>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Select({ label, value, onChange, options }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">{label}</label>
+      <select value={value} onChange={e=>onChange(e.target.value)}
+              className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm">
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function InfoBox({ label, value, bold=false }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+      <p className={`text-sm ${bold ? 'font-black text-slate-800' : 'font-medium text-slate-600'}`}>
+        {value || '---'}
+      </p>
+    </div>
+  );
+}
 
 const StudentManagement = () => {
   const { branding, API_BASE_URL, getLogoUrl, getProfileImageUrl } = useAuth();
@@ -95,6 +251,55 @@ const fetchData = async () => {
 
   const [formData, setFormData] = useState(initialFormState);
   const [profileImage, setProfileImage] = useState(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+
+  const fillDemoData = () => {
+    setFormData({
+      ...initialFormState,
+      lrn: '123456789012',
+      first_name: 'Juan',
+      middle_name: 'Santos',
+      last_name: 'Dela Cruz',
+      suffix: 'Jr.',
+      gender: 'Male',
+      dob: '2006-08-15',
+      place_of_birth: 'Manila City',
+      nationality: 'Filipino',
+      religion: 'Roman Catholic',
+      email: `juan.${Math.floor(Math.random()*1000)}@example.com`,
+      mobile_no: '+639171234567',
+      address_house: '#123 Rizal Street, Subd. Phase 1',
+      address_brgy: 'Brgy. Poblacion',
+      address_province: 'Bulacan',
+      address_city: 'Malolos',
+      address_zip: '3000',
+      elem_name: 'Malolos Central Elementary School',
+      elem_year: '2018',
+      elem_address: 'Malolos, Bulacan',
+      jhs_name: 'Bulacan National High School',
+      jhs_year: '2022',
+      jhs_address: 'Malolos, Bulacan',
+      shs_name: 'St. Jude Senior High Academy',
+      shs_year: '2024',
+      shs_address: 'Valenzuela City',
+      shs_strand: 'STEM',
+      is_working: false,
+      father_first_name: 'Roberto',
+      father_middle_name: 'Santos',
+      father_last_name: 'Dela Cruz',
+      father_occ: 'Civil Engineer',
+      father_contact: '+639179876543',
+      mother_first_name: 'Corazon',
+      mother_middle_name: 'Reyes',
+      mother_last_name: 'Garcia',
+      mother_occ: 'Registered Nurse',
+      mother_contact: '+639189876543',
+      guardian_type: 'Father',
+      enrollment_type: 'New',
+      grade_level: 'Grade 11',
+      payment_plan: 'Full Payment'
+    });
+  };
 
   // --- DAGDAG: INPUT FORMATTERS ---
   const handlePhoneInput = (val, field) => {
@@ -378,6 +583,14 @@ const fetchData = async () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setShowHelpModal(true)} 
+            className="p-4 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 rounded-2xl text-xs font-black flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
+            title="Page Overview & Tutorial"
+          >
+            <Sparkles size={18} className="text-amber-500" />
+            <span className="hidden sm:inline">Tips & Guide</span>
+          </button>
           <button onClick={fetchData} className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-all shadow-sm">
             <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
           </button>
@@ -448,36 +661,35 @@ const fetchData = async () => {
                     >
                       {/* DITO YUNG LOGIC SA TABLE: Picture o First Letter */}
                       {s.profile_image ? (
-                        <img src={getProfileImageUrl(s.profile_image)} className="w-full h-full object-cover" alt="profile" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+                        <img 
+                          src={getProfileImageUrl(s.profile_image)} 
+                          alt={s.first_name} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerText = s.first_name ? s.first_name.charAt(0).toUpperCase() : 'S';
+                          }}
+                        />
                       ) : (
-                        <span className="uppercase">{s.first_name?.charAt(0)}</span>
+                        s.first_name ? s.first_name.charAt(0).toUpperCase() : 'S'
                       )}
-                      {/* Ito yung lalabas kung sakaling broken link ang image */}
-                      <span className="hidden uppercase">{s.first_name?.charAt(0)}</span>
                     </div>
                     <div>
-                      <p className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
-                        {s.first_name} {s.last_name}
+                      <p className="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">
+                        {s.first_name} {s.middle_name ? `${s.middle_name.charAt(0)}.` : ''} {s.last_name} {s.suffix || ''}
                       </p>
-                      <p className="text-[10px] font-mono text-slate-400 font-bold uppercase">
-                        ID: {s.student_id}
-                      </p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ID: {s.student_id} | LRN: {s.lrn || 'N/A'}</p>
                     </div>
                   </div>
                 </td>
-                <td className="p-5 text-sm">
-                  <p className="font-bold text-slate-600 flex items-center gap-1">
-                    <BookOpen size={14} className="text-blue-500 shrink-0" /> 
-                    {s.grade_level} {['Grade 11', 'Grade 12', 'College'].includes(s.grade_level) && s.program_code ? `- ${s.program_code}` : ''}
+                <td className="p-5">
+                  <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-200/60 inline-block">
+                    {s.grade_level || 'N/A'}
+                  </span>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1 truncate max-w-[200px]" title={s.program_desc || s.program_code}>
+                    {s.program_code ? `${s.program_code} - ${s.program_desc || ''}` : 'Basic Education'}
                   </p>
-                  <div className="flex gap-2 items-center mt-1">
-                    <span className="text-[10px] text-slate-400 font-medium truncate max-w-[120px]">LRN: {s.lrn || 'NOT PROVIDED'}</span>
-                    {s.curriculum_year && (
-                      <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 py-0.5 rounded">
-                        Curriculum: {s.curriculum_year}
-                      </span>
-                    )}
-                  </div>
                 </td>
                 <td className="p-5">
                   <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
@@ -520,7 +732,17 @@ const fetchData = async () => {
                   {currentStep === 6 && "Step 6: Academic Details"}
                 </p>
               </div>
-              <button onClick={() => setShowModal(false)} className="bg-white shadow-sm p-3 rounded-2xl text-slate-400 hover:text-red-500 transition-colors"><X size={20}/></button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={fillDemoData}
+                  className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+                  title="Auto-fill form with sample student data for quick testing"
+                >
+                  <Sparkles size={16} className="text-amber-500 animate-bounce" />
+                  <span>✨ Demo Mode (Auto-Fill)</span>
+                </button>
+                <button onClick={() => setShowModal(false)} className="bg-white shadow-sm p-3 rounded-2xl text-slate-400 hover:text-red-500 transition-colors"><X size={20}/></button>
+              </div>
             </div>
 
             <div className="p-8 overflow-y-auto flex-1">
@@ -546,31 +768,31 @@ const fetchData = async () => {
                     />
                   </div>
                   <div className="md:col-span-1">
-                    <Input label="LRN (12 Digits)" value={formData.lrn} onChange={v => handleNumberOnly(v, 'lrn', 12)} placeholder="12-digit LRN" maxLength="12"/>
+                    <Input label="LRN (12 Digits)" value={formData.lrn} onChange={v => handleNumberOnly(v, 'lrn', 12)} placeholder="Ex. 123456789012" maxLength="12"/>
                   </div>
                   <div className="md:col-span-2"></div>
-                  <Input label="First Name" value={formData.first_name} onChange={v=>setFormData({...formData, first_name:v})} required/>
-                  <Input label="Middle Name" value={formData.middle_name} onChange={v=>setFormData({...formData, middle_name:v})}/>
-                  <Input label="Last Name" value={formData.last_name} onChange={v=>setFormData({...formData, last_name:v})} required/>
-                  <Input label="Suffix" value={formData.suffix} onChange={v=>setFormData({...formData, suffix:v})} placeholder="Jr, Sr, III"/>
+                  <Input label="First Name" value={formData.first_name} onChange={v=>setFormData({...formData, first_name:v})} placeholder="Ex. Juan / Maria" required/>
+                  <Input label="Middle Name" value={formData.middle_name} onChange={v=>setFormData({...formData, middle_name:v})} placeholder="Ex. Santos (Optional)"/>
+                  <Input label="Last Name" value={formData.last_name} onChange={v=>setFormData({...formData, last_name:v})} placeholder="Ex. Dela Cruz" required/>
+                  <Input label="Suffix" value={formData.suffix} onChange={v=>setFormData({...formData, suffix:v})} placeholder="Ex. Jr, Sr, III (Optional)"/>
                   <Select label="Gender" value={formData.gender} onChange={v=>setFormData({...formData, gender:v})} options={['Male', 'Female', 'Other']}/>
                   
-                  {/* LIMIT MAX DATE FOR DOB TO TODAY */}
-                  <Input label="Date of Birth" type="date" value={formData.dob} onChange={v=>setFormData({...formData, dob:v})} max={new Date().toISOString().split('T')[0]} required/>
+                  {/* EASY & BEAUTIFUL DATE OF BIRTH PICKER */}
+                  <DatePicker label="Date of Birth" value={formData.dob} onChange={v=>setFormData({...formData, dob:v})} required/>
                   
-                  <Input label="Place of Birth" value={formData.place_of_birth} onChange={v=>setFormData({...formData, place_of_birth:v})}/>
-                  <Input label="Nationality" value={formData.nationality} onChange={v=>setFormData({...formData, nationality:v})}/>
-                  <Input label="Religion" value={formData.religion} onChange={v=>setFormData({...formData, religion:v})}/>
+                  <Input label="Place of Birth" value={formData.place_of_birth} onChange={v=>setFormData({...formData, place_of_birth:v})} placeholder="Ex. Manila City, Metro Manila"/>
+                  <Input label="Nationality" value={formData.nationality} onChange={v=>setFormData({...formData, nationality:v})} placeholder="Ex. Filipino"/>
+                  <Input label="Religion" value={formData.religion} onChange={v=>setFormData({...formData, religion:v})} placeholder="Ex. Roman Catholic / Christian / Islam"/>
                 </div>
               )}
 
               {/* STEP 2: CONTACT & ADDRESS */}
               {currentStep === 2 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-right-4 duration-300">
-                  <Input label="Email Address" type="email" value={formData.email} onChange={v=>setFormData({...formData, email:v})} required/>
-                  <Input label="Mobile Number" value={formData.mobile_no} onChange={v => handlePhoneInput(v, 'mobile_no')} placeholder="+639..." required/>
-                  <div className="md:col-span-2"><Input label="House No. / Street" value={formData.address_house} onChange={v=>setFormData({...formData, address_house:v})} required/></div>
-                  <Input label="Barangay" value={formData.address_brgy} onChange={v=>setFormData({...formData, address_brgy:v})} required/>
+                  <Input label="Email Address" type="email" value={formData.email} onChange={v=>setFormData({...formData, email:v})} placeholder="Ex. juan.delacruz@email.com" required/>
+                  <Input label="Mobile Number" value={formData.mobile_no} onChange={v => handlePhoneInput(v, 'mobile_no')} placeholder="Ex. 09123456789 or +639123456789" required/>
+                  <div className="md:col-span-2"><Input label="House No. / Street" value={formData.address_house} onChange={v=>setFormData({...formData, address_house:v})} placeholder="Ex. #123 Rizal Street, Subd. Phase 1" required/></div>
+                  <Input label="Barangay" value={formData.address_brgy} onChange={v=>setFormData({...formData, address_brgy:v})} placeholder="Ex. Brgy. Poblacion / Brgy. Central" required/>
                   
                   {/* DYNAMIC PROVINCE/CITY DROPDOWNS */}
                   <div className="space-y-1.5">
@@ -588,7 +810,7 @@ const fetchData = async () => {
                     </select>
                   </div>
 
-                  <Input label="Zip Code" value={formData.address_zip} onChange={v => handleNumberOnly(v, 'address_zip', 5)} required maxLength="5"/>
+                  <Input label="Zip Code" value={formData.address_zip} onChange={v => handleNumberOnly(v, 'address_zip', 5)} placeholder="Ex. 3017 or 1000" required maxLength="5"/>
                 </div>
               )}
 
@@ -601,11 +823,11 @@ const fetchData = async () => {
                       <GraduationCap size={14}/> Elementary School (Graduated) *
                     </h4>
                     <div className="md:col-span-2">
-                      <Input label="Name of School *" value={formData.elem_name} onChange={v=>setFormData({...formData, elem_name:v})} required/>
+                      <Input label="Name of School *" value={formData.elem_name} onChange={v=>setFormData({...formData, elem_name:v})} placeholder="Ex. Malolos Elementary School" required/>
                     </div>
-                    <Input label="Year Graduated" value={formData.elem_year} onChange={v=>handleNumberOnly(v, 'elem_year', 4)} placeholder="e.g. 2020" maxLength="4"/>
+                    <Input label="Year Graduated" value={formData.elem_year} onChange={v=>handleNumberOnly(v, 'elem_year', 4)} placeholder="Ex. 2020" maxLength="4"/>
                     <div className="md:col-span-3">
-                      <Input label="School Address" value={formData.elem_address} onChange={v=>setFormData({...formData, elem_address:v})}/>
+                      <Input label="School Address" value={formData.elem_address} onChange={v=>setFormData({...formData, elem_address:v})} placeholder="Ex. Malolos, Bulacan"/>
                     </div>
                   </div>
 
@@ -615,11 +837,11 @@ const fetchData = async () => {
                       <GraduationCap size={14}/> Junior High School (JHS)
                     </h4>
                     <div className="md:col-span-2">
-                      <Input label="Name of School" value={formData.jhs_name} onChange={v=>setFormData({...formData, jhs_name:v})}/>
+                      <Input label="Name of School" value={formData.jhs_name} onChange={v=>setFormData({...formData, jhs_name:v})} placeholder="Ex. Bulacan National High School"/>
                     </div>
-                    <Input label="Year Completed" value={formData.jhs_year} onChange={v=>handleNumberOnly(v, 'jhs_year', 4)} placeholder="e.g. 2024" maxLength="4"/>
+                    <Input label="Year Completed" value={formData.jhs_year} onChange={v=>handleNumberOnly(v, 'jhs_year', 4)} placeholder="Ex. 2024" maxLength="4"/>
                     <div className="md:col-span-3">
-                      <Input label="School Address" value={formData.jhs_address} onChange={v=>setFormData({...formData, jhs_address:v})}/>
+                      <Input label="School Address" value={formData.jhs_address} onChange={v=>setFormData({...formData, jhs_address:v})} placeholder="Ex. Malolos, Bulacan"/>
                     </div>
                   </div>
 
@@ -629,13 +851,13 @@ const fetchData = async () => {
                       <GraduationCap size={14}/> Senior High School (SHS)
                     </h4>
                     <div className="md:col-span-2">
-                      <Input label="Name of School" value={formData.shs_name} onChange={v=>setFormData({...formData, shs_name:v})}/>
+                      <Input label="Name of School" value={formData.shs_name} onChange={v=>setFormData({...formData, shs_name:v})} placeholder="Ex. St. Jude Senior High Academy"/>
                     </div>
-                    <Input label="Year Completed" value={formData.shs_year} onChange={v=>handleNumberOnly(v, 'shs_year', 4)} placeholder="e.g. 2026" maxLength="4"/>
+                    <Input label="Year Completed" value={formData.shs_year} onChange={v=>handleNumberOnly(v, 'shs_year', 4)} placeholder="Ex. 2026" maxLength="4"/>
                     <div className="md:col-span-2">
-                      <Input label="School Address" value={formData.shs_address} onChange={v=>setFormData({...formData, shs_address:v})}/>
+                      <Input label="School Address" value={formData.shs_address} onChange={v=>setFormData({...formData, shs_address:v})} placeholder="Ex. Valenzuela City"/>
                     </div>
-                    <Input label="Strand / Track" value={formData.shs_strand} onChange={v=>setFormData({...formData, shs_strand:v})} placeholder="e.g. STEM, ABM, HUMSS"/>
+                    <Input label="Strand / Track" value={formData.shs_strand} onChange={v=>setFormData({...formData, shs_strand:v})} placeholder="Ex. STEM, ABM, HUMSS, TVL"/>
                   </div>
                 </div>
               )}
@@ -672,10 +894,10 @@ const fetchData = async () => {
                       <h4 className="md:col-span-2 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
                         <Briefcase size={14}/> Employment & Work Information *
                       </h4>
-                      <Input label="Company Name *" value={formData.work_company} onChange={v=>setFormData({...formData, work_company:v})} required/>
-                      <Input label="Position / Designation *" value={formData.work_position} onChange={v=>setFormData({...formData, work_position:v})} required/>
+                      <Input label="Company Name *" value={formData.work_company} onChange={v=>setFormData({...formData, work_company:v})} placeholder="Ex. Accenture Philippines / BPO Inc." required/>
+                      <Input label="Position / Designation *" value={formData.work_position} onChange={v=>setFormData({...formData, work_position:v})} placeholder="Ex. Customer Service Representative" required/>
                       <div className="md:col-span-2">
-                        <Input label="Company Address" value={formData.work_address} onChange={v=>setFormData({...formData, work_address:v})}/>
+                        <Input label="Company Address" value={formData.work_address} onChange={v=>setFormData({...formData, work_address:v})} placeholder="Ex. BGC, Taguig City"/>
                       </div>
                     </div>
                   ) : (
@@ -696,9 +918,9 @@ const fetchData = async () => {
                     <h4 className="md:col-span-3 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
                       <Users size={14}/> Father's Information
                     </h4>
-                    <Input label="First Name" value={formData.father_first_name} onChange={v=>setFormData({...formData, father_first_name:v})}/>
+                    <Input label="First Name" value={formData.father_first_name} onChange={v=>setFormData({...formData, father_first_name:v})} placeholder="Ex. Roberto"/>
                     <div className="space-y-1.5">
-                      <Input label="Middle Name" value={formData.father_middle_name} onChange={v=>setFormData({...formData, father_middle_name:v})} disabled={formData.father_no_middle}/>
+                      <Input label="Middle Name" value={formData.father_middle_name} onChange={v=>setFormData({...formData, father_middle_name:v})} disabled={formData.father_no_middle} placeholder="Ex. Santos"/>
                       <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
                         <input type="checkbox" checked={formData.father_no_middle} onChange={e=>{
                           setFormData({
@@ -710,9 +932,9 @@ const fetchData = async () => {
                         <span>No Middle Name</span>
                       </label>
                     </div>
-                    <Input label="Last Name" value={formData.father_last_name} onChange={v=>setFormData({...formData, father_last_name:v})}/>
-                    <Input label="Occupation" value={formData.father_occ} onChange={v=>setFormData({...formData, father_occ:v})}/>
-                    <Input label="Contact No." value={formData.father_contact} onChange={v => handlePhoneInput(v, 'father_contact')} placeholder="+639..."/>
+                    <Input label="Last Name" value={formData.father_last_name} onChange={v=>setFormData({...formData, father_last_name:v})} placeholder="Ex. Dela Cruz"/>
+                    <Input label="Occupation" value={formData.father_occ} onChange={v=>setFormData({...formData, father_occ:v})} placeholder="Ex. Civil Engineer / Businessman"/>
+                    <Input label="Contact No." value={formData.father_contact} onChange={v => handlePhoneInput(v, 'father_contact')} placeholder="Ex. 09171234567"/>
                   </div>
 
                   {/* MOTHER'S INFORMATION */}
@@ -720,9 +942,9 @@ const fetchData = async () => {
                     <h4 className="md:col-span-3 text-xs font-black text-pink-500 uppercase tracking-widest flex items-center gap-2">
                       <Users size={14}/> Mother's Information (Maiden Name)
                     </h4>
-                    <Input label="First Name" value={formData.mother_first_name} onChange={v=>setFormData({...formData, mother_first_name:v})}/>
+                    <Input label="First Name" value={formData.mother_first_name} onChange={v=>setFormData({...formData, mother_first_name:v})} placeholder="Ex. Corazon"/>
                     <div className="space-y-1.5">
-                      <Input label="Middle Name" value={formData.mother_middle_name} onChange={v=>setFormData({...formData, mother_middle_name:v})} disabled={formData.mother_no_middle}/>
+                      <Input label="Middle Name" value={formData.mother_middle_name} onChange={v=>setFormData({...formData, mother_middle_name:v})} disabled={formData.mother_no_middle} placeholder="Ex. Reyes"/>
                       <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
                         <input type="checkbox" checked={formData.mother_no_middle} onChange={e=>{
                           setFormData({
@@ -734,9 +956,9 @@ const fetchData = async () => {
                         <span>No Middle Name</span>
                       </label>
                     </div>
-                    <Input label="Maiden Last Name" value={formData.mother_last_name} onChange={v=>setFormData({...formData, mother_last_name:v})}/>
-                    <Input label="Occupation" value={formData.mother_occ} onChange={v=>setFormData({...formData, mother_occ:v})}/>
-                    <Input label="Contact No." value={formData.mother_contact} onChange={v => handlePhoneInput(v, 'mother_contact')} placeholder="+639..."/>
+                    <Input label="Maiden Last Name" value={formData.mother_last_name} onChange={v=>setFormData({...formData, mother_last_name:v})} placeholder="Ex. Garcia"/>
+                    <Input label="Occupation" value={formData.mother_occ} onChange={v=>setFormData({...formData, mother_occ:v})} placeholder="Ex. Registered Nurse / Teacher"/>
+                    <Input label="Contact No." value={formData.mother_contact} onChange={v => handlePhoneInput(v, 'mother_contact')} placeholder="Ex. 09181234567"/>
                   </div>
 
                   {/* GUARDIAN'S INFORMATION */}
@@ -761,9 +983,9 @@ const fetchData = async () => {
                       </label>
                     </div>
 
-                    <Input label="First Name" value={getGuardianValue('guardian_first_name')} onChange={v => setFormData({...formData, guardian_first_name: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'}/>
+                    <Input label="First Name" value={getGuardianValue('guardian_first_name')} onChange={v => setFormData({...formData, guardian_first_name: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder="Ex. Maria"/>
                     <div className="space-y-1.5">
-                      <Input label="Middle Name" value={getGuardianValue('guardian_middle_name')} onChange={v => setFormData({...formData, guardian_middle_name: v})} disabled={formData.guardian_type !== 'Other' || getGuardianValue('guardian_no_middle')}/>
+                      <Input label="Middle Name" value={getGuardianValue('guardian_middle_name')} onChange={v => setFormData({...formData, guardian_middle_name: v})} disabled={formData.guardian_type !== 'Other' || getGuardianValue('guardian_no_middle')} placeholder="Ex. Santos"/>
                       <label className="flex items-center gap-1.5 text-xs text-slate-500 font-bold select-none cursor-pointer mt-1 ml-1">
                         <input type="checkbox" checked={getGuardianValue('guardian_no_middle')} disabled={formData.guardian_type !== 'Other'} onChange={e=>{
                           setFormData({
@@ -775,14 +997,14 @@ const fetchData = async () => {
                         <span>No Middle Name</span>
                       </label>
                     </div>
-                    <Input label="Last Name" value={getGuardianValue('guardian_last_name')} onChange={v => setFormData({...formData, guardian_last_name: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'}/>
+                    <Input label="Last Name" value={getGuardianValue('guardian_last_name')} onChange={v => setFormData({...formData, guardian_last_name: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder="Ex. Dela Cruz"/>
                     
-                    <Input label="Relationship" value={getGuardianValue('guardian_rel')} onChange={v => setFormData({...formData, guardian_rel: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder={formData.guardian_type === 'Mother' ? 'Mother' : formData.guardian_type === 'Father' ? 'Father' : ''}/>
-                    <Input label="Contact No." value={getGuardianValue('guardian_contact')} onChange={v => handlePhoneInput(v, 'guardian_contact')} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder="+639..."/>
-                    <Input label="Occupation" value={getGuardianValue('guardian_occ')} onChange={v => setFormData({...formData, guardian_occ: v})} disabled={formData.guardian_type !== 'Other'}/>
+                    <Input label="Relationship" value={getGuardianValue('guardian_rel')} onChange={v => setFormData({...formData, guardian_rel: v})} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder={formData.guardian_type === 'Mother' ? 'Mother' : formData.guardian_type === 'Father' ? 'Father' : 'Ex. Aunt / Uncle / Sibling'}/>
+                    <Input label="Contact No." value={getGuardianValue('guardian_contact')} onChange={v => handlePhoneInput(v, 'guardian_contact')} disabled={formData.guardian_type !== 'Other'} required={formData.guardian_type === 'Other'} placeholder="Ex. 09191234567"/>
+                    <Input label="Occupation" value={getGuardianValue('guardian_occ')} onChange={v => setFormData({...formData, guardian_occ: v})} disabled={formData.guardian_type !== 'Other'} placeholder="Ex. Accountant / Manager"/>
                     
                     <div className="md:col-span-3">
-                      <Input label="Home Address" value={getGuardianValue('guardian_address')} onChange={v => setFormData({...formData, guardian_address: v})} disabled={formData.guardian_type !== 'Other'}/>
+                      <Input label="Home Address" value={getGuardianValue('guardian_address')} onChange={v => setFormData({...formData, guardian_address: v})} disabled={formData.guardian_type !== 'Other'} placeholder="Ex. #123 Rizal Street, Malolos, Bulacan"/>
                     </div>
                   </div>
                 </div>
@@ -1192,36 +1414,18 @@ const fetchData = async () => {
     </div>
   </div>
 )}
+
+      {/* SYSTEM HELP & TUTORIAL MODAL */}
+      <HelpTutorialModal 
+        isOpen={showHelpModal} 
+        onClose={() => setShowHelpModal(false)} 
+        onTriggerDemo={() => { 
+          setShowModal(true); 
+          fillDemoData(); 
+        }} 
+      />
     </div>
   );
 };
-
-// Reusable Components WITH SUPPORT FOR MAX AND MAXLENGTH
-const Input = ({ label, type="text", value, onChange, placeholder, required=false, max, maxLength }) => (
-  <div className="space-y-1.5">
-    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">{label} {required && '*'}</label>
-    <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required} max={max} maxLength={maxLength}
-           className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm" />
-  </div>
-);
-
-const Select = ({ label, value, onChange, options }) => (
-  <div className="space-y-1.5">
-    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">{label}</label>
-    <select value={value} onChange={e=>onChange(e.target.value)}
-            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm">
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
-  </div>
-);
-
-const InfoBox = ({ label, value, bold=false }) => (
-  <div className="space-y-1">
-    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-    <p className={`text-sm ${bold ? 'font-black text-slate-800' : 'font-medium text-slate-600'}`}>
-      {value || '---'}
-    </p>
-  </div>
-);
 
 export default StudentManagement;
