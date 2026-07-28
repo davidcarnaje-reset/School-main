@@ -11,9 +11,12 @@ const getSubjects = async (req, res) => {
           s.units, 
           s.grade_level_applicable,
           s.level_category,
+          s.subject_type,
           s.program_id,
           s.curriculum_year,
           COALESCE(p.program_code, 'General') as program_code,
+          COALESCE(p.program_description, '') as program_description,
+          p.major as program_major,
           COALESCE(p.curriculum_year, 'N/A') as program_curriculum_year
       FROM subjects s 
       LEFT JOIN academic_programs p ON s.program_id = p.id 
@@ -21,12 +24,12 @@ const getSubjects = async (req, res) => {
     `;
     const [subjects] = await pool.query(sql_subjects);
 
-    // 2. KUNIN ANG MGA AKTIBONG PROGRAMS
+    // 2. KUNIN ANG MGA AKTIBONG PROGRAMS WITH CURRICULUM YEAR
     const sql_programs = `
-      SELECT id, department, program_code 
+      SELECT id, department, program_code, program_description, major, status, curriculum_year 
       FROM academic_programs 
       WHERE status = 'Active' 
-      ORDER BY department ASC
+      ORDER BY department ASC, program_code ASC, curriculum_year DESC
     `;
     const [programs] = await pool.query(sql_programs);
 

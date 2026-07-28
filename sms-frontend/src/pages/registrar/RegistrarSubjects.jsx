@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { 
   BookOpen, Plus, Search, Layers, FileText, 
-  Trash2, X, CheckCircle, RefreshCw, GraduationCap, Filter, AlertTriangle
+  Trash2, X, CheckCircle, RefreshCw, GraduationCap, Filter, AlertTriangle, Download, Upload, FileSpreadsheet, AlertCircle, Check
 } from 'lucide-react';
 import SubjectDetailsModal from '../../components/registrar/SubjectDetailsModal';
 import { useAuth } from '../../context/AuthContext';
@@ -29,6 +31,13 @@ const RegistrarSubjects = () => {
 
   const [subjects, setSubjects] = useState([]);
   const [programs, setPrograms] = useState([]);
+  const [curriculumYearsList, setCurriculumYearsList] = useState([]);
+
+  // --- EXCEL IMPORT / EXPORT STATES ---
+  const fileInputRef = useRef(null);
+  const [importModal, setImportModal] = useState(false);
+  const [importedRows, setImportedRows] = useState([]);
+  const [importLoading, setImportLoading] = useState(false);
 
   const LEVEL_CONFIG = {
     'K-10': { levels: ['Kinder', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'], needsProgram: false },
@@ -49,12 +58,20 @@ const RegistrarSubjects = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/registrar/get_subjects.php`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [res, currRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/registrar/get_subjects.php`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_BASE_URL}/registrar/curriculum-years`).catch(() => ({ data: { data: [] } }))
+      ]);
       if (res.data.success) {
         setSubjects(res.data.subjects || []);
         setPrograms(res.data.programs || []);
+      }
+      if (currRes.data?.data) {
+        setCurriculumYearsList(currRes.data.data.filter(c => c.status === 'Active'));
+        if (currRes.data.data.length > 0) {
+          const defaultYr = currRes.data.data.find(c => c.status === 'Active')?.curriculum_year || currRes.data.data[0].curriculum_year;
+          setFormData(prev => ({ ...prev, curriculum_year: prev.curriculum_year || defaultYr }));
+        }
       }
     } catch (error) { console.error(error); }
     finally { setLoading(false); }
@@ -77,7 +94,22 @@ const RegistrarSubjects = () => {
       units: newUnits,
       subject_type: newSubjectType // Idinagdag ang subject_type dito
     });
-  }
+  };
+
+  const handleCurriculumYearChange = (newYear) => {
+    setFormData(prev => {
+      const filteredPrograms = programs.filter(p => 
+        p.department === (prev.level_category === 'SHS' ? 'SHS' : 'College') &&
+        (p.curriculum_year === newYear || (!p.curriculum_year && newYear === '2024-2025'))
+      );
+      const isValidProg = prev.program_id === 'GE' || filteredPrograms.some(p => p.id?.toString() === prev.program_id?.toString());
+      return {
+        ...prev,
+        curriculum_year: newYear,
+        program_id: isValidProg ? prev.program_id : ''
+      };
+    });
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -143,6 +175,323 @@ const RegistrarSubjects = () => {
     return matchesSearch && matchesCategory && matchesCurriculum;
   });
 
+  // --- EXCEL LOGIC FOR SUBJECTS ---
+  const handleExportExcel = async () => {
+    if (filteredSubjects.length === 0) {
+      alert("No subjects available to export.");
+      return;
+    }
+
+    const activeYears = curriculumYearsList.map(c => c.curriculum_year);
+    const progCodes = ['GE', ...new Set(programs.map(p => p.program_code))];
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'SMS Cloud';
+
+    const ws = workbook.addWorksheet('Subject Registry Masterlist', {
+      views: [{ showGridLines: true }]
+    });
+
+    ws.columns = [
+      { header: 'Subject Code', key: 'subject_code', width: 18 },
+      { header: 'Description', key: 'description', width: 45 },
+      { header: 'Academic Category', key: 'level_category', width: 20 },
+      { header: 'Subject Type', key: 'subject_type', width: 16 },
+      { header: 'Units', key: 'units', width: 12 },
+      { header: 'Grade / Year Level', key: 'grade_level_applicable', width: 22 },
+      { header: 'Program Code', key: 'program_code', width: 20 },
+      { header: 'Semester', key: 'semester', width: 15 },
+      { header: 'Curriculum Year', key: 'curriculum_year', width: 22 }
+    ];
+
+    // Header styling
+    const headerRow = ws.getRow(1);
+    headerRow.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF2563EB' }
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 28;
+
+    // Add all filtered subjects
+    filteredSubjects.forEach(s => {
+      ws.addRow({
+        subject_code: s.subject_code || '',
+        description: s.subject_description || '',
+        level_category: s.level_category || 'College',
+        subject_type: s.subject_type || 'None',
+        units: s.units || 0,
+        grade_level_applicable: s.grade_level_applicable || '1st Year',
+        program_code: s.program_code || 'GE',
+        semester: s.semester || '1st',
+        curriculum_year: s.curriculum_year || '2024-2025'
+      });
+    });
+
+    const catFormula = '"College,SHS,K-10"';
+    const typeFormula = '"GE,Major,Core,Applied,None"';
+    const semFormula = '"1st,2nd,Summer,N/A"';
+    const yearsFormula = activeYears.length > 0 ? `"${activeYears.join(',')}"` : '"2024-2025,2025-2026"';
+    const progsFormula = progCodes.length > 0 ? `"${progCodes.join(',')}"` : '"GE,BSIT,BSCS,STEM"';
+
+    const maxRow = Math.max(filteredSubjects.length + 50, 300);
+
+    for (let r = 2; r <= maxRow; r++) {
+      ws.getCell(`C${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [catFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Category', error: 'Select College, SHS, or K-10'
+      };
+      ws.getCell(`D${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [typeFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Subject Type', error: 'Select GE, Major, Core, Applied, or None'
+      };
+      ws.getCell(`G${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [progsFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Program Code', error: 'Select a valid Program Code or GE'
+      };
+      ws.getCell(`H${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [semFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Semester', error: 'Select 1st, 2nd, Summer, or N/A'
+      };
+      ws.getCell(`I${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [yearsFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Curriculum Year', error: 'Select an existing Curriculum Year'
+      };
+    }
+
+    // Guide sheet
+    const guideWs = workbook.addWorksheet('Instructions & Allowed Values');
+    guideWs.columns = [
+      { header: 'Field Name', key: 'field', width: 22 },
+      { header: 'Allowed Values / Format', key: 'allowed', width: 45 },
+      { header: 'Required?', key: 'required', width: 15 }
+    ];
+    const gHeader = guideWs.getRow(1);
+    gHeader.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    gHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    gHeader.height = 26;
+
+    guideWs.addRow({ field: 'Subject Code', allowed: 'e.g. CC 101, MATH101, GENMATH', required: 'Yes' });
+    guideWs.addRow({ field: 'Description', allowed: 'Full subject title', required: 'Yes' });
+    guideWs.addRow({ field: 'Academic Category', allowed: 'College, SHS, K-10', required: 'Yes' });
+    guideWs.addRow({ field: 'Subject Type', allowed: 'GE, Major, Core, Applied, None', required: 'Yes' });
+    guideWs.addRow({ field: 'Units', allowed: 'Number (e.g. 3 for College, 0 for SHS/K-10)', required: 'Yes' });
+    guideWs.addRow({ field: 'Grade / Year Level', allowed: '1st Year, 2nd Year, Grade 11, Grade 1, etc.', required: 'Yes' });
+    guideWs.addRow({ field: 'Program Code', allowed: progCodes.join(', ') || 'GE, BSIT, BSCS, STEM', required: 'Yes (or GE)' });
+    guideWs.addRow({ field: 'Semester', allowed: '1st, 2nd, Summer, N/A', required: 'Yes' });
+    guideWs.addRow({ field: 'Curriculum Year', allowed: activeYears.join(', ') || '2024-2025, 2025-2026', required: 'Yes' });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `Subject_Registry_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTemplate = async () => {
+    const activeYears = curriculumYearsList.map(c => c.curriculum_year);
+    const sampleYear = activeYears[0] || '2025-2026';
+    const progCodes = ['GE', ...new Set(programs.map(p => p.program_code))];
+    const sampleProg = progCodes[1] || 'GE';
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'SMS Cloud';
+
+    const ws = workbook.addWorksheet('Subject Registry Template', {
+      views: [{ showGridLines: true }]
+    });
+
+    ws.columns = [
+      { header: 'Subject Code', key: 'subject_code', width: 18 },
+      { header: 'Description', key: 'description', width: 45 },
+      { header: 'Academic Category', key: 'level_category', width: 20 },
+      { header: 'Subject Type', key: 'subject_type', width: 16 },
+      { header: 'Units', key: 'units', width: 12 },
+      { header: 'Grade / Year Level', key: 'grade_level_applicable', width: 22 },
+      { header: 'Program Code', key: 'program_code', width: 20 },
+      { header: 'Semester', key: 'semester', width: 15 },
+      { header: 'Curriculum Year', key: 'curriculum_year', width: 22 }
+    ];
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF2563EB' }
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 28;
+
+    // 1 Sample Row
+    ws.addRow({
+      subject_code: 'CC 101',
+      description: 'Basic Programming',
+      level_category: 'College',
+      subject_type: 'Major',
+      units: 3,
+      grade_level_applicable: '1st Year',
+      program_code: sampleProg,
+      semester: '1st',
+      curriculum_year: sampleYear
+    });
+
+    const catFormula = '"College,SHS,K-10"';
+    const typeFormula = '"GE,Major,Core,Applied,None"';
+    const semFormula = '"1st,2nd,Summer,N/A"';
+    const yearsFormula = activeYears.length > 0 ? `"${activeYears.join(',')}"` : '"2024-2025,2025-2026"';
+    const progsFormula = progCodes.length > 0 ? `"${progCodes.join(',')}"` : '"GE,BSIT,BSCS,STEM"';
+
+    for (let r = 2; r <= 300; r++) {
+      ws.getCell(`C${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [catFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Category', error: 'Select College, SHS, or K-10'
+      };
+      ws.getCell(`D${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [typeFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Subject Type', error: 'Select GE, Major, Core, Applied, or None'
+      };
+      ws.getCell(`G${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [progsFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Program Code', error: 'Select a valid Program Code or GE'
+      };
+      ws.getCell(`H${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [semFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Semester', error: 'Select 1st, 2nd, Summer, or N/A'
+      };
+      ws.getCell(`I${r}`).dataValidation = {
+        type: 'list', allowBlank: false, formulae: [yearsFormula],
+        showErrorMessage: true, errorTitle: 'Invalid Curriculum Year', error: 'Select an existing Curriculum Year'
+      };
+    }
+
+    const guideWs = workbook.addWorksheet('Instructions & Allowed Values');
+    guideWs.columns = [
+      { header: 'Field Name', key: 'field', width: 22 },
+      { header: 'Allowed Values / Format', key: 'allowed', width: 45 },
+      { header: 'Required?', key: 'required', width: 15 }
+    ];
+    const gHeader = guideWs.getRow(1);
+    gHeader.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    gHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    gHeader.height = 26;
+
+    guideWs.addRow({ field: 'Subject Code', allowed: 'e.g. CC 101, MATH101, GENMATH', required: 'Yes' });
+    guideWs.addRow({ field: 'Description', allowed: 'Full subject title', required: 'Yes' });
+    guideWs.addRow({ field: 'Academic Category', allowed: 'College, SHS, K-10', required: 'Yes' });
+    guideWs.addRow({ field: 'Subject Type', allowed: 'GE, Major, Core, Applied, None', required: 'Yes' });
+    guideWs.addRow({ field: 'Units', allowed: 'Number (e.g. 3 for College, 0 for SHS/K-10)', required: 'Yes' });
+    guideWs.addRow({ field: 'Grade / Year Level', allowed: '1st Year, 2nd Year, Grade 11, Grade 1, etc.', required: 'Yes' });
+    guideWs.addRow({ field: 'Program Code', allowed: progCodes.join(', ') || 'GE, BSIT, BSCS, STEM', required: 'Yes (or GE)' });
+    guideWs.addRow({ field: 'Semester', allowed: '1st, 2nd, Summer, N/A', required: 'Yes' });
+    guideWs.addRow({ field: 'Curriculum Year', allowed: activeYears.join(', ') || '2024-2025, 2025-2026', required: 'Yes' });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'Subject_Registry_Template.xlsx';
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const validYears = curriculumYearsList.map(c => c.curriculum_year);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const workbook = XLSX.read(bstr, { type: 'binary' });
+        const wsname = workbook.SheetNames[0];
+        const ws = workbook.Sheets[wsname];
+        const rawJson = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (rawJson.length === 0) {
+          alert("Uploaded Excel file is empty!");
+          return;
+        }
+
+        const parsed = rawJson.map((row, idx) => {
+          const code = (row['Subject Code'] || row['subject_code'] || row['Code'] || '').toString().trim();
+          const desc = (row['Description'] || row['subject_description'] || '').toString().trim();
+          const rawCat = (row['Academic Category'] || row['level_category'] || row['Category'] || 'College').toString().trim();
+          let cleanCat = 'College';
+          if (rawCat.toUpperCase().includes('SHS')) cleanCat = 'SHS';
+          else if (rawCat.toUpperCase().includes('K-10') || rawCat.toUpperCase().includes('K10')) cleanCat = 'K-10';
+
+          const type = (row['Subject Type'] || row['subject_type'] || (cleanCat === 'K-10' ? 'None' : 'GE')).toString().trim();
+          const units = parseInt(row['Units'] || row['units'] || (cleanCat === 'College' ? 3 : 0), 10);
+          const gradeLevel = (row['Grade / Year Level'] || row['grade_level_applicable'] || row['Grade Level'] || (cleanCat === 'College' ? '1st Year' : (cleanCat === 'SHS' ? 'Grade 11' : 'Grade 1'))).toString().trim();
+          const progCode = (row['Program Code'] || row['program_code'] || row['Program / Strand'] || 'GE').toString().trim();
+          const semester = (row['Semester'] || row['semester'] || (cleanCat === 'K-10' ? 'N/A' : '1st')).toString().trim();
+          const currYear = (row['Curriculum Year'] || row['curriculum_year'] || validYears[0] || '2024-2025').toString().trim();
+
+          let errorMsg = null;
+          if (!code) errorMsg = "Missing Subject Code";
+          else if (!desc) errorMsg = "Missing Description";
+          else if (validYears.length > 0 && !validYears.includes(currYear)) {
+            errorMsg = `Curriculum Year '${currYear}' does not exist in Admin Setup`;
+          }
+
+          return {
+            rowNum: idx + 2,
+            subject_code: code,
+            subject_description: desc,
+            level_category: cleanCat,
+            subject_type: type,
+            units: units,
+            grade_level_applicable: gradeLevel,
+            program_code: progCode,
+            semester: semester,
+            curriculum_year: currYear,
+            error: errorMsg
+          };
+        });
+
+        setImportedRows(parsed);
+        setImportModal(true);
+      } catch (err) {
+        console.error("Excel parse error:", err);
+        alert("Failed to read Excel file. Please ensure it is a valid .xlsx or .csv file.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null;
+  };
+
+  const handleConfirmImport = async () => {
+    if (importedRows.length === 0) return;
+    setImportLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/registrar/bulk_import_subjects.php`, {
+        subjects: importedRows
+      });
+
+      if (res.data.success) {
+        alert(res.data.message);
+        setImportModal(false);
+        setImportedRows([]);
+        fetchData();
+      } else {
+        alert("Import Error: " + res.data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Failed to import subjects.");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 text-left max-w-7xl mx-auto">
       {/* HEADER SECTION */}
@@ -153,9 +502,43 @@ const RegistrarSubjects = () => {
           </h1>
           <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1 italic">Curriculum Management & Masterlist</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all shadow-xl active:scale-95">
-          <Plus size={20} /> New Subject
-        </button>
+        <div className="flex gap-2 flex-wrap items-center">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            accept=".xlsx, .xls, .csv" 
+            className="hidden" 
+          />
+
+          <button 
+            onClick={handleDownloadTemplate}
+            className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs uppercase tracking-widest"
+            title="Download Sample Template"
+          >
+            <FileSpreadsheet size={18} className="text-emerald-600"/> Template
+          </button>
+
+          <button 
+            onClick={handleExportExcel}
+            className="px-4 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200 rounded-xl transition-all flex items-center gap-1.5 text-xs uppercase tracking-widest"
+            title="Export Subjects to Excel"
+          >
+            <Download size={18}/> Export Excel
+          </button>
+
+          <button 
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            className="px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 rounded-xl transition-all flex items-center gap-1.5 text-xs uppercase tracking-widest"
+            title="Upload Excel File"
+          >
+            <Upload size={18}/> Import Excel
+          </button>
+
+          <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all shadow-xl active:scale-95">
+            <Plus size={20} /> New Subject
+          </button>
+        </div>
       </div>
 
       {/* SEARCH & FILTER BAR */}
@@ -177,10 +560,18 @@ const RegistrarSubjects = () => {
            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
            <select value={curriculumFilter} onChange={(e) => setCurriculumFilter(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all appearance-none cursor-pointer">
               <option value="All">All Curricula</option>
-              <option value="2023-2024">2023-2024</option>
-              <option value="2024-2025">2024-2025</option>
-              <option value="2025-2026">2025-2026</option>
-              <option value="2026-2027">2026-2027</option>
+              {curriculumYearsList.length === 0 ? (
+                <>
+                  <option value="2023-2024">2023-2024</option>
+                  <option value="2024-2025">2024-2025</option>
+                  <option value="2025-2026">2025-2026</option>
+                  <option value="2026-2027">2026-2027</option>
+                </>
+              ) : (
+                curriculumYearsList.map(c => (
+                  <option key={c.id || c.curriculum_year} value={c.curriculum_year}>{c.curriculum_year}</option>
+                ))
+              )}
            </select>
         </div>
       </div>
@@ -341,11 +732,21 @@ const RegistrarSubjects = () => {
                 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Curriculum Year *</label>
-                  <select value={formData.curriculum_year} onChange={e=>setFormData({...formData, curriculum_year: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500">
-                    <option value="2023-2024">2023-2024</option>
-                    <option value="2024-2025">2024-2025</option>
-                    <option value="2025-2026">2025-2026</option>
-                    <option value="2026-2027">2026-2027</option>
+                  <select value={formData.curriculum_year} onChange={e => handleCurriculumYearChange(e.target.value)} className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500">
+                    {curriculumYearsList.length === 0 ? (
+                      <>
+                        <option value="2023-2024">2023-2024</option>
+                        <option value="2024-2025">2024-2025</option>
+                        <option value="2025-2026">2025-2026</option>
+                        <option value="2026-2027">2026-2027</option>
+                      </>
+                    ) : (
+                      curriculumYearsList.map(c => (
+                        <option key={c.id || c.curriculum_year} value={c.curriculum_year}>
+                          {c.curriculum_year} {c.description ? `(${c.description})` : ''}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
                 
@@ -376,9 +777,17 @@ const RegistrarSubjects = () => {
                       <select required value={formData.program_id} onChange={e => setFormData({...formData, program_id: e.target.value})} className="w-full p-4 bg-blue-50 border-2 border-blue-100 text-blue-900 rounded-2xl font-bold outline-none">
                         <option value="" disabled>-- Choose Program / Strand --</option>
                         <option value="GE">{formData.level_category === 'SHS' ? 'Applicable to All Strands' : 'Applicable to All Courses'}</option>
-                        {programs.filter(p => p.department === (formData.level_category === 'SHS' ? 'SHS' : 'College')).map(p => (
-                           <option key={p.id} value={p.id}>{p.program_code}</option>
-                        ))}
+                        {programs
+                          .filter(p => 
+                            p.department === (formData.level_category === 'SHS' ? 'SHS' : 'College') &&
+                            (p.curriculum_year === formData.curriculum_year || (!p.curriculum_year && formData.curriculum_year === '2024-2025'))
+                          )
+                          .map(p => (
+                             <option key={p.id} value={p.id}>
+                               {p.program_code} {p.program_description ? `- ${p.program_description}` : ''} {p.major ? `(Major in ${p.major.replace(/^major\s+in\s+/i, '')})` : ''}
+                             </option>
+                          ))
+                        }
                       </select>
                    </div>
                 )}
@@ -392,6 +801,88 @@ const RegistrarSubjects = () => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {/* PREVIEW SUBJECT EXCEL IMPORT MODAL */}
+      {importModal && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[120] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-5xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-black text-slate-800 uppercase tracking-tight text-lg">Preview Subject Excel Import</h3>
+                <p className="text-xs text-slate-500 font-medium">{importedRows.length} subject(s) found in uploaded file.</p>
+              </div>
+              <button type="button" onClick={() => setImportModal(false)} className="p-2 text-slate-400 hover:text-red-500"><X size={20}/></button>
+            </div>
+
+            {importedRows.some(r => r.error) && (
+              <div className="mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-800 text-xs font-bold">
+                <AlertCircle size={20} className="text-amber-600 flex-shrink-0" />
+                <div>
+                  Warning: Some rows contain invalid Curriculum Years or missing required fields. Rows with errors will be skipped upon import.
+                </div>
+              </div>
+            )}
+
+            <div className="p-6 overflow-y-auto max-h-[50vh]">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-slate-100 sticky top-0">
+                  <tr>
+                    <th className="p-3 font-bold text-slate-600">Row</th>
+                    <th className="p-3 font-bold text-slate-600">Code</th>
+                    <th className="p-3 font-bold text-slate-600">Description</th>
+                    <th className="p-3 font-bold text-slate-600">Category</th>
+                    <th className="p-3 font-bold text-slate-600">Type</th>
+                    <th className="p-3 font-bold text-slate-600">Units</th>
+                    <th className="p-3 font-bold text-slate-600">Level</th>
+                    <th className="p-3 font-bold text-slate-600">Program</th>
+                    <th className="p-3 font-bold text-slate-600">Curriculum</th>
+                    <th className="p-3 font-bold text-slate-600">Validation</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {importedRows.map((row, idx) => (
+                    <tr key={idx} className={row.error ? 'bg-red-50/70' : 'hover:bg-slate-50'}>
+                      <td className="p-3 text-slate-400 font-mono">#{row.rowNum || idx + 2}</td>
+                      <td className="p-3 font-bold text-blue-600">{row.subject_code}</td>
+                      <td className="p-3 text-slate-700">{row.subject_description}</td>
+                      <td className="p-3 font-semibold">{row.level_category}</td>
+                      <td className="p-3 text-slate-500">{row.subject_type}</td>
+                      <td className="p-3 font-bold">{row.units}u</td>
+                      <td className="p-3 text-slate-600">{row.grade_level_applicable}</td>
+                      <td className="p-3 font-bold text-indigo-600">{row.program_code}</td>
+                      <td className="p-3 font-bold">{row.curriculum_year}</td>
+                      <td className="p-3">
+                        {row.error ? (
+                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-bold flex items-center gap-1">
+                            <AlertCircle size={12}/> {row.error}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold flex items-center gap-1 w-fit">
+                            <Check size={12}/> Valid
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2.5rem] flex gap-3 justify-between items-center">
+              <span className="text-xs text-slate-400 font-bold">* Valid rows will be imported. Duplicates & invalid rows will be skipped automatically.</span>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setImportModal(false)} className="px-5 py-3 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-all">Cancel</button>
+                <button 
+                  onClick={handleConfirmImport} 
+                  disabled={importLoading || importedRows.every(r => r.error)} 
+                  className="px-6 py-3 font-black text-white rounded-xl shadow-lg bg-emerald-600 hover:bg-emerald-700 transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {importLoading ? <RefreshCw size={18} className="animate-spin"/> : <><Upload size={18}/> Save to System</>}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

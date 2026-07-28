@@ -526,6 +526,137 @@ export const updateRoomExtended = async (req, res) => {
   }
 };
 
+// ============================================================
+// 5. CURRICULUM YEAR SETUP
+// ============================================================
+const ensureCurriculumYearsTable = async () => {
+  try {
+    const [tables] = await pool.query("SHOW TABLES LIKE 'curriculum_years'");
+    if (tables.length === 0) {
+      await pool.query(`
+        CREATE TABLE curriculum_years (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          school_id INT NOT NULL DEFAULT 1,
+          curriculum_year VARCHAR(50) NOT NULL,
+          description VARCHAR(255) DEFAULT NULL,
+          status ENUM('Active', 'Inactive') DEFAULT 'Active',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_curr_school (school_id, curriculum_year)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      await pool.query(`
+        INSERT INTO curriculum_years (school_id, curriculum_year, description, status) VALUES
+        (1, '2023-2024', 'SY 2023-2024 DepEd / CHED Curriculum', 'Active'),
+        (1, '2024-2025', 'SY 2024-2025 DepEd / CHED Curriculum', 'Active'),
+        (1, '2025-2026', 'SY 2025-2026 DepEd / CHED Curriculum', 'Active'),
+        (1, '2026-2027', 'SY 2026-2027 DepEd / CHED Curriculum', 'Active')
+      `);
+    }
+  } catch (err) {
+    console.error("ensureCurriculumYearsTable error:", err);
+  }
+};
+
+export const getCurriculumYears = async (req, res) => {
+  try {
+    await ensureCurriculumYearsTable();
+    const schoolId = req.query.school_id || req.school_id || 1;
+    const [rows] = await pool.query(
+      "SELECT id, curriculum_year, description, status, created_at FROM curriculum_years WHERE school_id = ? ORDER BY curriculum_year DESC",
+      [schoolId]
+    );
+    return res.json({ status: 'success', data: rows });
+  } catch (error) {
+    console.error("getCurriculumYears error:", error);
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+export const createCurriculumYear = async (req, res) => {
+  try {
+    await ensureCurriculumYearsTable();
+    const { curriculum_year, description, status } = req.body;
+    if (!curriculum_year) {
+      return res.status(400).json({ status: 'error', message: 'Curriculum Year is required.' });
+    }
+    const schoolId = req.school_id || 1;
+
+    await pool.query(
+      `INSERT INTO curriculum_years (school_id, curriculum_year, description, status)
+       VALUES (?, ?, ?, ?)`,
+      [schoolId, curriculum_year.trim(), description || null, status || 'Active']
+    );
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "CREATE_CURRICULUM_YEAR",
+      `Created curriculum year: ${curriculum_year}`,
+      req
+    );
+
+    return res.json({ status: 'success', message: 'Curriculum year created successfully.' });
+  } catch (error) {
+    console.error("createCurriculumYear error:", error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ status: 'error', message: 'Curriculum Year already exists.' });
+    }
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+export const updateCurriculumYear = async (req, res) => {
+  try {
+    await ensureCurriculumYearsTable();
+    const { id } = req.params;
+    const { curriculum_year, description, status } = req.body;
+    const schoolId = req.school_id || 1;
+
+    await pool.query(
+      `UPDATE curriculum_years 
+       SET curriculum_year = ?, description = ?, status = ?
+       WHERE id = ? AND school_id = ?`,
+      [curriculum_year.trim(), description || null, status || 'Active', id, schoolId]
+    );
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "UPDATE_CURRICULUM_YEAR",
+      `Updated curriculum year ID: ${id} (${curriculum_year})`,
+      req
+    );
+
+    return res.json({ status: 'success', message: 'Curriculum year updated successfully.' });
+  } catch (error) {
+    console.error("updateCurriculumYear error:", error);
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+export const deleteCurriculumYear = async (req, res) => {
+  try {
+    await ensureCurriculumYearsTable();
+    const { id } = req.params;
+    const schoolId = req.school_id || 1;
+    await pool.query("DELETE FROM curriculum_years WHERE id = ? AND school_id = ?", [id, schoolId]);
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'Admin',
+      "DELETE_CURRICULUM_YEAR",
+      `Deleted curriculum year ID: ${id}`,
+      req
+    );
+
+    return res.json({ status: 'success', message: 'Curriculum year deleted successfully.' });
+  } catch (error) {
+    console.error("deleteCurriculumYear error:", error);
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
 export default {
   getSchoolProfile,
   updateSchoolProfile,
@@ -539,5 +670,10 @@ export default {
   deleteBuilding,
   getRoomsExtended,
   createRoomExtended,
-  updateRoomExtended
+  updateRoomExtended,
+  getCurriculumYears,
+  createCurriculumYear,
+  updateCurriculumYear,
+  deleteCurriculumYear
 };
+

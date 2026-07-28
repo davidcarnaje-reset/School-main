@@ -9,8 +9,8 @@ import encodeSubjects from '../controllers/registrar/encodeSubjects.js';
 import getRegistrarDashboard from '../controllers/registrar/getRegistrarDashboard.js';
 
 // Newly migrated controllers
-import { getAcademicPrograms, addAcademicProgram, deleteAcademicProgram } from '../controllers/registrar/academicPrograms.js';
-import { getSubjectDetails, addSubject, deleteSubject } from '../controllers/registrar/subjectManagement.js';
+import { getAcademicPrograms, addAcademicProgram, updateAcademicProgram, deleteAcademicProgram, bulkImportAcademicPrograms } from '../controllers/registrar/academicPrograms.js';
+import { getSubjectDetails, addSubject, deleteSubject, bulkImportSubjects } from '../controllers/registrar/subjectManagement.js';
 import { getClassAssignData, addClassAssign, updateClassAssign, deleteClassAssign, bulkAddClassAssign, deleteAssignment } from '../controllers/registrar/classAssignments.js';
 import { getSections, createSection, getSectionDetails, getSectionsForEnrollment, updateSection, deleteSection } from '../controllers/registrar/sectionsManagement.js';
 import { getRegistrarRequests, getFeesCatalog, searchStudents, addRequest, cancelRequest } from '../controllers/registrar/studentRequests.js';
@@ -31,6 +31,7 @@ import {
   getHonorStudents, 
   promoteStudentsBatch 
 } from '../controllers/registrar/depedReportsController.js';
+import { getCurriculumYears } from '../controllers/admin/schoolSetupController.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -42,14 +43,25 @@ router.get('/subjects', getSubjects);
 router.get('/dashboard-stats', getRegistrarDashboard);
 router.post('/register-student', upload.single('profile_image'), registerStudent);
 router.post('/encode-subjects', encodeSubjects);
+router.get('/curriculum-years', getCurriculumYears);
+router.get('/get_curriculum_years.php', getCurriculumYears);
 
 // New clean endpoints
 router.get('/academic-programs', getAcademicPrograms);
 router.post('/academic-programs', addAcademicProgram);
+router.put('/academic-programs', updateAcademicProgram);
 router.delete('/academic-programs', deleteAcademicProgram);
+router.post('/academic-programs/bulk-import', bulkImportAcademicPrograms);
+router.get('/get_academic_programs.php', getAcademicPrograms);
+router.post('/add_academic_program.php', addAcademicProgram);
+router.post('/update_academic_program.php', updateAcademicProgram);
+router.post('/delete_academic_program.php', deleteAcademicProgram);
+router.post('/bulk_import_academic_programs.php', bulkImportAcademicPrograms);
 
 router.post('/subjects', addSubject);
 router.delete('/subjects', deleteSubject);
+router.post('/subjects/bulk-import', bulkImportSubjects);
+router.post('/bulk_import_subjects.php', bulkImportSubjects);
 router.get('/subjects/details', getSubjectDetails);
 
 router.get('/class-assignments', getClassAssignData);

@@ -4,7 +4,7 @@ import {
   School, Palette, Upload, Image as ImageIcon, Save, RefreshCw, 
   Calendar, Building2, DoorOpen, Plus, Edit, Trash2, CheckCircle, 
   AlertCircle, Globe, Facebook, Phone, MapPin, Hash, Layers, 
-  Tag, Info, Check, X, Sliders
+  Tag, Info, Check, X, Sliders, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -82,9 +82,70 @@ const SchoolSetup = () => {
   // Global Delete Modal State
   const [deleteModal, setDeleteModal] = useState({ show: false, type: '', id: null, title: '' });
 
+  // -------------------------------------------------------------
+  // TAB 5: CURRICULUM YEARS STATES & CRUD
+  // -------------------------------------------------------------
+  const [curriculumYears, setCurriculumYears] = useState([]);
+  const [showCurrModal, setShowCurrModal] = useState(false);
+  const [editingCurr, setEditingCurr] = useState(null);
+  const [currForm, setCurrForm] = useState({
+    curriculum_year: '',
+    description: '',
+    status: 'Active'
+  });
+
+  const fetchCurriculumYears = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/admin/curriculum-years`);
+      if (res.data?.data) {
+        setCurriculumYears(res.data.data);
+      }
+    } catch (err) {
+      console.error("fetchCurriculumYears error:", err);
+    }
+  };
+
+  const handleSaveCurr = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      let res;
+      if (editingCurr) {
+        res = await axios.put(`${API_BASE_URL}/admin/curriculum-years/${editingCurr.id}`, currForm);
+      } else {
+        res = await axios.post(`${API_BASE_URL}/admin/curriculum-years`, currForm);
+      }
+      if (res.data?.status === 'success') {
+        showToast(editingCurr ? "Curriculum Year updated!" : "Curriculum Year created!", "success");
+        fetchCurriculumYears();
+        setShowCurrModal(false);
+        setEditingCurr(null);
+        setCurrForm({ curriculum_year: '', description: '', status: 'Active' });
+      } else {
+        showToast(res.data?.message || "Failed to save Curriculum Year.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(err.response?.data?.message || "Error saving Curriculum Year.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCurr = (curr) => {
+    setEditingCurr(curr);
+    setCurrForm({
+      curriculum_year: curr.curriculum_year || '',
+      description: curr.description || '',
+      status: curr.status || 'Active'
+    });
+    setShowCurrModal(true);
+  };
+
   useEffect(() => {
     fetchProfile();
     fetchSchoolYears();
+    fetchCurriculumYears();
     fetchBuildings();
     fetchRooms();
   }, [activeSchoolId]);
@@ -338,6 +399,7 @@ const SchoolSetup = () => {
       const { type, id } = deleteModal;
       let endpoint = '';
       if (type === 'sy') endpoint = `/admin/school-years/${id}`;
+      if (type === 'curriculum') endpoint = `/admin/curriculum-years/${id}`;
       if (type === 'building') endpoint = `/admin/buildings/${id}`;
       if (type === 'room') endpoint = `/admin/rooms/${id}`;
 
@@ -345,6 +407,7 @@ const SchoolSetup = () => {
       if (res.data?.status === 'success') {
         showToast("Record deleted successfully.", "success");
         if (type === 'sy') fetchSchoolYears();
+        if (type === 'curriculum') fetchCurriculumYears();
         if (type === 'building') fetchBuildings();
         if (type === 'room') fetchRooms();
       } else {
@@ -410,6 +473,18 @@ const SchoolSetup = () => {
         >
           <Calendar size={16} />
           <span>School Year Setup</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('curriculumyear')}
+          className={`flex items-center space-x-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all ${
+            activeTab === 'curriculumyear'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 border border-slate-200'
+          }`}
+        >
+          <BookOpen size={16} />
+          <span>Curriculum Year Setup</span>
         </button>
 
         <button
@@ -692,6 +767,81 @@ const SchoolSetup = () => {
                         </button>
                         <button
                           onClick={() => setDeleteModal({ show: true, type: 'sy', id: sy.id, title: sy.school_year })}
+                          className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: CURRICULUM YEAR SETUP */}
+      {/* ========================================================================= */}
+      {activeTab === 'curriculumyear' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Curriculum Years Setup</h2>
+              <p className="text-xs text-slate-500">Configure DepEd / CHED curriculum issuance years for academic programs & subjects.</p>
+            </div>
+            <button
+              onClick={() => {
+                setEditingCurr(null);
+                setCurrForm({ curriculum_year: '', description: '', status: 'Active' });
+                setShowCurrModal(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center space-x-2 transition-all shadow-md"
+            >
+              <Plus size={16} />
+              <span>Add Curriculum Year</span>
+            </button>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="p-4">Curriculum Year</th>
+                  <th className="p-4">Description / DepEd Reference</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {curriculumYears.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="p-8 text-center text-slate-400 font-medium">No curriculum years configured yet.</td>
+                  </tr>
+                ) : (
+                  curriculumYears.map((cy) => (
+                    <tr key={cy.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-4 font-bold text-slate-800">{cy.curriculum_year}</td>
+                      <td className="p-4 text-slate-600">{cy.description || 'DepEd / CHED Curriculum'}</td>
+                      <td className="p-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          cy.status === 'Active'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {cy.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right space-x-2">
+                        <button
+                          onClick={() => handleEditCurr(cy)}
+                          className="p-2 text-slate-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-all"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => setDeleteModal({ show: true, type: 'curriculum', id: cy.id, title: cy.curriculum_year })}
                           className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-all"
                         >
                           <Trash2 size={16} />
@@ -1156,6 +1306,82 @@ const SchoolSetup = () => {
                 <button type="button" onClick={() => setShowRoomModal(false)} className="px-5 py-3 rounded-2xl font-bold text-slate-500 text-xs">Cancel</button>
                 <button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-md">
                   {loading ? 'Saving...' : 'Save Room'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CURRICULUM YEAR */}
+      {/* ========================================================================= */}
+      {showCurrModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-lg font-bold text-slate-800">
+                {editingCurr ? 'Edit Curriculum Year' : 'Add New Curriculum Year'}
+              </h3>
+              <button
+                onClick={() => setShowCurrModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCurr} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Curriculum Year *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 2024-2025"
+                  value={currForm.curriculum_year}
+                  onChange={(e) => setCurrForm({ ...currForm, curriculum_year: e.target.value })}
+                  className="w-full p-3.5 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 text-sm font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Description / DepEd Order (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. DepEd Order No. 21, s. 2019 / MATATAG Curriculum"
+                  value={currForm.description}
+                  onChange={(e) => setCurrForm({ ...currForm, description: e.target.value })}
+                  className="w-full p-3.5 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 text-sm font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Status</label>
+                <select
+                  value={currForm.status}
+                  onChange={(e) => setCurrForm({ ...currForm, status: e.target.value })}
+                  className="w-full p-3.5 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 text-sm font-bold cursor-pointer"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div className="pt-4 flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCurrModal(false)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs transition-all shadow-md flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {loading ? <RefreshCw className="animate-spin" size={16} /> : <Check size={16} />}
+                  <span>{editingCurr ? 'Update' : 'Save'}</span>
                 </button>
               </div>
             </form>

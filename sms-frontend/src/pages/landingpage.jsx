@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { GraduationCap, Users, ShieldCheck, ArrowRight, ArrowLeft, Menu, X, ChevronLeft, ChevronRight, CheckCircle, Search, School, Compass, Loader2, Camera, User, Check, Mail, RefreshCw, Briefcase, AlertCircle, Sparkles } from 'lucide-react';
+import { GraduationCap, Users, ShieldCheck, ArrowRight, ArrowLeft, Menu, X, ChevronLeft, ChevronRight, CheckCircle, Search, School, Compass, Loader2, Camera, User, Check, Mail, RefreshCw, Briefcase, AlertCircle, Sparkles, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const LandingPage = () => {

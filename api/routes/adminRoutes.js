@@ -21,7 +21,11 @@ import {
   deleteBuilding,
   getRoomsExtended,
   createRoomExtended,
-  updateRoomExtended
+  updateRoomExtended,
+  getCurriculumYears,
+  createCurriculumYear,
+  updateCurriculumYear,
+  deleteCurriculumYear
 } from '../controllers/admin/schoolSetupController.js';
 
 const router = express.Router();
@@ -67,6 +71,24 @@ router.get('/school-years', getSchoolYears);
 router.post('/school-years', createSchoolYear);
 router.put('/school-years/:id', updateSchoolYear);
 router.delete('/school-years/:id', deleteSchoolYear);
+
+// Curriculum Year Endpoints
+router.get('/curriculum-years', getCurriculumYears);
+router.post('/curriculum-years', createCurriculumYear);
+router.put('/curriculum-years/:id', updateCurriculumYear);
+router.delete('/curriculum-years/:id', deleteCurriculumYear);
+
+// Legacy Curriculum Year routing aliases
+router.get('/get_curriculum_years.php', getCurriculumYears);
+router.post('/add_curriculum_year.php', createCurriculumYear);
+router.post('/update_curriculum_year.php', (req, res) => {
+  req.params.id = req.body.id;
+  updateCurriculumYear(req, res);
+});
+router.post('/delete_curriculum_year.php', (req, res) => {
+  req.params.id = req.body.id;
+  deleteCurriculumYear(req, res);
+});
 
 // Building Endpoints
 router.get('/buildings', getBuildings);
