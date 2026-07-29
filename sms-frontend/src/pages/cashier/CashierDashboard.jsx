@@ -27,8 +27,11 @@ const CashierDashboard = () => {
     totalCollections: "₱0.00",
     todayTransactions: 0,
     pendingPayments: 0,
+    activeStudents: 0,
     recentTransactions: [],
     breakdown: { Cash: 0, GCash: 0, Card: 0 },
+    weeklyRevenue: [],
+    monthlyRevenue: [],
   });
 
   // Timpla ng kulay: 12% opacity para hindi masyadong maputi pero hindi rin masakit sa mata
@@ -71,8 +74,11 @@ const CashierDashboard = () => {
         totalCollections: statsRes.data.totalCollections || "₱0.00",
         todayTransactions: statsRes.data.todayTransactions || 0,
         pendingPayments: statsRes.data.pendingPayments || 0,
+        activeStudents: statsRes.data.activeStudents || 0,
         recentTransactions: paymentsRes.data || [],
-        breakdown: statsRes.data.breakdown || {},
+        breakdown: statsRes.data.breakdown || { Cash: 0, GCash: 0, Card: 0 },
+        weeklyRevenue: statsRes.data.weeklyRevenue || [],
+        monthlyRevenue: statsRes.data.monthlyRevenue || [],
       });
     } catch (error) {
       console.error("Fetch error:", error);
@@ -119,10 +125,10 @@ const CashierDashboard = () => {
             colorClass="bg-rose-500"
           />
 
-          {/* 4. Active Users */}
+          {/* 4. Active Students */}
           <StatCard
-            title="Active Users"
-            value="1,240"
+            title="Active Students"
+            value={stats.activeStudents ? stats.activeStudents.toLocaleString() : "0"}
             icon={Users}
             colorClass="bg-emerald-500"
           />
@@ -164,10 +170,10 @@ const CashierDashboard = () => {
         {/* CHART SECTION */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 shrink-0">
           <div className="lg:col-span-2">
-            <RevenueAnalytics />
+            <RevenueAnalytics data={stats.weeklyRevenue} />
           </div>
           <div className="lg:col-span-1">
-            <MonthlyBarChart branding={branding} />
+            <MonthlyBarChart branding={branding} data={stats.monthlyRevenue} />
           </div>
         </div>
 

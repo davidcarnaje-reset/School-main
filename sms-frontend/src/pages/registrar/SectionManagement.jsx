@@ -11,6 +11,8 @@ const SectionManagement = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('ALL');
+  const [selectedLevelFilter, setSelectedLevelFilter] = useState('ALL');
   
   // 🛑 States para sa Details Modal
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -146,6 +148,35 @@ const SectionManagement = () => {
     } catch (err) { alert("Error saving section"); }
   };
 
+  const filteredSections = sections.filter((s) => {
+    // 1. Department filter
+    if (selectedDeptFilter !== 'ALL' && s.department !== selectedDeptFilter) {
+      return false;
+    }
+
+    // 2. Grade Level filter
+    if (selectedLevelFilter !== 'ALL' && s.grade_level !== selectedLevelFilter) {
+      return false;
+    }
+
+    // 3. Search query filter (name, level, department, program code, description, major)
+    if (searchTerm.trim() !== '') {
+      const term = searchTerm.toLowerCase().trim();
+      const matchName = s.section_name?.toLowerCase().includes(term);
+      const matchLevel = s.grade_level?.toLowerCase().includes(term);
+      const matchDept = s.department?.toLowerCase().includes(term);
+      const matchCode = s.program_code?.toLowerCase().includes(term);
+      const matchDesc = s.program_description?.toLowerCase().includes(term);
+      const matchMajor = s.major?.toLowerCase().includes(term);
+
+      if (!matchName && !matchLevel && !matchDept && !matchCode && !matchDesc && !matchMajor) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
   return (
     <div className="space-y-6 text-left max-w-7xl mx-auto">
       {/* HEADER */}
@@ -164,76 +195,142 @@ const SectionManagement = () => {
         </button>
       </div>
 
-      {/* SEARCH */}
-      <div className="bg-white p-4 rounded-[2rem] shadow-sm border-2 border-slate-50 flex items-center gap-4">
-        <Search className="text-slate-300 ml-4" size={24} />
-        <input 
-          type="text" 
-          placeholder="Filter by name, level, or strand..." 
-          className="flex-1 p-2 font-bold text-slate-600 outline-none bg-transparent"
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* SEARCH & FILTERS */}
+      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+        {/* Search Input */}
+        <div className="bg-white p-4 rounded-[2rem] shadow-sm border-2 border-slate-50 flex items-center gap-4 flex-1">
+          <Search className="text-slate-300 ml-4" size={24} />
+          <input 
+            type="text" 
+            value={searchTerm}
+            placeholder="Filter by name, level, or strand..." 
+            className="flex-1 p-2 font-bold text-slate-600 outline-none bg-transparent"
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')} 
+              className="p-1 hover:bg-slate-100 rounded-full text-slate-400 mr-2 transition-all"
+              title="Clear search"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Department Filter Pills */}
+        <div className="flex items-center gap-2 bg-white p-2 rounded-[2rem] border-2 border-slate-50 shadow-sm overflow-x-auto">
+          {['ALL', 'K-10', 'SHS', 'College'].map((dept) => (
+            <button
+              key={dept}
+              onClick={() => setSelectedDeptFilter(dept)}
+              className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+                selectedDeptFilter === dept
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              {dept}
+            </button>
+          ))}
+        </div>
+
+        {/* Grade Level Dropdown Filter */}
+        <div className="bg-white p-2 rounded-[2rem] border-2 border-slate-50 shadow-sm flex items-center">
+          <select
+            value={selectedLevelFilter}
+            onChange={(e) => setSelectedLevelFilter(e.target.value)}
+            className="px-4 py-2.5 bg-transparent text-slate-600 font-bold text-xs outline-none cursor-pointer"
+          >
+            <option value="ALL">All Grade Levels</option>
+            {gradeLevels.map((lvl) => (
+              <option key={lvl} value={lvl}>{lvl}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sections.filter(s => s.section_name.toLowerCase().includes(searchTerm.toLowerCase())).map((s) => (
-          <div 
-            key={s.id} 
-            className="bg-white rounded-[2.5rem] p-8 shadow-sm border-2 border-slate-50 hover:border-blue-200 transition-all group relative cursor-pointer"
-            onClick={() => handleCardClick(s)}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                s.department === 'College' ? 'bg-purple-100 text-purple-600' : 
-                s.department === 'SHS' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
-              }`}>
-                {s.department}
-              </span>
-              <div className="flex items-center gap-1 z-10" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={(e) => handleEditClick(e, s)}
-                  className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-blue-600 cursor-pointer"
-                  title="Edit Section"
-                >
-                  <Edit size={16} />
-                </button>
-                <button
-                  onClick={(e) => handleDeleteClick(e, s)}
-                  className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-red-600 cursor-pointer"
-                  title="Delete Section"
-                >
-                  <Trash2 size={16} />
-                </button>
-                <Layers className="text-slate-100 group-hover:text-blue-100 transition-colors ml-2" size={32} />
-              </div>
-            </div>
-
-            <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">{s.section_name}</h2>
-            <p className="text-blue-600 font-black text-xs uppercase mt-2 tracking-widest">{s.grade_level}</p>
-            
-            {s.program_code && (
-              <div className="mt-4 flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <GraduationCap size={16} className="text-slate-400" />
-                <p className="text-[10px] font-bold text-slate-500 uppercase truncate">
-                  {s.program_code} - {s.major || s.program_description}
-                </p>
-              </div>
-            )}
-
-            <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6">
-              <div className="flex items-center gap-2">
-                <Users size={18} className="text-slate-300" />
-                <span className="text-xs font-black text-slate-600 uppercase">Limit: {s.max_capacity}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span className="text-[10px] font-black text-slate-400 uppercase">Active</span>
-              </div>
-            </div>
+      {filteredSections.length === 0 ? (
+        <div className="bg-white rounded-[2.5rem] p-12 text-center border-2 border-slate-50 shadow-sm">
+          <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Search size={32} />
           </div>
-        ))}
-      </div>
+          <h3 className="text-xl font-black text-slate-700 uppercase">No Sections Found</h3>
+          <p className="text-slate-400 text-sm font-medium mt-1">Try adjusting your search terms or filter criteria.</p>
+          {(searchTerm || selectedDeptFilter !== 'ALL' || selectedLevelFilter !== 'ALL') && (
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedDeptFilter('ALL');
+                setSelectedLevelFilter('ALL');
+              }}
+              className="mt-4 px-6 py-2.5 bg-blue-50 text-blue-600 font-black text-xs uppercase rounded-xl hover:bg-blue-100 transition-all cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredSections.map((s) => (
+            <div 
+              key={s.id} 
+              className="bg-white rounded-[2.5rem] p-8 shadow-sm border-2 border-slate-50 hover:border-blue-200 transition-all group relative cursor-pointer"
+              onClick={() => handleCardClick(s)}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                  s.department === 'College' ? 'bg-purple-100 text-purple-600' : 
+                  s.department === 'SHS' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
+                }`}>
+                  {s.department}
+                </span>
+                <div className="flex items-center gap-1 z-10" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={(e) => handleEditClick(e, s)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-blue-600 cursor-pointer"
+                    title="Edit Section"
+                  >
+                    <Edit size={16} />
+                  </button>
+                  <button
+                    onClick={(e) => handleDeleteClick(e, s)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-red-600 cursor-pointer"
+                    title="Delete Section"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                  <Layers className="text-slate-100 group-hover:text-blue-100 transition-colors ml-2" size={32} />
+                </div>
+              </div>
+
+              <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">{s.section_name}</h2>
+              <p className="text-blue-600 font-black text-xs uppercase mt-2 tracking-widest">{s.grade_level}</p>
+              
+              {s.program_code && (
+                <div className="mt-4 flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <GraduationCap size={16} className="text-slate-400" />
+                  <p className="text-[10px] font-bold text-slate-500 uppercase truncate">
+                    {s.program_code} - {s.major || s.program_description}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6">
+                <div className="flex items-center gap-2">
+                  <Users size={18} className="text-slate-300" />
+                  <span className="text-xs font-black text-slate-600 uppercase">Limit: {s.max_capacity}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase">Active</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 🛑 ARCHITECT FIX: Dito natin tatawagin ang Dashboard Modal 🛑 */}
       <SectionDetailsModal 

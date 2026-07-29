@@ -53,9 +53,15 @@ const Payroll = () => {
     setLoading(true);
     try {
       const res = await axios.get(`${API_BASE_URL}/cashier/get_employees.php`);
-      setEmployees(res.data);
+      if (Array.isArray(res.data)) {
+        setEmployees(res.data);
+      } else if (res.data && Array.isArray(res.data.employees)) {
+        setEmployees(res.data.employees);
+      } else {
+        setEmployees([]);
+      }
     } catch (err) {
-      console.error("Error fetching employees");
+      console.error("Error fetching employees:", err);
     } finally {
       setLoading(false);
     }
@@ -299,7 +305,7 @@ const Payroll = () => {
       <body>
         <div class="payslip-card">
           <div class="header">
-            <h2 style="margin:0; italic">PAYROLL <span style="color:#3b82f6">PRO</span></h2>
+            <h2 style="margin:0; italic">PAYROLL <span style="color:#3b82f6">MANAGEMENT</span></h2>
             <p style="font-size:10px; color:#999; margin:5px 0 uppercase">${period.period_name}</p>
           </div>
           
@@ -348,6 +354,26 @@ const Payroll = () => {
     printWindow.document.close();
   };
 
+  const filteredEmployees = employees.filter((emp) => {
+    const pos = (emp.position || '').toLowerCase();
+    if (pos.includes('super_admin') || pos.includes('super admin')) return false;
+
+    const term = search.toLowerCase().trim();
+    if (!term) return true;
+
+    const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.toLowerCase();
+    const empId = String(emp.employee_id || '').toLowerCase();
+    const position = (emp.position || '').toLowerCase();
+    const department = (emp.department || '').toLowerCase();
+
+    return (
+      fullName.includes(term) ||
+      empId.includes(term) ||
+      position.includes(term) ||
+      department.includes(term)
+    );
+  });
+
   return (
     <div className="p-6 space-y-6 text-left max-w-7xl mx-auto">
       {/* 1. HEADER & TABS - UPDATE THIS PART */}
@@ -358,7 +384,7 @@ const Payroll = () => {
           </div>
           <div>
             <h1 className="text-3xl md:text-4xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">
-              Payroll <span style={{ color: branding?.theme_color }}>Pro</span>
+              Payroll <span style={{ color: branding?.theme_color }}>Management</span>
             </h1>
             <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.3em] mt-2">
               Personnel & Salary Management
@@ -400,18 +426,9 @@ const Payroll = () => {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <button
-              onClick={() => {
-                setFormData(initialForm);
-                setIsModalOpen(true);
-              }}
-              className="bg-blue-600 text-white p-4 rounded-2xl flex items-center gap-3 hover:bg-black transition-all shadow-lg shadow-blue-100"
-            >
-              <UserPlus size={18} />
-              <span className="text-[10px] font-black uppercase">
-                Add Employee
-              </span>
-            </button>
+            <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+              Total Personnel: {filteredEmployees.length}
+            </div>
           </div>
 
           <div className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm">
@@ -427,13 +444,14 @@ const Payroll = () => {
               </thead>
               {/* UPDATE TABLE BODY FOR EMPLOYEES */}
               <tbody className="border-separate border-spacing-y-3">
-                {employees
-                  .filter((emp) =>
-                    `${emp.first_name} ${emp.last_name}`
-                      .toLowerCase()
-                      .includes(search.toLowerCase()),
-                  )
-                  .map((emp) => (
+                {filteredEmployees.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="p-12 text-center text-slate-400 font-bold uppercase text-xs">
+                      No matching personnel found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredEmployees.map((emp) => (
                     <tr
                       key={emp.id}
                       className="group transition-all hover:translate-x-1"
@@ -493,7 +511,8 @@ const Payroll = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>

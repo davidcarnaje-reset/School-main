@@ -50,11 +50,37 @@ export const createUser = async (req, res) => {
     const nextId = (idRows[0].maxId || 0) + 1;
     const schoolId = req.school_id || 1;
 
+    // Generate Official Employee Number (e.g. EMP-2026-0001)
+    const currentYear = new Date().getFullYear();
+    const [empCountRows] = await pool.query("SELECT COUNT(*) as count FROM users WHERE role != 'student'");
+    const empSeq = String((empCountRows[0]?.count || 0) + 1).padStart(4, '0');
+    const employeeNumber = `EMP-${currentYear}-${empSeq}`;
+
     const [result] = await pool.query(
       `INSERT INTO users (id, username, password, first_name, middle_name, last_name, full_name, email, phone_number, birthday, role, status, is_verified, verification_token, school_id) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', 0, ?, ?)`,
       [nextId, username, hashedPassword, first_name, middle_name || null, last_name, fullName, email, phone_number || null, birthday || null, role, verificationToken, schoolId]
     );
+
+    // Sync into employees table for payroll with official Employee Number
+    try {
+      const [maxEmpIdRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
+      const nextEmpId = maxEmpIdRows[0].maxId + 1;
+      await pool.query(
+        `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status)
+         VALUES (?, ?, ?, ?, ?, ?, 25000, 'Active')`,
+        [
+          nextEmpId,
+          employeeNumber,
+          first_name,
+          last_name,
+          role.toUpperCase() + ' STAFF',
+          'Administration'
+        ]
+      );
+    } catch (empErr) {
+      console.warn("Sync new staff to employees table notice:", empErr.message);
+    }
 
     // Send verification / invitation email to the newly invited staff member
     let emailSent = false;
@@ -71,17 +97,17 @@ export const createUser = async (req, res) => {
       req.user?.id || 1,
       req.user?.role || 'Admin',
       "CREATE_USER",
-      `Created/invited user account: ${fullName} (${role})`,
+      `Created/invited user account: ${fullName} (${role}, ID: ${employeeNumber})`,
       req
     );
 
     return res.json({
       success: true,
       message: emailSent 
-        ? "Staff invited successfully. Verification token generated and email sent."
-        : `Staff invited successfully, but invitation email failed to send: ${emailErrorMsg}. Please check SMTP configurations in the .env file.`,
+        ? `Staff invited successfully (Employee No: ${employeeNumber}). Verification token generated and email sent.`
+        : `Staff invited successfully (Employee No: ${employeeNumber}), but invitation email failed to send: ${emailErrorMsg}. Please check SMTP configurations in the .env file.`,
       emailSent,
-      data: { id: nextId, username, email, role }
+      data: { id: nextId, username, employee_number: employeeNumber, email, role }
     });
   } catch (error) {
     console.error("Create user error:", error);

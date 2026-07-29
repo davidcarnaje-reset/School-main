@@ -16,7 +16,9 @@ import {
   Receipt,
   BookOpen,
   Banknote,
-  ShieldAlert
+  ShieldAlert,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import CreateAnnouncementModal from "../components/shared/CreateAnnouncementModal";
@@ -25,12 +27,19 @@ import ReadNotificationModal from "../components/shared/ReadNotificationModal";
 const CashierLayout = () => {
   const { logout, user, branding, activePermissions, API_BASE_URL, getLogoUrl } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return JSON.parse(localStorage.getItem('cashierSidebarCollapsed')) ?? false;
+  });
   const [isCreateNotifModalOpen, setIsCreateNotifModalOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [selectedNotif, setSelectedNotif] = useState(null);
   const location = useLocation();
   const notifRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem('cashierSidebarCollapsed', JSON.stringify(isCollapsed));
+  }, [isCollapsed]);
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -57,31 +66,35 @@ const CashierLayout = () => {
     hexColor ? `${hexColor}1A` : "#f8fafc";
 
   const fetchNotifications = async () => {
+    if (!user) return;
     try {
+      const currentId = user.role === 'student' ? user.student_id : user.id;
       const res = await axios.get(
-        `${API_BASE_URL}/shared/get_notifications.php`,
+        `${API_BASE_URL}/notifications/get_notifications.php?user_id=${currentId}&role=${user.role || 'cashier'}`
       );
-      setNotifications(res.data);
+      if (res.data.success) {
+        setNotifications(res.data.notifications || []);
+      }
     } catch (error) {
       console.error("Notif error:", error);
     }
   };
 
   useEffect(() => {
-    //fetchNotifications();
-    //const handleClickOutside = (e) => {
-      //if (notifRef.current && !notifRef.current.contains(e.target))
-        //setIsNotifOpen(false);
-    //};
-    //document.addEventListener("mousedown", handleClickOutside);
-    //return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/cashier/dashboard" },
+
+    { type: "header", label: "Billing & Transactions" },
     { icon: Search, label: "Student Billing", path: "/cashier/billing", module: "billing" },
     { icon: CreditCard, label: "Process Payments", path: "/cashier/payments", module: "payments" },
     { icon: Layers, label: "Fee Catalog", path: "/cashier/fees", module: "fees" },
+
+    { type: "header", label: "Scholarships" },
     { icon: Receipt, label: "Scholarships", path: "/cashier/scholarships", module: "scholarships" },
     {
       icon: BookOpen,
@@ -89,6 +102,8 @@ const CashierLayout = () => {
       path: "/cashier/scholarship-catalog",
       module: "scholarship_catalog"
     },
+
+    { type: "header", label: "Reports & Finance" },
     { icon: History, label: "Collection Reports", path: "/cashier/reports", module: "reports" },
     { icon: Banknote, label: "Payroll", path: "/cashier/payroll", module: "payroll" },
   ];
@@ -112,8 +127,18 @@ const CashierLayout = () => {
   const portalEnabled = isCurrentPortalEnabled();
 
   const filteredMenuItems = !portalEnabled ? [] : menuItems.filter(item => {
+    if (item.type === 'header') return true;
     if (!item.module) return true;
     return isModuleEnabled("cashier", item.module);
+  });
+
+  // Clean trailing/duplicate headers
+  const finalMenuItems = filteredMenuItems.filter((item, idx, arr) => {
+    if (item.type === 'header') {
+      const nextItem = arr[idx + 1];
+      return nextItem && nextItem.type !== 'header';
+    }
+    return true;
   });
 
   return (
@@ -126,18 +151,28 @@ const CashierLayout = () => {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* SIDEBAR - Compact Version */}
+      {/* SIDEBAR - Collapsible & Partitioned */}
       <aside
         className={`
-        fixed inset-y-4 left-4 z-50 w-64 bg-slate-900 rounded-[2rem] shadow-2xl transition-transform duration-300 transform
+        fixed inset-y-4 left-4 z-50 bg-slate-900 rounded-[2rem] shadow-2xl transition-all duration-300 ease-in-out
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-[120%]"}
         lg:relative lg:translate-x-0 lg:inset-y-0 lg:left-0
+        w-64 ${isCollapsed ? "lg:w-[5.5rem]" : "lg:w-64"}
       `}
       >
-        <div className="flex flex-col h-full p-6">
-          {/* BRANDING AREA - Scaled Down */}
-          <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-14 h-14 bg-white rounded-2xl p-2 shadow-xl mb-3 flex items-center justify-center overflow-hidden border-2 border-slate-800 shrink-0">
+        {/* COLLAPSE TOGGLE BUTTON */}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="hidden lg:flex absolute right-0 translate-x-1/2 top-10 w-8 h-8 bg-blue-600 text-white rounded-full items-center justify-center shadow-md border-[3px] border-slate-50 z-50 hover:bg-blue-700 hover:scale-105 transition-all cursor-pointer"
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        >
+          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} strokeWidth={2.5} />}
+        </button>
+
+        <div className="flex flex-col h-full p-4 md:p-6 overflow-hidden">
+          {/* BRANDING AREA */}
+          <div className="flex flex-col items-center text-center mb-6 shrink-0">
+            <div className="w-12 h-12 md:w-14 md:h-14 bg-white rounded-2xl p-2 shadow-xl mb-2 flex items-center justify-center overflow-hidden border-2 border-slate-800 shrink-0">
               {branding?.school_logo ? (
                 <img
                   src={getLogoUrl(branding.school_logo)}
@@ -150,54 +185,74 @@ const CashierLayout = () => {
                 </span>
               )}
             </div>
-            <h1 className="text-white font-black italic tracking-tighter text-sm leading-tight uppercase line-clamp-2 px-2">
-              {branding?.school_name}
-            </h1>
-            <div className="mt-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
-              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
-                Cashier Portal
-              </p>
-            </div>
+            {!isCollapsed && (
+              <>
+                <h1 className="text-white font-black italic tracking-tighter text-xs md:text-sm leading-tight uppercase line-clamp-2 px-2">
+                  {branding?.school_name}
+                </h1>
+                <div className="mt-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                    Cashier Portal
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* NAVIGATION - Reduced Paddings & Icon Size */}
-          {/* NAVIGATION - Smooth & Rounded */}
+          {/* NAVIGATION */}
           <nav className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar">
-            {filteredMenuItems.map((item) => {
+            {finalMenuItems.map((item, index) => {
+              if (item.type === "header") {
+                return (
+                  <React.Fragment key={`header-${index}`}>
+                    <div className={`my-3 mx-auto w-6 border-t border-slate-800 hidden ${isCollapsed ? 'lg:block' : ''}`} />
+                    <div className={`pt-4 pb-1 px-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap truncate">
+                        {item.label}
+                      </p>
+                    </div>
+                  </React.Fragment>
+                );
+              }
+
               const isActive = location.pathname === item.path;
               return (
                 <Link
                   key={item.path}
                   to={item.path}
+                  title={isCollapsed ? item.label : undefined}
                   onClick={() => setIsSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-full font-bold transition-all duration-500 ease-in-out group ${
+                  className={`flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-4'} py-3 rounded-full font-bold transition-all duration-300 ease-in-out group ${
                     isActive
                       ? "text-white shadow-lg shadow-black/20 scale-[1.02]"
                       : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
                   }`}
                   style={
-                    isActive ? { backgroundColor: branding.theme_color } : {}
+                    isActive ? { backgroundColor: branding?.theme_color || '#2563eb' } : {}
                   }
                 >
                   <item.icon
                     size={18}
-                    className={`transition-transform duration-500 ${isActive ? "scale-110" : "group-hover:translateX-1"}`}
+                    className={`shrink-0 transition-transform duration-300 ${isActive ? "scale-110" : "group-hover:scale-110"}`}
                   />
-                  <span className="tracking-tight text-sm uppercase italic text-[11px]">
-                    {item.label}
-                  </span>
+                  {!isCollapsed && (
+                    <span className="tracking-tight text-xs uppercase italic text-[11px] ml-3 truncate">
+                      {item.label}
+                    </span>
+                  )}
                 </Link>
               );
             })}
           </nav>
 
-          {/* LOGOUT - Compact */}
+          {/* LOGOUT */}
           <button
             onClick={logout}
-            className="flex items-center gap-3 px-4 py-4 rounded-2xl font-black text-rose-500 hover:bg-rose-500/10 transition-all mt-4 uppercase text-[10px] tracking-widest border border-rose-500/10 shrink-0"
+            title={isCollapsed ? "Sign Out" : undefined}
+            className={`flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-4'} py-3.5 rounded-2xl font-black text-rose-500 hover:bg-rose-500/10 transition-all mt-4 uppercase text-[10px] tracking-widest border border-rose-500/10 shrink-0 cursor-pointer`}
           >
-            <LogOut size={16} />
-            <span>Sign Out</span>
+            <LogOut size={16} className="shrink-0" />
+            {!isCollapsed && <span className="ml-3">Sign Out</span>}
           </button>
         </div>
       </aside>

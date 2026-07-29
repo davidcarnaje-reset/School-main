@@ -61,16 +61,22 @@ const createNotification = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      const notifQuery = "INSERT INTO notifications (sender_id, sender_role, type, title, message, attachment) VALUES (?, ?, ?, ?, ?, ?)";
+      const [maxIdRows] = await connection.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM notifications FOR UPDATE");
+      const nextId = maxIdRows[0].maxId + 1;
+
+      const notifQuery = "INSERT INTO notifications (id, sender_id, sender_role, type, title, message, attachment) VALUES (?, ?, ?, ?, ?, ?, ?)";
       const [notifResult] = await connection.query(notifQuery, [
-        sender_id, sender_role, type, title, final_message, attachment_filename
+        nextId, sender_id, sender_role, type, title, final_message, attachment_filename
       ]);
-      notification_id = notifResult.insertId;
+      notification_id = nextId;
 
       if (recipients.length > 0) {
-        const recipientQuery = "INSERT INTO notification_recipients (notification_id, recipient_id, recipient_role) VALUES (?, ?, ?)";
+        const [maxRecipRows] = await connection.query("SELECT COALESCE(MAX(id), 0) AS maxRecipId FROM notification_recipients FOR UPDATE");
+        let nextRecipId = maxRecipRows[0].maxRecipId + 1;
+
+        const recipientQuery = "INSERT INTO notification_recipients (id, notification_id, recipient_id, recipient_role, is_read) VALUES (?, ?, ?, ?, 0)";
         for (const r of recipients) {
-          await connection.query(recipientQuery, [notification_id, r.id, r.role]);
+          await connection.query(recipientQuery, [nextRecipId++, notification_id, r.id, r.role]);
         }
       } else {
         throw new Error("No recipients found for the selected target.");

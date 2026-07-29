@@ -1,11 +1,8 @@
 import pool from '../../config/db.js';
 
 const getNotifications = async (req, res) => {
-  const { user_id, role } = req.query;
-
-  if (!user_id || !role) {
-    return res.status(400).json({ success: false, message: "User context missing." });
-  }
+  const user_id = req.query.user_id || req.user?.id || (req.user?.role === 'student' ? req.user?.student_id : 1);
+  const role = req.query.role || req.user?.role || 'admin';
 
   try {
     // 1. QUERY PARA SA LISTAHAN NG NOTIFICATIONS

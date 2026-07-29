@@ -17,13 +17,13 @@ import {
 // ==========================================
 export const RevenueAnalytics = ({ data = [] }) => {
   const displayData = data.length > 0 ? data : [
-    { day: "Mon", amount: 4000 },
-    { day: "Tue", amount: 3000 },
-    { day: "Wed", amount: 5000 },
-    { day: "Thu", amount: 2780 },
-    { day: "Fri", amount: 6890 },
-    { day: "Sat", amount: 2390 },
-    { day: "Sun", amount: 3490 },
+    { day: "Mon", amount: 0 },
+    { day: "Tue", amount: 0 },
+    { day: "Wed", amount: 0 },
+    { day: "Thu", amount: 0 },
+    { day: "Fri", amount: 0 },
+    { day: "Sat", amount: 0 },
+    { day: "Sun", amount: 0 },
   ];
 
   return (
@@ -39,7 +39,7 @@ export const RevenueAnalytics = ({ data = [] }) => {
         </div>
         <div className="px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
           <span className="text-[9px] font-black text-emerald-600 uppercase">
-            +12.5% Today
+            Live Data
           </span>
         </div>
       </div>
@@ -72,6 +72,7 @@ export const RevenueAnalytics = ({ data = [] }) => {
                 border: "none",
                 boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
               }}
+              formatter={(value) => [`₱${Number(value).toLocaleString()}`, "Collection"]}
               itemStyle={{ fontSize: "11px", fontWeight: "bold" }}
             />
             <Area
@@ -89,7 +90,7 @@ export const RevenueAnalytics = ({ data = [] }) => {
   );
 };
 
-export const MonthlyBarChart = ({ branding }) => {
+export const MonthlyBarChart = ({ branding, data = [] }) => {
   // LOGIC PARA SA TATLONG BULAN (Prev, Current, Next)
   const months = [
     "Jan",
@@ -108,10 +109,10 @@ export const MonthlyBarChart = ({ branding }) => {
   const d = new Date();
   const currentIdx = d.getMonth();
 
-  const data = [
-    { name: months[(currentIdx - 1 + 12) % 12], amount: 45000 },
-    { name: months[currentIdx], amount: 65000 },
-    { name: months[(currentIdx + 1) % 12], amount: 30000 },
+  const chartData = data.length > 0 ? data : [
+    { name: months[(currentIdx - 1 + 12) % 12], amount: 0 },
+    { name: months[currentIdx], amount: 0 },
+    { name: months[(currentIdx + 1) % 12], amount: 0 },
   ];
 
   return (
@@ -129,7 +130,7 @@ export const MonthlyBarChart = ({ branding }) => {
       <div className="h-40 w-full" style={{ minHeight: "160px" }}>
         <ResponsiveContainer width="100%" height={160}>
           <BarChart
-            data={data}
+            data={chartData}
             margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
           >
             <XAxis
@@ -140,6 +141,7 @@ export const MonthlyBarChart = ({ branding }) => {
             />
             <Tooltip
               cursor={{ fill: "transparent" }}
+              formatter={(value) => [`₱${Number(value).toLocaleString()}`, "Collection"]}
               contentStyle={{
                 borderRadius: "15px",
                 border: "none",
@@ -148,7 +150,7 @@ export const MonthlyBarChart = ({ branding }) => {
             />
             <Bar dataKey="amount" radius={[10, 10, 10, 10]} barSize={40}>
               {/* Added optional chaining ?. para safe */}
-              {data?.map((entry, index) => (
+              {chartData?.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={
