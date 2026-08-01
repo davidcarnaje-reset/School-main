@@ -218,24 +218,45 @@ const LandingPage = () => {
   const getGuardianName = (f) => `${f.guardian_first_name || ''} ${f.guardian_middle_name || ''} ${f.guardian_last_name || ''}`.replace(/\s+/g, ' ').trim() || '---';
 
   const getProgramOptions = () => {
+    let filtered = [];
     if (formData.grade_level === 'Grade 11' || formData.grade_level === 'Grade 12') {
-      return programs
-        .filter(p => p.department === 'SHS')
-        .map(p => ({ 
-          value: p.id, 
-          label: `${p.program_code} - ${p.program_description} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
-        }));
+      filtered = programs.filter(p => p.department === 'SHS');
     } else if (formData.grade_level === 'College') {
-      return programs
-        .filter(p => p.department === 'College')
-        .map(p => ({ 
-          value: p.id, 
-          label: p.major 
-            ? `${p.program_code} Major in ${p.major} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
-            : `${p.program_code} - ${p.program_description} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
-        }));
+      filtered = programs.filter(p => p.department === 'College');
+    } else {
+      return [];
     }
-    return [];
+
+    // Filter to only the latest active curriculum version for each course & major
+    const latestMap = new Map();
+    filtered.forEach(p => {
+      const key = `${p.program_code}_${p.major || ''}`;
+      if (!latestMap.has(key)) {
+        latestMap.set(key, p);
+      } else {
+        const existing = latestMap.get(key);
+        const currYearNew = parseInt(String(p.curriculum_year || '0').split('-')[0], 10) || p.id;
+        const currYearExist = parseInt(String(existing.curriculum_year || '0').split('-')[0], 10) || existing.id;
+        if (currYearNew > currYearExist || (currYearNew === currYearExist && p.id > existing.id)) {
+          latestMap.set(key, p);
+        }
+      }
+    });
+
+    return Array.from(latestMap.values()).map(p => {
+      let formattedMajor = p.major || '';
+      if (formattedMajor) {
+        formattedMajor = formattedMajor.toLowerCase().startsWith('major in') 
+          ? formattedMajor 
+          : `Major in ${formattedMajor}`;
+      }
+      return { 
+        value: p.id, 
+        label: p.major 
+          ? `${p.program_code} - ${formattedMajor}` 
+          : `${p.program_code} - ${p.program_description}` 
+      };
+    });
   };
 
   const isStepValid = () => {
@@ -285,7 +306,7 @@ const LandingPage = () => {
   const prevStep = () => setCurrentStep(prev => prev - 1);
 
   // Captcha Generator Code
-  const generateCaptcha = () => {
+  const generateCaptcha = (resetError = true) => {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     let text = '';
     for (let i = 0; i < 5; i++) {
@@ -293,7 +314,9 @@ const LandingPage = () => {
     }
     setCaptchaChallenge(text);
     setCaptchaInput('');
-    setCaptchaError(false);
+    if (resetError) {
+      setCaptchaError(false);
+    }
     
     setTimeout(() => {
       const canvas = document.getElementById('captcha-canvas');
@@ -340,7 +363,7 @@ const LandingPage = () => {
     // CAPTCHA VALIDATION
     if (captchaInput.trim().toUpperCase() !== captchaChallenge) {
       setCaptchaError(true);
-      generateCaptcha();
+      generateCaptcha(false);
       return;
     }
     
@@ -1204,9 +1227,12 @@ const LandingPage = () => {
                         required
                       />
                       {captchaError && (
-                        <div className="text-xs text-red-500 font-bold mb-3 flex items-center gap-1.5 animate-bounce">
-                          <AlertCircle size={14}/>
-                          Incorrect captcha! New code generated.
+                        <div className="p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-xs text-red-600 font-bold flex items-center gap-3 animate-in fade-in zoom-in-95 shadow-sm">
+                          <AlertCircle size={20} className="shrink-0 text-red-500" />
+                          <div>
+                            <div className="font-black text-slate-900 uppercase tracking-tight">Incorrect Security Code</div>
+                            <div className="text-[11px] text-red-500 font-medium mt-0.5">The code typed did not match. A new code has been generated above—please re-enter it.</div>
+                          </div>
                         </div>
                       )}
                     </div>

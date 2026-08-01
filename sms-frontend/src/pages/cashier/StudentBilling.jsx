@@ -143,76 +143,181 @@ const StudentBilling = () => {
   };
 
   const handlePrintReceipt = () => {
-    const printContent = document.getElementById("printable-receipt");
-    const windowUrl = "about:blank";
-    const uniqueName = new Date();
-    const windowName = "Print" + uniqueName.getTime();
-    const printWindow = window.open(
-      windowUrl,
-      windowName,
-      "left=50000,top=50000,width=0,height=0",
-    );
+    const printWindow = window.open("", "_blank", "width=800,height=900");
+    const allocatedFees = Object.entries(allocations)
+      .map(([id, amount]) => {
+        const item = billingData?.items?.find((i) => i.id.toString() === id.toString());
+        if (amount <= 0) return "";
+        return `
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 0; font-weight: 700; color: #334155; text-transform: uppercase;">${item?.item_name || "Fee"}</td>
+            <td style="padding: 10px 0; font-weight: 800; text-align: right; color: #0f172a;">₱${parseFloat(amount).toLocaleString()}</td>
+          </tr>
+        `;
+      })
+      .join("");
 
     printWindow.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
-          <title>Official Receipt - ${billingData?.summary?.student_id}</title>
-          <script src="https://cdn.tailwindcss.com"></script>
+          <title>Official Receipt - ${billingData?.summary?.student_id || ''}</title>
           <style>
-            @media print {
-              @page { margin: 0.5in; }
-              body { font-family: sans-serif; }
+            @page {
+              size: A4 portrait;
+              margin: 0mm;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              height: 100vh;
+              overflow: hidden;
+              font-family: 'Segoe UI', Arial, sans-serif;
+              background-color: #ffffff;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .page {
+              width: 100%;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 40px 30px;
+              box-sizing: border-box;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #2563eb;
+              padding-bottom: 15px;
+              margin-bottom: 25px;
+            }
+            .title {
+              font-size: 22px;
+              font-weight: 900;
+              text-transform: uppercase;
+              letter-spacing: -0.5px;
+              color: #0f172a;
+              margin: 0;
+            }
+            .subtitle {
+              font-size: 11px;
+              font-weight: 800;
+              color: #2563eb;
+              letter-spacing: 2px;
+              margin-top: 5px;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 12px;
+              background: #f8fafc;
+              padding: 15px 20px;
+              border-radius: 12px;
+              margin-bottom: 25px;
+              border: 1px solid #e2e8f0;
+            }
+            .info-item label {
+              font-size: 10px;
+              font-weight: 800;
+              color: #64748b;
+              text-transform: uppercase;
+              display: block;
+            }
+            .info-item value {
+              font-size: 13px;
+              font-weight: 800;
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 25px;
+              font-size: 13px;
+            }
+            .total-card {
+              background: #eff6ff;
+              border: 2px solid #bfdbfe;
+              padding: 15px 20px;
+              border-radius: 12px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .total-label {
+              font-size: 12px;
+              font-weight: 900;
+              text-transform: uppercase;
+              color: #1e40af;
+            }
+            .total-amount {
+              font-size: 24px;
+              font-weight: 900;
+              color: #1d4ed8;
+            }
+            .footer {
+              margin-top: 40px;
+              text-align: center;
+              font-size: 10px;
+              color: #94a3b8;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 1px;
             }
           </style>
         </head>
-        <body onload="window.print();window.close()">
-          <div class="p-8 max-w-[400px] mx-auto border-2 border-slate-100">
-            <div class="text-center mb-6">
-              <h1 class="text-xl font-black uppercase italic tracking-tighter">School Management System</h1>
-              <p class="text-[10px] font-bold text-slate-500">OFFICIAL PAYMENT RECEIPT</p>
+        <body>
+          <div class="page">
+            <div class="header">
+              <h1 class="title">${branding?.school_name || 'SCHOOL MANAGEMENT SYSTEM'}</h1>
+              <div class="subtitle">OFFICIAL PAYMENT RECEIPT</div>
             </div>
-            
-            <div class="space-y-2 mb-6 border-y-2 border-dashed border-slate-200 py-4">
-              <div class="flex justify-between text-xs">
-                <span class="font-bold text-slate-400">STUDENT:</span>
-                <span class="font-black uppercase">${billingData?.summary?.first_name} ${billingData?.summary?.last_name}</span>
+
+            <div class="info-grid">
+              <div class="info-item">
+                <label>Student Name</label>
+                <value>${billingData?.summary?.first_name || ''} ${billingData?.summary?.last_name || ''}</value>
               </div>
-              <div class="flex justify-between text-xs">
-                <span class="font-bold text-slate-400">ID NO:</span>
-                <span class="font-black">${billingData?.summary?.student_id}</span>
+              <div class="info-item">
+                <label>Student ID</label>
+                <value>${billingData?.summary?.student_id || 'N/A'}</value>
               </div>
-              <div class="flex justify-between text-xs">
-                <span class="font-bold text-slate-400">DATE:</span>
-                <span class="font-black">${new Date().toLocaleString()}</span>
+              <div class="info-item">
+                <label>Date & Time</label>
+                <value>${new Date().toLocaleString()}</value>
+              </div>
+              <div class="info-item">
+                <label>Transaction Status</label>
+                <value style="color: #16a34a;">PAID / VERIFIED</value>
               </div>
             </div>
 
-            <div class="space-y-3 mb-6">
-              ${Object.entries(allocations)
-                .map(([id, amount]) => {
-                  const item = billingData.items.find(
-                    (i) => i.id.toString() === id.toString(),
-                  );
-                  if (amount <= 0) return "";
-                  return `
-                  <div class="flex justify-between text-xs">
-                    <span class="font-bold uppercase text-slate-600">${item?.item_name || "Fee"}</span>
-                    <span class="font-black">₱${parseFloat(amount).toLocaleString()}</span>
-                  </div>
-                `;
-                })
-                .join("")}
+            <table>
+              <thead>
+                <tr style="border-bottom: 2px solid #cbd5e1; text-align: left;">
+                  <th style="padding-bottom: 8px; font-size: 11px; text-transform: uppercase; color: #64748b;">Fee Particulars</th>
+                  <th style="padding-bottom: 8px; font-size: 11px; text-transform: uppercase; color: #64748b; text-align: right;">Amount Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allocatedFees || `<tr><td colspan="2" style="padding:15px; text-align:center; color:#94a3b8;">General Payment</td></tr>`}
+              </tbody>
+            </table>
+
+            <div class="total-card">
+              <span class="total-label">Total Amount Paid</span>
+              <span class="total-amount">₱${totalToPost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
 
-            <div class="bg-slate-50 p-4 rounded-xl flex justify-between items-center">
-              <span class="text-xs font-black uppercase italic">Total Paid:</span>
-              <span class="text-lg font-black italic text-indigo-600">₱${totalToPost.toLocaleString()}</span>
-            </div>
-
-            <div class="mt-8 text-center">
-              <p class="text-[8px] font-bold text-slate-400 uppercase tracking-[0.2em]">Thank you for your payment!</p>
+            <div class="footer">
+              This serves as an official electronic receipt.<br>
+              Thank you for your payment!
             </div>
           </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
         </body>
       </html>
     `);

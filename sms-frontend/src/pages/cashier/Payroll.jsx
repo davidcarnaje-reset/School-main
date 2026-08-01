@@ -285,69 +285,151 @@ const Payroll = () => {
   const printIndividualPayslip = (entry, period) => {
     const printWindow = window.open("", "_blank");
 
-    // Dito natin bubuuin ang itsura ng Payslip (HTML/CSS)
     printWindow.document.write(`
+    <!DOCTYPE html>
     <html>
       <head>
         <title>Payslip - ${entry.full_name}</title>
         <style>
-          body { font-family: sans-serif; padding: 40px; color: #333; }
-          .payslip-card { border: 2px solid #eee; padding: 30px; border-radius: 20px; max-width: 500px; margin: auto; }
-          .header { text-align: center; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; }
-          .row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
-          .label { font-weight: bold; color: #666; text-transform: uppercase; font-size: 12px; }
-          .value { font-weight: 800; }
-          .total-row { margin-top: 20px; padding-top: 15px; border-top: 2px dashed #eee; }
-          .net-pay { font-size: 24px; color: #059669; font-weight: 900; }
-          .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #999; text-transform: uppercase; }
+          @page {
+            size: A4 portrait;
+            margin: 0mm;
+          }
+          html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #ffffff;
+            color: #1e293b;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .page {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 30px;
+            box-sizing: border-box;
+          }
+          .payslip-card {
+            border: 2px solid #e2e8f0;
+            padding: 30px;
+            border-radius: 20px;
+            background: #ffffff;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 2px solid #2563eb;
+            padding-bottom: 12px;
+            margin-bottom: 25px;
+          }
+          .header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+          }
+          .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 13px;
+          }
+          .label {
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+            font-size: 11px;
+          }
+          .value {
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .total-row {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px dashed #cbd5e1;
+          }
+          .net-pay-card {
+            background: #f0fdf4;
+            border: 2px solid #bbf7d0;
+            padding: 15px 20px;
+            border-radius: 14px;
+            margin-top: 20px;
+            text-align: right;
+          }
+          .net-pay {
+            font-size: 26px;
+            color: #16a34a;
+            font-weight: 900;
+          }
+          .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
         </style>
       </head>
       <body>
-        <div class="payslip-card">
-          <div class="header">
-            <h2 style="margin:0; italic">PAYROLL <span style="color:#3b82f6">MANAGEMENT</span></h2>
-            <p style="font-size:10px; color:#999; margin:5px 0 uppercase">${period.period_name}</p>
-          </div>
-          
-          <div class="row">
-            <span class="label">Employee Name:</span>
-            <span class="value">${entry.full_name}</span>
-          </div>
-          <div class="row">
-            <span class="label">Position:</span>
-            <span class="value">${entry.position}</span>
-          </div>
-          <div class="row">
-            <span class="label">Period:</span>
-            <span class="value">${period.start_date} - ${period.end_date}</span>
-          </div>
-          
-          <div class="total-row">
+        <div class="page">
+          <div class="payslip-card">
+            <div class="header">
+              <h2>PAYROLL <span style="color:#2563eb">MANAGEMENT</span></h2>
+              <p style="font-size:10px; color:#64748b; font-weight:800; margin:5px 0 0 0; text-transform:uppercase;">${period.period_name}</p>
+            </div>
+            
             <div class="row">
-              <span class="label">Days Worked:</span>
-              <span class="value">${entry.days_worked}</span>
+              <span class="label">Employee Name:</span>
+              <span class="value">${entry.full_name}</span>
             </div>
             <div class="row">
-              <span class="label">OT Hours:</span>
-              <span class="value">${entry.ot_hours}</span>
+              <span class="label">Position:</span>
+              <span class="value">${entry.position}</span>
             </div>
             <div class="row">
-              <span class="label">Late Minutes:</span>
-              <span class="value">${entry.late_minutes}</span>
+              <span class="label">Period:</span>
+              <span class="value">${period.start_date} - ${period.end_date}</span>
             </div>
-          </div>
+            
+            <div class="total-row">
+              <div class="row">
+                <span class="label">Days Worked:</span>
+                <span class="value">${entry.days_worked}</span>
+              </div>
+              <div class="row">
+                <span class="label">OT Hours:</span>
+                <span class="value">${entry.ot_hours}</span>
+              </div>
+              <div class="row">
+                <span class="label">Late Minutes:</span>
+                <span class="value">${entry.late_minutes}</span>
+              </div>
+            </div>
 
-          <div class="total-row" style="text-align: right;">
-            <div class="label">Net Take Home Pay:</div>
-            <div class="net-pay">₱${parseFloat(entry.net_pay).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-          </div>
+            <div class="net-pay-card">
+              <div class="label" style="color: #15803d; margin-bottom: 4px;">Net Take Home Pay</div>
+              <div class="net-pay">₱${parseFloat(entry.net_pay).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            </div>
 
-          <div class="footer">
-            Generated on ${new Date().toLocaleDateString()}<br>
-            CONFIDENTIAL DOCUMENT
+            <div class="footer">
+              Generated on ${new Date().toLocaleDateString()}<br>
+              OFFICIAL CONFIDENTIAL PAYSLIP
+            </div>
           </div>
         </div>
-        <script>window.print(); window.close();</script>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
       </body>
     </html>
   `);

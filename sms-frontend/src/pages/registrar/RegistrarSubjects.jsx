@@ -625,9 +625,23 @@ const RegistrarSubjects = () => {
                         </div>
                       </td>
                       <td className="p-6">
-                         <span className={`text-xs font-bold ${item.program_code ? 'text-slate-700' : 'text-blue-500 italic'}`}>
-                             {item.program_code || 'General Education (All)'}
-                         </span>
+                         <div>
+                            <span className={`text-xs font-black ${item.program_code ? 'text-slate-800' : 'text-blue-500 italic'}`}>
+                                {item.program_code || 'General Education (All)'}
+                            </span>
+                            {(() => {
+                              const foundProg = programs.find(p => p.id?.toString() === item.program_id?.toString());
+                              const majorText = item.program_major || item.major || foundProg?.major;
+                              if (!majorText) return null;
+                              const cleanMajor = majorText.replace(/^major\s+in\s+/i, '').trim();
+                              if (!cleanMajor) return null;
+                              return (
+                                <p className="text-[10px] font-bold text-indigo-600 mt-0.5 uppercase tracking-wide">
+                                  Major in {cleanMajor}
+                                </p>
+                              );
+                            })()}
+                         </div>
                       </td>
                       <td className="p-6 text-center">
                          <span className="text-lg font-black text-slate-600">{item.units}<span className="text-[10px] text-slate-400 font-bold ml-0.5">u</span></span>

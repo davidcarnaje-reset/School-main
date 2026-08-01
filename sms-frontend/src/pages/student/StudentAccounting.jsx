@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { printCertificateOfRegistration } from '../../utils/printCOR';
 
 const StudentAccounting = () => {
   const { user, branding, API_BASE_URL, getLogoUrl } = useAuth();
@@ -71,7 +72,9 @@ const StudentAccounting = () => {
     if (user?.email) fetchData();
   }, [user.email]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    printCertificateOfRegistration(studentData, branding);
+  };
 
   // Filter Logic for Statement Table
   const filteredItems = allBillingItems.filter(item => {

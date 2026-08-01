@@ -63,7 +63,195 @@ const fetchData = async () => {
     if (user?.email) fetchData();
   }, [user.email]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank", "width=800,height=900");
+    const gradeRows = grades.map(g => `
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px; font-weight: 800; color: #1e293b;">${g.code || ''}</td>
+        <td style="padding: 10px; font-weight: 700; color: #334155;">${g.title || ''}</td>
+        <td style="padding: 10px; font-weight: 800; text-align: center;">${g.units || '3'}</td>
+        <td style="padding: 10px; font-weight: 900; text-align: center; color: #2563eb;">${g.final || '---'}</td>
+        <td style="padding: 10px; font-weight: 800; text-align: center; color: ${g.remarks === 'Passed' ? '#16a34a' : '#dc2626'};">${g.remarks || 'Passed'}</td>
+      </tr>
+    `).join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Official Report Card - ${studentData?.full_name || ''}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 0mm;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              height: 100vh;
+              overflow: hidden;
+              font-family: 'Segoe UI', Arial, sans-serif;
+              background-color: #ffffff;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .page {
+              width: 100%;
+              max-width: 750px;
+              margin: 0 auto;
+              padding: 40px 30px;
+              box-sizing: border-box;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 3px double #2563eb;
+              padding-bottom: 15px;
+              margin-bottom: 25px;
+            }
+            .title {
+              font-size: 24px;
+              font-weight: 900;
+              text-transform: uppercase;
+              color: #0f172a;
+              margin: 0;
+            }
+            .subtitle {
+              font-size: 11px;
+              font-weight: 800;
+              color: #2563eb;
+              letter-spacing: 2px;
+              margin-top: 5px;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 12px;
+              background: #f8fafc;
+              padding: 15px 20px;
+              border-radius: 12px;
+              margin-bottom: 25px;
+              border: 1px solid #e2e8f0;
+            }
+            .info-item label {
+              font-size: 10px;
+              font-weight: 800;
+              color: #64748b;
+              text-transform: uppercase;
+              display: block;
+            }
+            .info-item value {
+              font-size: 13px;
+              font-weight: 800;
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 25px;
+              font-size: 12px;
+            }
+            th {
+              background: #f1f5f9;
+              padding: 10px;
+              font-size: 10px;
+              font-weight: 900;
+              text-transform: uppercase;
+              color: #475569;
+              border-bottom: 2px solid #cbd5e1;
+            }
+            .gwa-card {
+              background: #eff6ff;
+              border: 2px solid #bfdbfe;
+              padding: 15px 20px;
+              border-radius: 12px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .gwa-label {
+              font-size: 12px;
+              font-weight: 900;
+              text-transform: uppercase;
+              color: #1e40af;
+            }
+            .gwa-value {
+              font-size: 24px;
+              font-weight: 900;
+              color: #1d4ed8;
+            }
+            .footer {
+              margin-top: 40px;
+              text-align: center;
+              font-size: 10px;
+              color: #94a3b8;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <div class="header">
+              <h1 class="title">${branding?.school_name || 'SCHOOL MANAGEMENT SYSTEM'}</h1>
+              <div class="subtitle">OFFICIAL ACADEMIC EVALUATION & REPORT CARD</div>
+            </div>
+
+            <div class="info-grid">
+              <div class="info-item">
+                <label>Student Name</label>
+                <value>${studentData?.full_name || '---'}</value>
+              </div>
+              <div class="info-item">
+                <label>Student ID / LRN</label>
+                <value>${studentData?.student_id || '---'} (LRN: ${studentData?.lrn || 'N/A'})</value>
+              </div>
+              <div class="info-item">
+                <label>Grade / Year Level</label>
+                <value>${studentData?.grade_level || 'N/A'}</value>
+              </div>
+              <div class="info-item">
+                <label>Academic Year</label>
+                <value>${studentData?.school_year || '2024-2025'}</value>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align: left;">Code</th>
+                  <th style="text-align: left;">Subject Title</th>
+                  <th style="text-align: center;">Units</th>
+                  <th style="text-align: center;">Final Grade</th>
+                  <th style="text-align: center;">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${gradeRows || `<tr><td colspan="5" style="padding:20px; text-align:center; color:#94a3b8;">No grade evaluation entries found.</td></tr>`}
+              </tbody>
+            </table>
+
+            <div class="gwa-card">
+              <span class="gwa-label">General Weighted Average (GWA)</span>
+              <span class="gwa-value">${computeGWA()}</span>
+            </div>
+
+            <div class="footer">
+              This document is an official electronic copy of the student's academic record.<br>
+              Issued by Office of the School Registrar.
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   // Compute GWA
   const computeGWA = () => {

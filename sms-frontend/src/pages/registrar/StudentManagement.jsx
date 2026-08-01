@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'; 
 import { useAuth } from '../../context/AuthContext';
 import HelpTutorialModal from '../../components/shared/HelpTutorialModal';
+import { printCertificateOfRegistration } from '../../utils/printCOR';
 
 // Reusable Components WITH SUPPORT FOR MAX AND MAXLENGTH
 function Input({ label, type="text", value, onChange, placeholder, required=false, max, maxLength }) {
@@ -540,21 +541,45 @@ const fetchData = async () => {
 
   // HELPER PARA SA DROPDOWNS NG SHS / COLLEGE
   const getProgramOptions = () => {
+    let filtered = [];
     if (formData.grade_level === 'Grade 11' || formData.grade_level === 'Grade 12') {
-      return programs
-        .filter(p => p.department === 'SHS')
-        .map(p => ({ value: p.id, label: `${p.program_code} - ${p.program_description} (Curriculum: ${p.curriculum_year || '2024-2025'})` }));
+      filtered = programs.filter(p => p.department === 'SHS');
     } else if (formData.grade_level === 'College') {
-      return programs
-        .filter(p => p.department === 'College')
-        .map(p => ({ 
-          value: p.id, 
-          label: p.major 
-            ? `${p.program_code} Major in ${p.major} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
-            : `${p.program_code} - ${p.program_description} (Curriculum: ${p.curriculum_year || '2024-2025'})` 
-        }));
+      filtered = programs.filter(p => p.department === 'College');
+    } else {
+      return [];
     }
-    return [];
+
+    // Filter to only the latest active curriculum version for each course & major
+    const latestMap = new Map();
+    filtered.forEach(p => {
+      const key = `${p.program_code}_${p.major || ''}`;
+      if (!latestMap.has(key)) {
+        latestMap.set(key, p);
+      } else {
+        const existing = latestMap.get(key);
+        const currYearNew = parseInt(String(p.curriculum_year || '0').split('-')[0], 10) || p.id;
+        const currYearExist = parseInt(String(existing.curriculum_year || '0').split('-')[0], 10) || existing.id;
+        if (currYearNew > currYearExist || (currYearNew === currYearExist && p.id > existing.id)) {
+          latestMap.set(key, p);
+        }
+      }
+    });
+
+    return Array.from(latestMap.values()).map(p => {
+      let formattedMajor = p.major || '';
+      if (formattedMajor) {
+        formattedMajor = formattedMajor.toLowerCase().startsWith('major in') 
+          ? formattedMajor 
+          : `Major in ${formattedMajor}`;
+      }
+      return { 
+        value: p.id, 
+        label: p.major 
+          ? `${p.program_code} - ${formattedMajor}` 
+          : `${p.program_code} - ${p.program_description}` 
+      };
+    });
   };
 
   const StepIndicator = () => (
@@ -1132,8 +1157,11 @@ const fetchData = async () => {
           <h3 className="font-black text-slate-800 tracking-tight">Student Full Profile</h3>
         </div>
         <div className="flex gap-2">
-          <button onClick={handlePrint} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-xl font-bold text-sm hover:bg-slate-700 transition-all shadow-lg">
-             <Printer size={18} /> Print to PDF
+          <button onClick={() => {
+            setViewModal(false);
+            printCertificateOfRegistration(selectedStudent, branding);
+          }} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-xl font-bold text-sm hover:bg-slate-700 transition-all shadow-lg">
+             <Printer size={18} /> Print Formal COR
           </button>
           <button onClick={() => setViewModal(false)} className="p-2.5 bg-slate-100 text-slate-400 hover:text-red-500 rounded-xl transition-colors"><X size={20}/></button>
         </div>

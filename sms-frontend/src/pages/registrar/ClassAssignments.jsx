@@ -511,11 +511,16 @@ return (
                     className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500"
                   >
                     <option value="">-- Select Academic Venue --</option>
-                    {rooms.map(r => (
-                        <option key={r.id} value={r.id}>
-                            {r.room_name} ({r.room_type} | Capacity: {r.capacity})
-                        </option>
-                    ))}
+                    {rooms.map(r => {
+                        const roomLabel = (r.room_name?.trim().toLowerCase() === 'room' && r.room_number)
+                          ? `Room ${r.room_number}`
+                          : `${r.room_name}${r.room_number ? ` (${r.room_number})` : ''}`;
+                        return (
+                          <option key={r.id} value={r.id}>
+                              {roomLabel} ({r.room_type} | Capacity: {r.capacity})
+                          </option>
+                        );
+                    })}
                   </select>
                 </div>
 
@@ -599,7 +604,12 @@ return (
                                 {/* ROOM */}
                                 <select required value={draft.room_id} onChange={e => handleDraftChange(index, 'room_id', e.target.value)} className="w-full xl:w-1/4 p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none">
                                     <option value="">-- Assign Room --</option>
-                                    {rooms.map(r => <option key={r.id} value={r.id}>{r.room_name}</option>)}
+                                    {rooms.map(r => {
+                                        const roomLabel = (r.room_name?.trim().toLowerCase() === 'room' && r.room_number)
+                                          ? `Room ${r.room_number}`
+                                          : `${r.room_name}${r.room_number ? ` (${r.room_number})` : ''}`;
+                                        return <option key={r.id} value={r.id}>{roomLabel}</option>;
+                                    })}
                                 </select>
 
                                 {/* TIME & DAYS */}

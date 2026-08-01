@@ -89,42 +89,179 @@ const PaymentDashboard = () => {
 
   // PROFESSIONAL PRINT RECEIPT
   const handlePrintReceipt = () => {
-    const printWindow = window.open("", "_blank", "width=400,height=600");
+    const printWindow = window.open("", "_blank", "width=800,height=900");
+    const serviceItems = selectedItems
+      .map(
+        (item) => `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 10px 0; font-weight: 700; color: #334155; text-transform: uppercase;">${item.service_name}</td>
+          <td style="padding: 10px 0; font-weight: 800; text-align: right; color: #0f172a;">₱${parseFloat(item.amount).toLocaleString()}</td>
+        </tr>
+      `,
+      )
+      .join("");
+
     printWindow.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
-          <title>Receipt - ${data?.student?.student_id}</title>
-          <script src="https://cdn.tailwindcss.com"></script>
+          <title>Payment Receipt - ${data?.student?.student_id || ''}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 0mm;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              height: 100vh;
+              overflow: hidden;
+              font-family: 'Segoe UI', Arial, sans-serif;
+              background-color: #ffffff;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .page {
+              width: 100%;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 40px 30px;
+              box-sizing: border-box;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #2563eb;
+              padding-bottom: 15px;
+              margin-bottom: 25px;
+            }
+            .title {
+              font-size: 22px;
+              font-weight: 900;
+              text-transform: uppercase;
+              letter-spacing: -0.5px;
+              color: #0f172a;
+              margin: 0;
+            }
+            .subtitle {
+              font-size: 11px;
+              font-weight: 800;
+              color: #2563eb;
+              letter-spacing: 2px;
+              margin-top: 5px;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 12px;
+              background: #f8fafc;
+              padding: 15px 20px;
+              border-radius: 12px;
+              margin-bottom: 25px;
+              border: 1px solid #e2e8f0;
+            }
+            .info-item label {
+              font-size: 10px;
+              font-weight: 800;
+              color: #64748b;
+              text-transform: uppercase;
+              display: block;
+            }
+            .info-item value {
+              font-size: 13px;
+              font-weight: 800;
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 25px;
+              font-size: 13px;
+            }
+            .total-card {
+              background: #eff6ff;
+              border: 2px solid #bfdbfe;
+              padding: 15px 20px;
+              border-radius: 12px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .total-label {
+              font-size: 12px;
+              font-weight: 900;
+              text-transform: uppercase;
+              color: #1e40af;
+            }
+            .total-amount {
+              font-size: 24px;
+              font-weight: 900;
+              color: #1d4ed8;
+            }
+            .footer {
+              margin-top: 40px;
+              text-align: center;
+              font-size: 10px;
+              color: #94a3b8;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+          </style>
         </head>
-        <body onload="window.print();window.close()">
-          <div class="p-6 text-slate-800">
-            <div class="text-center border-b-2 border-slate-100 pb-4 mb-4">
-              <h1 class="text-lg font-black uppercase italic">School Management System</h1>
-              <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Service Request Receipt</p>
+        <body>
+          <div class="page">
+            <div class="header">
+              <h1 class="title">${branding?.school_name || 'SCHOOL MANAGEMENT SYSTEM'}</h1>
+              <div class="subtitle">SERVICE REQUEST PAYMENT RECEIPT</div>
             </div>
-            <div class="text-[10px] space-y-1 mb-6">
-              <p><strong>NAME:</strong> ${data?.student?.first_name} ${data?.student?.last_name}</p>
-              <p><strong>ID:</strong> ${data?.student?.student_id}</p>
-              <p><strong>DATE:</strong> ${new Date().toLocaleString()}</p>
+
+            <div class="info-grid">
+              <div class="info-item">
+                <label>Student Name</label>
+                <value>${data?.student?.first_name || ''} ${data?.student?.last_name || ''}</value>
+              </div>
+              <div class="info-item">
+                <label>Student ID</label>
+                <value>${data?.student?.student_id || 'N/A'}</value>
+              </div>
+              <div class="info-item">
+                <label>Date & Time</label>
+                <value>${new Date().toLocaleString()}</value>
+              </div>
+              <div class="info-item">
+                <label>Transaction Status</label>
+                <value style="color: #16a34a;">PAID / COMPLETED</value>
+              </div>
             </div>
-            <div class="space-y-2 mb-6">
-              ${selectedItems
-                .map(
-                  (item) => `
-                <div class="flex justify-between text-xs">
-                  <span class="uppercase">${item.service_name}</span>
-                  <span class="font-bold">₱${parseFloat(item.amount).toLocaleString()}</span>
-                </div>
-              `,
-                )
-                .join("")}
+
+            <table>
+              <thead>
+                <tr style="border-bottom: 2px solid #cbd5e1; text-align: left;">
+                  <th style="padding-bottom: 8px; font-size: 11px; text-transform: uppercase; color: #64748b;">Service Description</th>
+                  <th style="padding-bottom: 8px; font-size: 11px; text-transform: uppercase; color: #64748b; text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${serviceItems || `<tr><td colspan="2" style="padding:15px; text-align:center; color:#94a3b8;">General Service Payment</td></tr>`}
+              </tbody>
+            </table>
+
+            <div class="total-card">
+              <span class="total-label">Total Amount Paid</span>
+              <span class="total-amount">₱${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
-            <div class="bg-slate-50 p-3 rounded-lg flex justify-between items-center border border-slate-100">
-              <span class="text-xs font-black uppercase">Total Amount:</span>
-              <span class="text-lg font-black italic">₱${total.toLocaleString()}</span>
+
+            <div class="footer">
+              This serves as an official electronic service request receipt.<br>
+              Thank you for your transaction!
             </div>
-            <p class="text-[8px] text-center mt-8 text-slate-400 font-bold uppercase tracking-widest italic">Thank you for your transaction!</p>
           </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
         </body>
       </html>
     `);

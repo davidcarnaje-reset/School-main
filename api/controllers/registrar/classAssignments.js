@@ -13,7 +13,7 @@ export const getClassAssignData = async (req, res) => {
       "SELECT id, section_name, grade_level, department, program_id FROM sections WHERE status = 'Active' ORDER BY grade_level ASC, section_name ASC"
     );
     const [rooms] = await pool.query(
-      "SELECT id, room_name, room_type, capacity FROM rooms WHERE status = 'Active' ORDER BY room_name ASC"
+      "SELECT id, room_name, room_number, room_type, capacity FROM rooms WHERE status = 'Active' ORDER BY room_name ASC, room_number ASC"
     );
 
     const sql_assignments = `
@@ -30,7 +30,9 @@ export const getClassAssignData = async (req, res) => {
         sub.subject_code,
         sec.section_name,
         sec.grade_level,
-        r.room_name as room 
+        r.room_name,
+        r.room_number,
+        CONCAT(IF(LOWER(TRIM(r.room_name)) = 'room' AND r.room_number IS NOT NULL AND TRIM(r.room_number) != '', CONCAT('Room ', r.room_number), IF(r.room_number IS NOT NULL AND TRIM(r.room_number) != '', CONCAT(r.room_name, ' (', r.room_number, ')'), r.room_name))) as room 
       FROM class_assignments ca
       LEFT JOIN users u ON ca.teacher_id = u.id
       LEFT JOIN subjects sub ON ca.subject_id = sub.id

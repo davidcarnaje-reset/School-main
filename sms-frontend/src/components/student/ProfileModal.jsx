@@ -34,7 +34,23 @@ const ProfileModal = ({
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleUpdateProfile} className="p-10 overflow-y-auto space-y-8">
+        <form onSubmit={isVerified ? handleUpdateProfile : (e) => e.preventDefault()} className="p-10 overflow-y-auto space-y-8">
+          
+          {/* Payment Required Informative Banner */}
+          {!isVerified && (
+            <div className="p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle size={20} className="text-orange-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                  Account Created - Payment Required
+                </div>
+                <p className="text-[11px] text-slate-600 font-medium mt-1 leading-relaxed">
+                  Mayroon ka nang opisyal na student account sa system, subalit kailangan munang magbayad ng paunang tuition / enrollment fee sa Cashier bago ma-edit ang iyong profile details at ma-unlock ang buong access.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row gap-8">
             
             {/* Profile Image Section */}
@@ -58,10 +74,16 @@ const ProfileModal = ({
                 </span>
               </div>
 
-              <label className="bg-slate-900 text-white px-5 py-2.5 rounded-xl cursor-pointer text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md mt-2">
-                Change Photo
-                <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
-              </label>
+              {isVerified ? (
+                <label className="bg-slate-900 text-white px-5 py-2.5 rounded-xl cursor-pointer text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md mt-2">
+                  Change Photo
+                  <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
+                </label>
+              ) : (
+                <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-1.5 mt-2">
+                  <Lock size={12}/> Photo Locked
+                </div>
+              )}
             </div>
             
             {/* Input Fields */}
@@ -92,10 +114,15 @@ const ProfileModal = ({
                   </label>
                   <input 
                     type="email"
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-[11px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                    disabled={!isVerified}
+                    className={`w-full p-3 border rounded-xl text-[11px] font-bold outline-none transition-all ${
+                      isVerified 
+                        ? 'bg-white border-slate-200 focus:ring-2 focus:ring-blue-500/20' 
+                        : 'bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
                     value={editForm?.email || ''} 
                     onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                    placeholder="Enter email"
+                    placeholder={isVerified ? "Enter email" : "No email available (Unpaid)"}
                     required
                   />
                 </div>
@@ -106,10 +133,15 @@ const ProfileModal = ({
                   </label>
                   <input 
                     type="text"
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-[11px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                    disabled={!isVerified}
+                    className={`w-full p-3 border rounded-xl text-[11px] font-bold outline-none transition-all ${
+                      isVerified 
+                        ? 'bg-white border-slate-200 focus:ring-2 focus:ring-blue-500/20' 
+                        : 'bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
                     value={editForm?.contact_no || ''} 
                     onChange={(e) => setEditForm({...editForm, contact_no: e.target.value})}
-                    placeholder="e.g. 09123456789"
+                    placeholder={isVerified ? "e.g. 09123456789" : "No contact number available (Unpaid)"}
                   />
                 </div>
 
@@ -118,10 +150,15 @@ const ProfileModal = ({
                     <MapPin size={10}/> Home Address
                   </label>
                   <textarea 
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-[11px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20 min-h-[80px] resize-none"
+                    disabled={!isVerified}
+                    className={`w-full p-3 border rounded-xl text-[11px] font-bold outline-none min-h-[80px] resize-none transition-all ${
+                      isVerified 
+                        ? 'bg-white border-slate-200 focus:ring-2 focus:ring-blue-500/20' 
+                        : 'bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
                     value={editForm?.address || ''} 
                     onChange={(e) => setEditForm({...editForm, address: e.target.value})}
-                    placeholder="Enter full address"
+                    placeholder={isVerified ? "Enter full address" : "No address available (Unpaid)"}
                   />
                 </div>
               </div>
@@ -130,10 +167,23 @@ const ProfileModal = ({
 
           <button 
             type="submit" 
-            style={{ backgroundColor: branding.theme_color }} 
-            className="w-full py-4 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            disabled={!isVerified}
+            style={{ backgroundColor: isVerified ? branding.theme_color : '#94a3b8' }} 
+            className={`w-full py-4 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${
+              isVerified 
+                ? 'shadow-lg hover:brightness-110 active:scale-[0.98]' 
+                : 'opacity-60 cursor-not-allowed shadow-none'
+            }`}
           >
-            <Save size={16} /> Save Changes
+            {isVerified ? (
+              <>
+                <Save size={16} /> Save Changes
+              </>
+            ) : (
+              <>
+                <Lock size={16} /> Editing Disabled (Payment Required)
+              </>
+            )}
           </button>
         </form>
       </div>

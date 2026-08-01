@@ -73,6 +73,11 @@ const registerStudent = async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing required fields (email, first_name, last_name)." });
   }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    return res.status(400).json({ success: false, message: "Invalid email format. Please provide a valid email address." });
+  }
+
   const connection = await db.getConnection();
 
   try {
@@ -281,24 +286,30 @@ const registerStudent = async (req, res) => {
       student_id
     ]);
 
+    // Build the full name
+    const full_name = `${first_name} ${middle_name ? middle_name + ' ' : ''}${last_name}${suffix ? ' ' + suffix : ''}`.trim();
+
+    // 7. Dispatch welcome/verification email BEFORE committing transaction to guarantee valid email delivery
+    try {
+      await sendStudentWelcomeEmail(email, full_name, student_id, generatedPassword, req);
+    } catch (mailError) {
+      await connection.rollback();
+      console.error(`❌ Registration cancelled for ${email}:`, mailError.message);
+      return res.status(400).json({
+        success: false,
+        message: `Hindi maipadalad ang verification/welcome email sa "${email}". Hindi na-create ang student account. Pakitiyak na tama at totoong email address ang ginamit.`
+      });
+    }
+
+    // 8. Commit database transaction only if email dispatch succeeded
     await connection.commit();
     await logAuditTrail(
       req.user?.id || 1,
       req.user?.role || 'Registrar',
       "REGISTER_STUDENT",
-      `Registered student ${first_name} ${last_name} with ID: ${student_id}`,
+      `Registered student ${full_name} with ID: ${student_id}`,
       req
     );
-
-    // Build the full name
-    const full_name = `${first_name} ${middle_name ? middle_name + ' ' : ''}${last_name}${suffix ? ' ' + suffix : ''}`.trim();
-
-    // Isolated welcome email dispatch routine
-    try {
-      await sendStudentWelcomeEmail(email, full_name, student_id, generatedPassword, req);
-    } catch (mailError) {
-      console.error(`⚠️ Welcome email dispatch failed for ${email}:`, mailError);
-    }
 
     return res.status(201).json({
       success: true,
