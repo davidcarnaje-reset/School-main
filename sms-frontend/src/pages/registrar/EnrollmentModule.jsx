@@ -79,8 +79,12 @@ const handleOpenSubjectPicker = () => {
   const fetchFeesCatalog = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/registrar/get_fees_catalog.php`);
-      if (Array.isArray(response.data)) setFeesCatalog(response.data);
+      if (Array.isArray(response.data)) {
+        setFeesCatalog(response.data);
+        return response.data;
+      }
     } catch (error) { console.error("Error fetching catalog", error); }
+    return [];
   };
 
   // ARCHITECT FIX: Kukunin ang mga sections na pwede sa grade level ng bata
@@ -102,34 +106,100 @@ const handleOpenSubjectPicker = () => {
       return lower.includes('college') || lower.includes('year');
   };
 
-  const handleOpenEnroll = (student) => {
+  const getStudentDept = (student) => {
+      if (student?.department) return student.department;
+      const gl = (student?.grade_level || '').toLowerCase();
+      if (gl.includes('college') || gl.includes('year')) return 'College';
+      if (gl.includes('11') || gl.includes('12') || gl.includes('shs')) return 'SHS';
+      if (gl.includes('grade 7') || gl.includes('grade 8') || gl.includes('grade 9') || gl.includes('grade 10') || gl.includes('high school')) return 'High School';
+      if (gl.includes('grade') || gl.includes('elem') || gl.includes('kinder')) return 'Elementary';
+      return '';
+  };
+
+  const getApplicableFeesForStudent = (allFees, student) => {
+      if (!student || !Array.isArray(allFees)) return [];
+
+      const dept = getStudentDept(student);
+      const progCode = (student.program_code || '').trim().toLowerCase();
+      const gradeLevel = (student.grade_level || '').trim().toLowerCase();
+      
+      const rawMajor = (student.major || '').trim().toLowerCase();
+      const cleanMajor = rawMajor.replace(/^major\s+in\s+/i, '').trim();
+
+      const possibleCourseMajorKeys = [];
+      if (progCode && cleanMajor) {
+          possibleCourseMajorKeys.push(`${progCode} (${cleanMajor})`);
+          possibleCourseMajorKeys.push(`${progCode} (major in ${cleanMajor})`);
+          possibleCourseMajorKeys.push(`${progCode} - ${cleanMajor}`);
+          possibleCourseMajorKeys.push(`${progCode} - major in ${cleanMajor}`);
+      }
+
+      const tuitionFees = allFees.filter(f => f.category === 'Tuition');
+      const nonTuitionFees = allFees.filter(f => f.category !== 'Tuition');
+
+      let matchedTuition = [];
+
+      // 1. Match full course with major e.g. "BSCS (Application Development)"
+      if (possibleCourseMajorKeys.length > 0) {
+          matchedTuition = tuitionFees.filter(f => {
+              const app = (f.applicable_to || '').trim().toLowerCase();
+              return possibleCourseMajorKeys.includes(app);
+          });
+      }
+
+      // 2. Match program code e.g. "BSCS" or "BSBA"
+      if (matchedTuition.length === 0 && progCode) {
+          matchedTuition = tuitionFees.filter(f => (f.applicable_to || '').trim().toLowerCase() === progCode);
+      }
+
+      // 3. Match grade level e.g. "1st Year"
+      if (matchedTuition.length === 0 && gradeLevel) {
+          matchedTuition = tuitionFees.filter(f => (f.applicable_to || '').trim().toLowerCase() === gradeLevel);
+      }
+
+      // 4. Match department e.g. "College"
+      if (matchedTuition.length === 0 && dept) {
+          matchedTuition = tuitionFees.filter(f => (f.applicable_to || '').trim().toLowerCase() === dept.toLowerCase());
+      }
+
+      // 5. Match item name for grade level
+      if (matchedTuition.length === 0 && gradeLevel) {
+          matchedTuition = tuitionFees.filter(f => f.item_name.toLowerCase().includes(gradeLevel));
+      }
+
+      // 6. Fallback to 'All'
+      if (matchedTuition.length === 0) {
+          matchedTuition = tuitionFees.filter(f => {
+              const app = (f.applicable_to || 'All').trim().toLowerCase();
+              return app === 'all' || app === '';
+          });
+      }
+
+      const matchedNonTuition = nonTuitionFees.filter(f => {
+          const app = (f.applicable_to || 'All').trim().toLowerCase();
+          if (app === 'all' || app === '') return true;
+          if (dept && app === dept.toLowerCase()) return true;
+          if (progCode && app === progCode) return true;
+          if (possibleCourseMajorKeys.includes(app)) return true;
+          if (gradeLevel && app === gradeLevel) return true;
+          return false;
+      });
+
+      return [...matchedTuition, ...matchedNonTuition];
+  };
+
+  const handleOpenEnroll = async (student) => {
     setSelectedStudent(student);
     
-    // Kunin ang mga sections na available para sa student na ito
+    // Kunin ang mga sections at pinakabagong fees catalog
     fetchSections(student.grade_level, student.program_id);
+    const freshCatalog = await fetchFeesCatalog();
+    const catalogToUse = Array.isArray(freshCatalog) && freshCatalog.length > 0 ? freshCatalog : feesCatalog;
 
-    const matchedFees = feesCatalog.filter(f => {
-        const isMandatory = f.category === 'Mandatory';
-        
-        let isCorrectTuition = false;
-        if (f.category === 'Tuition') {
-            const lowerGrade = student.grade_level.toLowerCase();
-            const isCollege = lowerGrade.includes('college') || lowerGrade.includes('year');
-            const isSHS = ['grade 11', 'grade 12'].includes(lowerGrade);
-            
-            if (isCollege) {
-                // Match student's program code (e.g. BSCS) or generic "College"
-                isCorrectTuition = f.applicable_to === student.program_code || f.applicable_to === 'College';
-            } else if (isSHS) {
-                // Match student's program/strand code (e.g. STEM) or generic "SHS"
-                isCorrectTuition = f.applicable_to === student.program_code || f.applicable_to === 'SHS';
-            } else {
-                // For Elementary and JHS: match grade level name in fee item name
-                isCorrectTuition = f.item_name.toLowerCase().includes(lowerGrade);
-            }
-        }
-        return isMandatory || isCorrectTuition;
-    }).map(f => f.id);
+    const applicable = getApplicableFeesForStudent(catalogToUse, student);
+    const defaultSelected = applicable
+        .filter(f => f.category === 'Tuition' || f.category === 'Mandatory')
+        .map(f => f.id);
 
     // Default form setup
     setEnrollForm({ 
@@ -137,7 +207,7 @@ const handleOpenSubjectPicker = () => {
         grade_level: student.grade_level,
         student_status: 'Regular', // Default sa Regular
         section_id: '',
-        selected_fees: matchedFees,
+        selected_fees: defaultSelected,
         selected_classes: []
     });
     setEnrollModal(true);
@@ -396,24 +466,37 @@ const handleOpenSubjectPicker = () => {
               <div className="border-t border-slate-100 pt-6">
                 <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-4 flex items-center gap-2"><CreditCard size={14}/> Assessment of Fees</h4>
                 
-                {feesCatalog.length === 0 ? (
-                    <div className="p-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300">
-                        <p className="text-slate-400 font-bold">Walang laman ang Fees Catalog.</p>
-                    </div>
-                ) : (
+                {(() => {
+                  const applicableFees = selectedStudent ? getApplicableFeesForStudent(feesCatalog, selectedStudent) : [];
+                  
+                  if (applicableFees.length === 0) {
+                    return (
+                      <div className="p-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                        <p className="text-slate-400 font-bold">Walang angkop na bayarin sa Fees Catalog para sa estudyanteng ito.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
                     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-inner">
-                      {feesCatalog.map(fee => {
+                      {applicableFees.map(fee => {
                         const isSelected = enrollForm.selected_fees.includes(fee.id);
                         return (
                           <div key={fee.id} onClick={() => toggleFee(fee.id)} className={`p-4 border-b border-slate-100 flex justify-between items-center cursor-pointer transition-all ${isSelected ? 'bg-blue-50/40' : 'hover:bg-slate-50'}`}>
-                            {/* ... Fee List Display ... */}
                             <div className="flex items-center gap-3">
                               <div className={`${isSelected ? 'text-blue-600' : 'text-slate-300'}`}>
                                 {isSelected ? <CheckSquare size={22} /> : <Square size={22} />}
                               </div>
                               <div>
                                 <p className={`font-bold text-sm ${isSelected ? 'text-blue-900' : 'text-slate-700'}`}>{fee.item_name}</p>
-                                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-tighter">{fee.category}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-tighter">{fee.category}</span>
+                                  {fee.applicable_to && fee.applicable_to !== 'All' && (
+                                    <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                                      {fee.applicable_to}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <p className={`font-black ${isSelected ? 'text-blue-600' : 'text-slate-400'}`}>₱{parseFloat(fee.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
@@ -423,17 +506,18 @@ const handleOpenSubjectPicker = () => {
                       <div className="p-5 bg-slate-900 flex justify-between items-center text-white">
                         <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Assessment</p>
                         <p className="text-2xl font-black">
-                          ₱{feesCatalog.filter(f => enrollForm.selected_fees.includes(f.id)).reduce((sum, f) => sum + parseFloat(f.amount), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          ₱{applicableFees.filter(f => enrollForm.selected_fees.includes(f.id)).reduce((sum, f) => sum + parseFloat(f.amount), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
 
             <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
               <button onClick={() => setEnrollModal(false)} className="px-6 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition-all">Cancel</button>
-              <button onClick={submitEnrollment} disabled={feesCatalog.length === 0} className="px-8 py-2.5 rounded-xl font-black text-white shadow-lg bg-blue-600 hover:bg-blue-700 transition-all flex items-center gap-2">
+              <button onClick={submitEnrollment} disabled={getApplicableFeesForStudent(feesCatalog, selectedStudent).length === 0} className="px-8 py-2.5 rounded-xl font-black text-white shadow-lg bg-blue-600 hover:bg-blue-700 transition-all flex items-center gap-2">
                 <CheckCircle size={18}/> Confirm & Forward
               </button>
             </div>

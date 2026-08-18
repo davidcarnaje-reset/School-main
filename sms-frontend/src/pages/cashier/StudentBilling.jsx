@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Search,
@@ -15,6 +15,12 @@ import {
   X,
   Info,
   AlertCircle,
+  Filter,
+  ArrowLeft,
+  RefreshCw,
+  Users,
+  FileText,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -29,6 +35,10 @@ const StudentBilling = () => {
   const [allocations, setAllocations] = useState({});
   const [loading, setLoading] = useState(false);
 
+  const [studentList, setStudentList] = useState([]);
+  const [listLoading, setListLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
   const [availableScholarships, setAvailableScholarships] = useState([]);
   const [selectedSch, setSelectedSch] = useState(null);
 
@@ -40,32 +50,70 @@ const StudentBilling = () => {
   const [selectedGrant, setSelectedGrant] = useState(null); // Para sa modal data
   const [processing, setProcessing] = useState(false); // Loading state ng modal button
 
-  // --- LOGIC FUNCTIONS (Retained from your code) ---
-  const handleSearch = async () => {
-    if (!searchId) return;
+  const fetchBillingList = async (query = searchId, status = statusFilter) => {
+    setListLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/cashier/get_billing_list.php`, {
+        params: { search: query, status }
+      });
+      if (res.data.status === "success") {
+        setStudentList(res.data.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load student billing list", err);
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBillingList(searchId, statusFilter);
+  }, [statusFilter]);
+
+  // --- LOGIC FUNCTIONS ---
+  const handleSearch = async (targetId = null) => {
+    const query = targetId !== null && typeof targetId === 'string' ? targetId : searchId;
+    if (!query || !query.trim()) {
+      setBillingData(null);
+      fetchBillingList("", statusFilter);
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/cashier/get_billing_details.php?id=${searchId}`,
+        `${API_BASE_URL}/cashier/get_billing_details.php?id=${encodeURIComponent(query.trim())}`
       );
-      if (res.data.status === "success") {
+      if (res.data.status === "success" && res.data.summary) {
         setBillingData(res.data);
         const schRes = await axios.get(
-          `${API_BASE_URL}/cashier/get_student_scholarships.php?id=${searchId}`,
+          `${API_BASE_URL}/cashier/get_student_scholarships.php?id=${encodeURIComponent(res.data.summary.student_id)}`
         );
         setAvailableScholarships(
-          schRes.data.status === "success" ? schRes.data.data : [],
+          schRes.data.status === "success" ? schRes.data.data : []
         );
         setAllocations({});
       } else {
-        alert(res.data.message);
+        // Search in list table
+        fetchBillingList(query, statusFilter);
         setBillingData(null);
       }
     } catch (err) {
-      alert("Search failed.");
+      fetchBillingList(query, statusFilter);
+      setBillingData(null);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSelectStudent = (studentId) => {
+    setSearchId(studentId);
+    handleSearch(studentId);
+  };
+
+  const handleBackToList = () => {
+    setBillingData(null);
+    fetchBillingList(searchId, statusFilter);
   };
 
   const handleAllocationChange = (itemId, value, max) => {
@@ -340,10 +388,14 @@ const StudentBilling = () => {
         <div className="relative group">
           <input
             type="text"
-            placeholder="Search Student ID (e.g. 2024-0001)"
+            placeholder="Search Student Name or ID..."
             className="w-full md:w-[400px] pl-14 pr-4 py-4 bg-white border-2 border-slate-100 rounded-[2rem] font-bold text-xs shadow-sm outline-none focus:border-indigo-500 transition-all group-hover:border-slate-300"
             value={searchId}
-            onChange={(e) => setSearchId(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSearchId(val);
+              fetchBillingList(val, statusFilter);
+            }}
             onKeyPress={(e) => e.key === "Enter" && handleSearch()}
           />
           <Search
@@ -351,7 +403,7 @@ const StudentBilling = () => {
             size={20}
           />
           <button
-            onClick={handleSearch}
+            onClick={() => handleSearch()}
             className="absolute right-3 top-1/2 -translate-y-1/2 bg-indigo-600 text-white px-6 py-2 rounded-full font-black text-[10px] uppercase hover:bg-slate-900 transition-all shadow-md"
           >
             {loading ? "..." : "Find"}
@@ -359,25 +411,158 @@ const StudentBilling = () => {
         </div>
       </div>
 
-      {!billingData && !loading ? (
-        <div className="flex flex-col items-center justify-center py-32 bg-white/50 border-4 border-dashed border-slate-100 rounded-[4rem]">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-xl mb-6 text-slate-200">
-            <User size={48} />
+      {!billingData ? (
+        <div className="space-y-6">
+          {/* Filter Bar & Quick Stats */}
+          <div className="bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <Filter size={18} className="text-indigo-600" />
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-4 py-2 bg-slate-50 border-2 border-slate-100 rounded-full font-bold text-xs text-slate-700 outline-none focus:border-indigo-500 cursor-pointer"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="UNPAID">Unpaid</option>
+                <option value="PARTIAL">Partial</option>
+                <option value="PAID">Paid</option>
+                <option value="PENDING">Pending</option>
+              </select>
+
+              <button
+                onClick={() => fetchBillingList(searchId, statusFilter)}
+                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                title="Refresh List"
+              >
+                <RefreshCw size={16} className={listLoading ? "animate-spin" : ""} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-6 text-xs font-bold text-slate-500">
+              <div>
+                Total Records: <span className="font-black text-slate-800">{studentList.length}</span>
+              </div>
+              <div>
+                Unpaid: <span className="font-black text-rose-600">{studentList.filter(s => parseFloat(s.balance) > 0).length}</span>
+              </div>
+            </div>
           </div>
-          <h3 className="text-xl font-black text-slate-300 uppercase italic tracking-tighter">
-            Enter Student ID to Start
-          </h3>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 italic">
-            Ready for Assessment & Payment
-          </p>
+
+          {/* Student Billing Table */}
+          <div className="bg-white rounded-[3rem] border-2 border-slate-100 shadow-sm overflow-hidden p-8">
+            <SectionHeader title="Student Assessment Records" icon={Users} />
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[10px] font-black uppercase text-slate-400 border-b-2 border-slate-50">
+                    <th className="pb-4 text-left px-4">Student</th>
+                    <th className="pb-4 text-left px-4">Program / Grade</th>
+                    <th className="pb-4 text-right px-4">Total Assessment</th>
+                    <th className="pb-4 text-right px-4">Paid Amount</th>
+                    <th className="pb-4 text-right px-4">Balance</th>
+                    <th className="pb-4 text-center px-4">Status</th>
+                    <th className="pb-4 text-center px-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {listLoading ? (
+                    <tr>
+                      <td colSpan="7" className="py-12 text-center text-slate-400 font-bold text-xs">
+                        Loading student billing records...
+                      </td>
+                    </tr>
+                  ) : studentList.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="py-12 text-center text-slate-400 font-bold text-xs">
+                        No student billing records found.
+                      </td>
+                    </tr>
+                  ) : (
+                    studentList.map((item) => {
+                      const statusUpper = (item.payment_status || "UNPAID").toUpperCase();
+                      const statusColor =
+                        statusUpper === "PAID"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                          : statusUpper === "PARTIAL"
+                          ? "bg-amber-50 text-amber-600 border-amber-100"
+                          : "bg-rose-50 text-rose-600 border-rose-100";
+
+                      return (
+                        <tr
+                          key={item.billing_id}
+                          className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                          onClick={() => handleSelectStudent(item.student_id)}
+                        >
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black text-xs">
+                                <User size={20} />
+                              </div>
+                              <div>
+                                <h4 className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">
+                                  {item.first_name} {item.last_name}
+                                </h4>
+                                <span className="text-[10px] font-bold text-slate-400 tracking-wider">
+                                  {item.student_id}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 font-bold text-xs text-slate-600">
+                            {item.program_code || item.grade_level || "Active Student"}
+                          </td>
+                          <td className="py-4 px-4 text-right font-black text-xs text-slate-800">
+                            ₱{parseFloat(item.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-4 px-4 text-right font-bold text-xs text-emerald-600">
+                            ₱{parseFloat(item.paid_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-4 px-4 text-right font-black text-xs text-rose-600">
+                            ₱{parseFloat(item.balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-4 px-4 text-center">
+                            <span className={`px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest ${statusColor}`}>
+                              {statusUpper}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleSelectStudent(item.student_id)}
+                              className="inline-flex items-center gap-1 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-wider transition-all"
+                            >
+                              <span>View</span>
+                              <ChevronRight size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       ) : (
-        billingData && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* LEFT: MAIN BILLING AREA */}
-            <div className="lg:col-span-8 space-y-6">
-              {/* Student Pill Card */}
-              <div className="bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="space-y-6">
+            {/* Back Button */}
+            <div>
+              <button
+                onClick={handleBackToList}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-700 hover:bg-slate-50 rounded-full font-black text-xs uppercase tracking-wider shadow-sm transition-all"
+              >
+                <ArrowLeft size={16} className="text-indigo-600" />
+                <span>Back to Student List</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* LEFT: MAIN BILLING AREA */}
+              <div className="lg:col-span-8 space-y-6">
+                {/* Student Pill Card */}
+                <div className="bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-5">
                   <div className="w-16 h-16 bg-indigo-50 rounded-[1.5rem] flex items-center justify-center text-indigo-600 shadow-inner">
                     <User size={32} />
@@ -573,7 +758,7 @@ const StudentBilling = () => {
               </div>
             </div>
           </div>
-        )
+        </div>
       )}
 
       {/* MODALS (Simplified for brevity - logic remains the same) */}

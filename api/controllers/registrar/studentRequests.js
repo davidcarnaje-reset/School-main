@@ -26,7 +26,7 @@ export const getRegistrarRequests = async (req, res) => {
 
 export const getFeesCatalog = async (req, res) => {
   try {
-    const sql = "SELECT id, item_name, amount, category FROM fees_catalog ORDER BY category DESC, item_name ASC";
+    const sql = "SELECT id, item_name, amount, category, applicable_to FROM fees_catalog ORDER BY category DESC, item_name ASC";
     const [fees] = await pool.query(sql);
 
     const formattedFees = (fees || []).map(fee => {

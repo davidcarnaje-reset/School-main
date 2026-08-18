@@ -78,7 +78,11 @@ const FeeCatalog = () => {
   };
 
   const handleEditClick = (fee) => {
-    const prog = programs.find(p => p.program_code === fee.applicable_to);
+    const prog = programs.find(p => {
+      const cleanMajor = p.major ? p.major.replace(/^major\s+in\s+/i, '').trim() : '';
+      const fullVal = cleanMajor ? `${p.program_code} (${cleanMajor})` : p.program_code;
+      return p.program_code === fee.applicable_to || fullVal === fee.applicable_to;
+    });
     let derivedTargetType = fee.applicable_to;
     let derivedSubTarget = "";
     
@@ -408,9 +412,23 @@ const FeeCatalog = () => {
                     onChange={(e) => handleSubTargetChange(e.target.value)}
                   >
                     <option value="">All SHS Strands</option>
-                    {programs.filter(p => p.department === "SHS").map(p => (
-                      <option key={p.id} value={p.program_code}>{p.program_code} - {p.program_description}</option>
-                    ))}
+                    {programs
+                      .filter(p => p.department === "SHS")
+                      .reduce((acc, current) => {
+                        const cleanMajor = current.major ? current.major.replace(/^major\s+in\s+/i, '').trim() : '';
+                        const key = `${current.program_code.trim().toUpperCase()}_${cleanMajor.toUpperCase()}`;
+                        if (!acc.some(item => item.key === key)) {
+                          acc.push({ ...current, cleanMajor, key });
+                        }
+                        return acc;
+                      }, [])
+                      .map(p => {
+                        const val = p.cleanMajor ? `${p.program_code} (${p.cleanMajor})` : p.program_code;
+                        const label = p.cleanMajor 
+                          ? `${p.program_code} - ${p.program_description} (${p.cleanMajor})`
+                          : `${p.program_code} - ${p.program_description}`;
+                        return <option key={p.id} value={val}>{label}</option>;
+                      })}
                   </select>
                 </div>
               )}
@@ -418,7 +436,7 @@ const FeeCatalog = () => {
               {formData.category === "Tuition" && targetType === "College" && (
                 <div className="space-y-1.5 animate-in slide-in-from-top-2">
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-2">
-                    Select Course (Optional)
+                    Select Course & Major (Optional)
                   </label>
                   <select
                     className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-[10px] uppercase outline-none focus:border-indigo-500 focus:bg-white transition-all"
@@ -426,9 +444,23 @@ const FeeCatalog = () => {
                     onChange={(e) => handleSubTargetChange(e.target.value)}
                   >
                     <option value="">All College Courses</option>
-                    {programs.filter(p => p.department === "College").map(p => (
-                      <option key={p.id} value={p.program_code}>{p.program_code} - {p.program_description}</option>
-                    ))}
+                    {programs
+                      .filter(p => p.department === "College")
+                      .reduce((acc, current) => {
+                        const cleanMajor = current.major ? current.major.replace(/^major\s+in\s+/i, '').trim() : '';
+                        const key = `${current.program_code.trim().toUpperCase()}_${cleanMajor.toUpperCase()}`;
+                        if (!acc.some(item => item.key === key)) {
+                          acc.push({ ...current, cleanMajor, key });
+                        }
+                        return acc;
+                      }, [])
+                      .map(p => {
+                        const val = p.cleanMajor ? `${p.program_code} (${p.cleanMajor})` : p.program_code;
+                        const label = p.cleanMajor 
+                          ? `${p.program_code} - ${p.program_description} (Major in ${p.cleanMajor})`
+                          : `${p.program_code} - ${p.program_description}`;
+                        return <option key={p.id} value={val}>{label}</option>;
+                      })}
                   </select>
                 </div>
               )}

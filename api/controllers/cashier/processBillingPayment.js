@@ -44,10 +44,14 @@ const processBillingPayment = async (req, res) => {
       );
       const item_name = itemRows[0] ? itemRows[0].item_name : 'School Fee';
 
+      // Manual ID lookup for payments
+      const [maxPayIdRows] = await connection.query("SELECT COALESCE(MAX(payment_id), 0) AS maxId FROM payments FOR UPDATE");
+      const nextPayId = (parseInt(maxPayIdRows[0]?.maxId, 10) || 0) + 1;
+
       // INSERT SA PAYMENTS TABLE (Recent Transactions list sa UI)
       await connection.query(
-        "INSERT INTO payments (student_id, amount_paid, payment_method, fee_category, transaction_date) VALUES (?, ?, 'Cash', ?, NOW())",
-        [student_id, pay_amount, item_name]
+        "INSERT INTO payments (payment_id, student_id, amount_paid, payment_method, fee_category, transaction_date) VALUES (?, ?, ?, 'Cash', ?, NOW())",
+        [nextPayId, student_id, pay_amount, item_name]
       );
     }
 

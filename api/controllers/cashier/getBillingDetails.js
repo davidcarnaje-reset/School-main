@@ -8,17 +8,22 @@ const getBillingDetails = async (req, res) => {
   }
 
   try {
-    // 1. Kunin ang pinaka-latest na billing summary ng student
+    // 1. Kunin ang pinaka-latest na billing summary ng student (by student_id or name)
+    const term = search.trim();
+    const likeTerm = `%${term}%`;
     const sql_billing = `
       SELECT b.id, b.student_id, b.total_amount, b.paid_amount, b.balance, 
              b.payment_status, s.first_name, s.last_name
       FROM student_billing b
       JOIN students s ON b.student_id = s.student_id
       WHERE b.student_id = ? 
+         OR CONCAT(s.first_name, ' ', s.last_name) LIKE ?
+         OR s.first_name LIKE ?
+         OR s.last_name LIKE ?
       ORDER BY b.id DESC 
       LIMIT 1
     `;
-    const [billingRows] = await pool.query(sql_billing, [search]);
+    const [billingRows] = await pool.query(sql_billing, [term, likeTerm, likeTerm, likeTerm]);
     const billing = billingRows[0];
 
     if (!billing) {
@@ -41,7 +46,7 @@ const getBillingDetails = async (req, res) => {
       ORDER BY transaction_date DESC 
       LIMIT 5
     `;
-    const [history] = await pool.query(sql_history, [search]);
+    const [history] = await pool.query(sql_history, [billing.student_id]);
 
     return res.json({
       status: "success",

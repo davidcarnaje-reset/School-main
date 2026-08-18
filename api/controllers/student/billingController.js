@@ -60,12 +60,15 @@ export const processPayment = async (req, res) => {
   }
 
   try {
+    const [maxPayIdRows] = await pool.query("SELECT COALESCE(MAX(payment_id), 0) AS maxId FROM payments");
+    const nextPayId = (parseInt(maxPayIdRows[0]?.maxId, 10) || 0) + 1;
+
     const query = `
-      INSERT INTO payments (student_id, amount_paid, payment_method, fee_category, transaction_date) 
-      VALUES (?, ?, ?, ?, NOW())
+      INSERT INTO payments (payment_id, student_id, amount_paid, payment_method, fee_category, transaction_date) 
+      VALUES (?, ?, ?, ?, ?, NOW())
     `;
 
-    await pool.query(query, [studentId, amount, method || '', fee_category || '']);
+    await pool.query(query, [nextPayId, studentId, amount, method || '', fee_category || '']);
 
     return res.status(201).json({
       success: true,

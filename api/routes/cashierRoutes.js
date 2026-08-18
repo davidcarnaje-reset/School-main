@@ -3,6 +3,7 @@ import express from 'express';
 // Existing controllers
 import getDashboardStats from '../controllers/cashier/getDashboardStats.js';
 import getBillingDetails from '../controllers/cashier/getBillingDetails.js';
+import getBillingList from '../controllers/cashier/getBillingList.js';
 import processBillingPayment from '../controllers/cashier/processBillingPayment.js';
 
 // Newly migrated controllers
@@ -40,6 +41,7 @@ const router = express.Router();
 // Clean RESTful endpoints
 router.get('/dashboard-stats', getDashboardStats);
 router.get('/billing-details', getBillingDetails);
+router.get('/billing-list', getBillingList);
 router.post('/billing-payment', processBillingPayment);
 
 router.get('/scholarships', fetchScholarships);
@@ -71,6 +73,8 @@ router.get('/get_dashboard_stats', getDashboardStats);
 router.get('/get_dashboard_stats.php', getDashboardStats);
 router.get('/get_billing_details', getBillingDetails);
 router.get('/get_billing_details.php', getBillingDetails);
+router.get('/get_billing_list', getBillingList);
+router.get('/get_billing_list.php', getBillingList);
 router.post('/process_billing_payment', processBillingPayment);
 router.post('/process_billing_payment.php', processBillingPayment);
 

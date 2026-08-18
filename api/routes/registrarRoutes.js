@@ -16,7 +16,7 @@ import { getSections, createSection, getSectionDetails, getSectionsForEnrollment
 import { getRegistrarRequests, getFeesCatalog, searchStudents, addRequest, cancelRequest } from '../controllers/registrar/studentRequests.js';
 import { getStudentRecords, getStudentDocuments, unlockGrades } from '../controllers/registrar/studentRecords.js';
 import { getScholarshipApplications, evaluateScholarship, readImage } from '../controllers/registrar/scholarshipManagement.js';
-import { getStudentsByStatus, getAvailableClasses } from '../controllers/registrar/enrollmentHelper.js';
+import { getStudentsByStatus, getAvailableClasses, processEnrollment } from '../controllers/registrar/enrollmentHelper.js';
 import { 
   getStudentTOR, 
   getGradeTemplates, saveGradeTemplate, deleteGradeTemplate,
@@ -119,8 +119,8 @@ router.get('/get_subjects.php', getSubjects);
 router.get('/get_registrar_dashboard.php', getRegistrarDashboard);
 router.post('/add_student', upload.single('profile_image'), registerStudent);
 router.post('/add_student.php', upload.single('profile_image'), registerStudent);
-router.post('/process_enrollment', encodeSubjects);
-router.post('/process_enrollment.php', encodeSubjects);
+router.post('/process_enrollment', processEnrollment);
+router.post('/process_enrollment.php', processEnrollment);
 
 // Newly added legacy paths
 router.get('/get_academic_programs.php', getAcademicPrograms);
