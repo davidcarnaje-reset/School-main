@@ -8,7 +8,26 @@ export const getUsers = async (req, res) => {
   try {
     const schoolId = req.school_id || 1;
     const [rows] = await pool.query(
-      "SELECT id, username, first_name, middle_name, last_name, full_name, email, phone_number, birthday, role, is_verified, status FROM users WHERE school_id = ? ORDER BY id DESC",
+      `SELECT 
+        u.id, 
+        u.username, 
+        u.first_name, 
+        u.middle_name, 
+        u.last_name, 
+        u.full_name, 
+        u.email, 
+        u.phone_number, 
+        u.birthday, 
+        u.role, 
+        u.is_verified, 
+        u.status,
+        MAX(e.employee_id) AS employee_number
+      FROM users u
+      LEFT JOIN employees e ON TRIM(LOWER(u.first_name)) = TRIM(LOWER(e.first_name)) 
+                          AND TRIM(LOWER(u.last_name)) = TRIM(LOWER(e.last_name))
+      WHERE u.school_id = ?
+      GROUP BY u.id
+      ORDER BY u.id DESC`,
       [schoolId]
     );
     return res.json(rows);
@@ -50,11 +69,37 @@ export const createUser = async (req, res) => {
     const nextId = (idRows[0].maxId || 0) + 1;
     const schoolId = req.school_id || 1;
 
-    // Generate Official Employee Number (e.g. EMP-2026-0001)
+    // 1. Fetch employee prefixes from school_settings
+    const [settingsRows] = await pool.query(
+      "SELECT prefix_faculty, prefix_staff FROM school_settings WHERE id = ?",
+      [schoolId]
+    );
+    const facultyPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_faculty) ? settingsRows[0].prefix_faculty : 'SF';
+    const staffPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_staff) ? settingsRows[0].prefix_staff : 'SA';
+
+    // 2. Determine prefix by role (Teacher/Faculty vs general staff)
+    const isFaculty = role.toLowerCase() === 'teacher';
+    const customPrefix = isFaculty ? facultyPrefix : staffPrefix;
+
     const currentYear = new Date().getFullYear();
-    const [empCountRows] = await pool.query("SELECT COUNT(*) as count FROM users WHERE role != 'student'");
-    const empSeq = String((empCountRows[0]?.count || 0) + 1).padStart(4, '0');
-    const employeeNumber = `EMP-${currentYear}-${empSeq}`;
+    const idPrefix = `${customPrefix}${currentYear}-`;
+
+    // 3. Query the latest employee_id matching this prefix and year in employees table
+    const [lastEmployeeRows] = await pool.query(
+      "SELECT employee_id FROM employees WHERE employee_id LIKE ? ORDER BY id DESC LIMIT 1",
+      [`${idPrefix}%`]
+    );
+
+    let newNum = "0001";
+    if (lastEmployeeRows.length > 0) {
+      const lastEmployeeId = lastEmployeeRows[0].employee_id;
+      const lastNum = parseInt(lastEmployeeId.substring(idPrefix.length), 10);
+      if (!isNaN(lastNum)) {
+        newNum = String(lastNum + 1).padStart(4, '0');
+      }
+    }
+    const employeeNumber = `${idPrefix}${newNum}`;
+
 
     const [result] = await pool.query(
       `INSERT INTO users (id, username, password, first_name, middle_name, last_name, full_name, email, phone_number, birthday, role, status, is_verified, verification_token, school_id) 
@@ -107,7 +152,7 @@ export const createUser = async (req, res) => {
         ? `Staff invited successfully (Employee No: ${employeeNumber}). Verification token generated and email sent.`
         : `Staff invited successfully (Employee No: ${employeeNumber}), but invitation email failed to send: ${emailErrorMsg}. Please check SMTP configurations in the .env file.`,
       emailSent,
-      data: { id: nextId, username, employee_number: employeeNumber, email, role }
+      data: { id: nextId, username, employee_number: employeeNumber, email, role, password: tempPassword }
     });
   } catch (error) {
     console.error("Create user error:", error);
@@ -195,6 +240,13 @@ export const deleteUser = async (req, res) => {
       return res.json({ success: true, message: "Student account deleted successfully." });
     }
 
+    const [userRows] = await pool.query("SELECT first_name, last_name FROM users WHERE id = ? AND school_id = ?", [id, schoolId]);
+    if (userRows.length > 0) {
+      await pool.query(
+        "DELETE FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))",
+        [userRows[0].first_name, userRows[0].last_name]
+      );
+    }
     await pool.query("DELETE FROM users WHERE id = ? AND school_id = ?", [id, schoolId]);
 
     await logAuditTrail(

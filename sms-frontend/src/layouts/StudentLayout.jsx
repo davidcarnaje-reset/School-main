@@ -3,7 +3,7 @@ import { Outlet, useLocation, Link } from 'react-router-dom';
 import { 
   User, BookOpen, CreditCard, LogOut, Menu, X, 
   GraduationCap, LayoutDashboard, Bell, ChevronLeft, ChevronRight,
-  FileBadge // Dinagdag natin ito para sa Scholarship Icon
+  FileBadge, Heart, Activity
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
@@ -81,6 +81,8 @@ const StudentLayout = () => {
     { icon: <GraduationCap size={20}/>, label: "My Grades", path: "/student/grades" }, // <--- DINAGDAG
     { icon: <CreditCard size={20}/>, label: "Accounting", path: "/student/accounting" },
     { icon: <FileBadge size={20}/>, label: "Scholarship", path: "/student/scholarship" }, // <--- INIBA ANG ICON
+    { icon: <Heart size={20}/>, label: "Guidance Center", path: "/student/guidance" },
+    { icon: <Activity size={20}/>, label: "School Health", path: "/student/health" },
   ];
 
   const handleNotifClick = async (notif) => {

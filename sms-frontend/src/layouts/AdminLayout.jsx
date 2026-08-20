@@ -1,27 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  LayoutDashboard, Users, Settings, LogOut, Menu, X, 
-  BookOpen, CreditCard, UserCircle, Search, Receipt, 
+import {
+  LayoutDashboard, Users, Settings, LogOut, Menu, X,
+  BookOpen, CreditCard, UserCircle, Search, Receipt,
   History, ClipboardList, GraduationCap, Layers, FileText,
   Library, Award, ChevronLeft, ChevronRight, MapPin,
   Bell, Megaphone, Banknote, FileCheck2, Image, Globe, Compass, School,
   Server, Shield, LifeBuoy, Zap, FileSpreadsheet, Building, Package, Wrench, Key, Sliders,
-  Laptop, HelpCircle, BarChart2, Activity, ShieldAlert,
+  Laptop, HelpCircle, BarChart2, Activity, ShieldAlert, Lock,
   UserCheck, FolderOpen, AlertCircle, CheckCircle2, Heart, Trash2,
-  Calendar, Clock, Sparkles, Printer
-} from 'lucide-react'; 
+  Calendar, Clock, Sparkles, Printer, Plus
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import UserProfileModal from '../components/admin/UserProfileModal'; 
+import UserProfileModal from '../components/admin/UserProfileModal';
 import CreateAnnouncementModal from '../components/shared/CreateAnnouncementModal';
 import ReadNotificationModal from '../components/shared/ReadNotificationModal';
 import HelpTutorialModal from '../components/shared/HelpTutorialModal';
 
 const AdminLayout = () => {
   const { logout, user, branding, activePermissions, API_BASE_URL, getLogoUrl } = useAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  const [isCollapsed, setIsCollapsed] = useState(false); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
@@ -71,7 +71,7 @@ const AdminLayout = () => {
           notification_id: notif.id,
           user_id: currentId
         });
-        fetchNotifications(); 
+        fetchNotifications();
       } catch (error) { console.error("Error marking as read:", error); }
     }
   };
@@ -102,20 +102,20 @@ const AdminLayout = () => {
       { icon: <History size={20} />, label: 'Audit Trail Logs', path: '/admin/audit-logs' },
     ],
     registrar: [
-        { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/registrar/dashboard' },
-        { icon: <Sliders size={20} />, label: 'Registrar Setup', path: '/registrar/setup', module: 'setup' },
-        { icon: <UserCircle size={20} />, label: 'Student Masterlist', path: '/registrar/students', module: 'students' },
-        { type: 'header', label: 'Academics' }, 
-        { icon: <Library size={20} />, label: 'Academic Programs', path: '/registrar/programs', module: 'programs' }, 
-        { icon: <BookOpen size={20} />, label: 'Subject Management', path: '/registrar/subjects', module: 'subjects' },
-        { icon: <GraduationCap size={20} />, label: 'Class Assignments', path: '/registrar/assignments', module: 'assignments' },
-        { type: 'header', label: 'Enrollment & Requests' },
-        { icon: <ClipboardList size={20} />, label: 'Enrollment Module', path: '/registrar/enrollment', module: 'enrollment' },
-        { icon: <FileText size={20} />, label: 'Student Requests', path: '/registrar/requests', module: 'requests' }, 
-        { icon: <Award size={20} />, label: 'Scholarship Applications', path: '/registrar/scholarships', module: 'scholarships' },
-        { icon: <Layers size={20} />, label: 'Section Management', path: '/registrar/sections', module: 'sections' },
-        { icon: <FileCheck2 size={20} />, label: 'Student Grades', path: '/registrar/grades', module: 'grades' },
-        { icon: <Printer size={20} />, label: 'DepEd / CHED Reports', path: '/registrar/deped-reports', module: 'deped_reports' },
+      { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/registrar/dashboard' },
+      { icon: <Sliders size={20} />, label: 'Registrar Setup', path: '/registrar/setup', module: 'setup' },
+      { icon: <UserCircle size={20} />, label: 'Student Masterlist', path: '/registrar/students', module: 'students' },
+      { type: 'header', label: 'Academics' },
+      { icon: <Library size={20} />, label: 'Academic Programs', path: '/registrar/programs', module: 'programs' },
+      { icon: <BookOpen size={20} />, label: 'Subject Management', path: '/registrar/subjects', module: 'subjects' },
+      { icon: <GraduationCap size={20} />, label: 'Class Assignments', path: '/registrar/assignments', module: 'assignments' },
+      { type: 'header', label: 'Enrollment & Requests' },
+      { icon: <ClipboardList size={20} />, label: 'Enrollment Module', path: '/registrar/enrollment', module: 'enrollment' },
+      { icon: <FileText size={20} />, label: 'Student Requests', path: '/registrar/requests', module: 'requests' },
+      { icon: <Award size={20} />, label: 'Scholarship Applications', path: '/registrar/scholarships', module: 'scholarships' },
+      { icon: <Layers size={20} />, label: 'Section Management', path: '/registrar/sections', module: 'sections' },
+      { icon: <FileCheck2 size={20} />, label: 'Student Grades', path: '/registrar/grades', module: 'grades' },
+      { icon: <Printer size={20} />, label: 'DepEd / CHED Reports', path: '/registrar/deped-reports', module: 'deped_reports' },
     ],
     hr: [
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/hr/dashboard' },
@@ -163,6 +163,19 @@ const AdminLayout = () => {
       { icon: <Sliders size={20} />, label: 'Supply Management', path: '/custodian/supplies', module: 'supplies' },
       { icon: <Trash2 size={20} />, label: 'Disposal Management', path: '/custodian/disposal', module: 'disposal' },
       { icon: <BarChart2 size={20} />, label: 'Reports & Audits', path: '/custodian/reports', module: 'reports' }
+    ],
+    guidance: [
+      { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/guidance/dashboard' },
+      { icon: <Users size={20} />, label: 'Student Cases', path: '/guidance/cases', module: 'cases' },
+      { icon: <Calendar size={20} />, label: 'Appointments', path: '/guidance/appointments', module: 'appointments' },
+      { icon: <ClipboardList size={20} />, label: 'Psychological Tests', path: '/guidance/tests', module: 'tests' },
+      { icon: <AlertCircle size={20} />, label: 'Incident Reports', path: '/guidance/incidents', module: 'incidents' }
+    ],
+    nurse: [
+      { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/nurse/dashboard' },
+      { icon: <UserCircle size={20} />, label: 'Student Profiles', path: '/nurse/records', module: 'profiles' },
+      { icon: <Plus size={20} />, label: 'Clinic Visits', path: '/nurse/visits', module: 'visits' },
+      { icon: <Sliders size={20} />, label: 'Medicine Inventory', path: '/nurse/inventory', module: 'inventory' }
     ]
   };
 
@@ -175,8 +188,8 @@ const AdminLayout = () => {
 
   const isModuleEnabled = (role, moduleName) => {
     if (activePermissions === null) return false;
-    const perm = activePermissions.find(p => 
-      p.role.toLowerCase() === role.toLowerCase() && 
+    const perm = activePermissions.find(p =>
+      p.role.toLowerCase() === role.toLowerCase() &&
       p.module_name.toLowerCase() === moduleName.toLowerCase()
     );
     return perm ? perm.is_enabled === 1 : false;
@@ -186,11 +199,18 @@ const AdminLayout = () => {
     if (user?.role === 'super_admin' || user?.role === 'admin') return true;
     if (activePermissions === null) return true; // Wait for permissions to load
     const rolePerms = activePermissions.filter(p => p.role.toLowerCase() === user.role.toLowerCase());
-    if (rolePerms.length === 0) return true;
+    if (rolePerms.length === 0) return false;
     return rolePerms.some(p => p.is_enabled === 1);
   };
 
   const portalEnabled = isCurrentPortalEnabled();
+
+  const getActiveSubModule = () => {
+    if (!user || !currentMenu) return null;
+    return currentMenu.find(item => item.path && (location.pathname === item.path || location.pathname.startsWith(item.path + '/')));
+  };
+  const activeSubModule = getActiveSubModule();
+  const subModuleDisabled = activeSubModule && activeSubModule.module && !isModuleEnabled(user?.role, activeSubModule.module);
 
   const filteredMenu = !portalEnabled ? [] : currentMenu.filter(item => {
     if (item.type === 'header') return true;
@@ -221,7 +241,7 @@ const AdminLayout = () => {
 
   return (
     <div className="flex h-screen bg-slate-50 relative font-sans overflow-hidden">
-      
+
       {/* 1. MOBILE OVERLAY */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />
@@ -234,9 +254,9 @@ const AdminLayout = () => {
         lg:translate-x-0 lg:relative lg:h-[calc(100vh-2rem)] lg:my-4 lg:ml-4
         w-64 ${isCollapsed ? 'lg:w-[5.5rem]' : 'lg:w-64'} 
       `}>
-        
+
         {/* COLLAPSE BUTTON - Ngayon ay makakalabas na ito ng sidebar nang buo */}
-        <button 
+        <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="hidden lg:flex absolute right-0 translate-x-1/2 top-10 w-8 h-8 bg-blue-600 text-white rounded-full items-center justify-center shadow-md border-[3px] border-slate-50 z-50 hover:bg-blue-700 hover:scale-105 transition-all"
         >
@@ -245,7 +265,7 @@ const AdminLayout = () => {
 
         {/* VISUAL BOX - Dito napunta ang kulay at ang overflow-hidden para mapigilan ang text bleed */}
         <div className="bg-slate-900 text-slate-300 flex flex-col w-full h-full overflow-hidden shadow-2xl lg:rounded-[2rem]">
-          
+
           {/* LOGO HEADER */}
           <div className={`h-20 px-4 border-b border-slate-800 flex items-center shrink-0 transition-all ${isCollapsed ? 'lg:justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-3 overflow-hidden">
@@ -257,7 +277,7 @@ const AdminLayout = () => {
                 </div>
               )}
               <span className={`text-[15px] leading-tight font-black text-white tracking-tight line-clamp-2 w-36 whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'lg:w-0 lg:opacity-0 lg:hidden' : 'opacity-100'}`}>
-                  {activeSchoolId ? branding.school_name : "School Management System"}
+                {activeSchoolId ? branding.school_name : "School Management System"}
               </span>
             </div>
           </div>
@@ -265,7 +285,7 @@ const AdminLayout = () => {
           {/* Super Admin Back to Network button */}
           {user?.role === 'super_admin' && activeSchoolId && !isCollapsed && (
             <div className="px-4 pt-4 shrink-0">
-              <button 
+              <button
                 onClick={() => {
                   localStorage.removeItem('selected_school_id');
                   window.location.href = '/admin/schools';
@@ -281,46 +301,46 @@ const AdminLayout = () => {
           {/* NAVIGATION LIST */}
           <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {finalMenu.map((item, index) => {
-              
+
               if (item.type === 'header') {
-                  return (
-                    <React.Fragment key={index}>
-                      <div className={`my-4 mx-auto w-6 border-t border-slate-700 hidden ${isCollapsed ? 'lg:block' : ''}`}></div>
-                      <div className={`pt-6 pb-2 px-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
-                          <p className="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap truncate">{item.label}</p>
-                      </div>
-                    </React.Fragment>
-                  );
+                return (
+                  <React.Fragment key={index}>
+                    <div className={`my-4 mx-auto w-6 border-t border-slate-700 hidden ${isCollapsed ? 'lg:block' : ''}`}></div>
+                    <div className={`pt-6 pb-2 px-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
+                      <p className="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap truncate">{item.label}</p>
+                    </div>
+                  </React.Fragment>
+                );
               }
 
               const isActive = location.pathname === item.path;
               return (
-                <Link 
-                  key={index} 
-                  to={item.path} 
-                  className={`flex items-center p-3 rounded-2xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${isCollapsed ? 'lg:justify-center gap-0' : 'gap-4'}`} 
+                <Link
+                  key={index}
+                  to={item.path}
+                  className={`flex items-center p-3 rounded-2xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${isCollapsed ? 'lg:justify-center gap-0' : 'gap-4'}`}
                   style={isActive ? { backgroundColor: branding.theme_color || '#2563eb' } : {}}
-                  title={isCollapsed ? item.label : ''} 
+                  title={isCollapsed ? item.label : ''}
                 >
                   <div className="shrink-0">{item.icon}</div>
                   <span className={`font-bold text-sm whitespace-nowrap truncate transition-all duration-300 ${isCollapsed ? 'lg:hidden lg:w-0 lg:opacity-0' : 'opacity-100'}`}>
-                      {item.label}
+                    {item.label}
                   </span>
                 </Link>
               );
             })}
           </nav>
-          
+
           {/* FOOTER */}
           <div className="p-4 border-t border-slate-800 shrink-0">
-               <button 
-                  onClick={logout} 
-                  className={`flex items-center p-3 rounded-2xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 w-full transition-all ${isCollapsed ? 'lg:justify-center' : 'gap-3'}`}
-                  title={isCollapsed ? "Sign Out" : ""}
-               >
-                  <LogOut size={20} className="shrink-0" />
-                  <span className={`text-sm font-bold whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'lg:hidden lg:w-0 lg:opacity-0' : 'opacity-100'}`}>Sign Out</span>
-               </button>
+            <button
+              onClick={logout}
+              className={`flex items-center p-3 rounded-2xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 w-full transition-all ${isCollapsed ? 'lg:justify-center' : 'gap-3'}`}
+              title={isCollapsed ? "Sign Out" : ""}
+            >
+              <LogOut size={20} className="shrink-0" />
+              <span className={`text-sm font-bold whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'lg:hidden lg:w-0 lg:opacity-0' : 'opacity-100'}`}>Sign Out</span>
+            </button>
           </div>
         </div>
       </aside>
@@ -343,10 +363,10 @@ const AdminLayout = () => {
           </div>
 
           <div className="flex items-center shrink-0">
-            
+
             {/* SYSTEM GUIDE & NOTIFICATION SECTION */}
             <div className="flex items-center space-x-1 sm:space-x-2 mr-2 pr-2 sm:mr-6 sm:pr-6 border-r border-slate-200 relative shrink-0">
-              <button 
+              <button
                 onClick={() => setIsHelpModalOpen(true)}
                 className="p-2 sm:px-3.5 sm:py-2 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-2xl transition-all flex items-center gap-1.5 font-black text-xs shadow-sm cursor-pointer active:scale-95 shrink-0"
                 title="System Help & Page Guide"
@@ -357,7 +377,7 @@ const AdminLayout = () => {
 
               {user?.role !== 'student' && (
                 <button onClick={() => setIsCreateNotifModalOpen(true)} className="p-2 sm:p-2.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all shrink-0">
-                    <Megaphone size={18} />
+                  <Megaphone size={18} />
                 </button>
               )}
               <div className="relative shrink-0">
@@ -365,7 +385,7 @@ const AdminLayout = () => {
                   <Bell size={18} />
                   {unreadCount > 0 && (
                     <span className="absolute top-1.5 right-1.5 w-4 h-4 sm:w-5 sm:h-5 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce">
-                        {unreadCount}
+                      {unreadCount}
                     </span>
                   )}
                 </button>
@@ -376,7 +396,7 @@ const AdminLayout = () => {
                       <h3 className="font-bold text-slate-800">Notifications</h3>
                       <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-bold">{unreadCount} New</span>
                     </div>
-                    
+
                     <div className="max-h-[60vh] overflow-y-auto p-2 space-y-1">
                       {notifications.length === 0 ? (
                         <div className="p-10 text-center text-slate-400">
@@ -385,19 +405,19 @@ const AdminLayout = () => {
                         </div>
                       ) : (
                         notifications.map((notif) => (
-                          <div 
-                            key={notif.id} 
+                          <div
+                            key={notif.id}
                             onClick={() => handleNotifClick(notif)}
                             className={`flex gap-3 p-3 rounded-2xl cursor-pointer transition-all relative ${notif.is_read === 0 ? 'bg-blue-50/50 hover:bg-blue-100' : 'hover:bg-slate-50 opacity-70'}`}
                           >
                             {notif.is_read === 0 && <div className="w-2 h-2 bg-blue-500 rounded-full absolute left-2 top-1/2 -translate-y-1/2" />}
-                            
+
                             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 ml-2 overflow-hidden border border-slate-200">
-                               {notif.sender_image ? (
-                                 <img src={`${API_BASE_URL}/uploads/profiles/${notif.sender_image}`} className="w-full h-full object-cover" />
-                               ) : (
-                                 getNotifIcon(notif.type)
-                               )}
+                              {notif.sender_image ? (
+                                <img src={`${API_BASE_URL}/uploads/profiles/${notif.sender_image}`} className="w-full h-full object-cover" />
+                              ) : (
+                                getNotifIcon(notif.type)
+                              )}
                             </div>
 
                             <div className="flex-1 min-w-0">
@@ -421,11 +441,11 @@ const AdminLayout = () => {
             {/* USER PROFILE */}
             <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer shrink-0" onClick={() => setIsProfileOpen(true)} title="Account Settings & Profile">
               <div className="hidden sm:block text-right">
-                  <p className="text-sm font-black text-slate-800 leading-tight">{user?.full_name}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: branding.theme_color }}>{user?.role}</p>
+                <p className="text-sm font-black text-slate-800 leading-tight">{user?.full_name}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: branding.theme_color }}>{user?.role}</p>
               </div>
               <div className="w-9 h-9 sm:w-11 sm:h-11 bg-slate-200 rounded-2xl overflow-hidden shadow-sm border-2 border-white ring-1 ring-slate-100 shrink-0">
-                 {user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400 text-sm sm:text-base">{user?.full_name?.charAt(0) || user?.name?.charAt(0) || 'U'}</div>}
+                {user?.profile_image && user.profile_image !== 'null' && user.profile_image !== 'undefined' ? <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400 text-sm sm:text-base">{user?.full_name?.charAt(0) || user?.name?.charAt(0) || 'U'}</div>}
               </div>
             </div>
           </div>
@@ -434,16 +454,20 @@ const AdminLayout = () => {
         {/* CONTENT */}
         <div className="p-6 lg:p-10">
           <div className="max-w-7xl mx-auto">
-            {!portalEnabled ? (
+            {!portalEnabled || subModuleDisabled ? (
               <div className="h-[60vh] bg-white rounded-[2.5rem] p-12 text-center border border-slate-100 shadow-xl max-w-xl mx-auto flex flex-col items-center justify-center animate-in zoom-in duration-300">
-                <ShieldAlert className="text-amber-500 mb-4 animate-bounce" size={60} />
-                <h3 className="text-2xl font-black text-slate-800 tracking-tight">Portal Access Disabled</h3>
-                <p className="text-slate-500 mt-2 max-w-sm font-medium">
-                  Ang portal na ito ay kasalukuyang naka-disable para sa inyong campus. Mangyaring makipag-ugnayan sa Super Admin upang i-enable ito.
+                <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mb-6 ring-8 ring-amber-500/5 shadow-inner">
+                  <Lock size={40} className="animate-pulse" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">System Module Isn't Enabled</h3>
+                <p className="text-slate-500 mt-3 max-w-sm text-sm leading-relaxed font-medium">
+                  {!portalEnabled 
+                    ? "Ang portal na ito ay kasalukuyang naka-disable para sa inyong campus. Mangyaring makipag-ugnayan sa Administrator o IT Support."
+                    : "Ang system module na ito ay kasalukuyang naka-disable sa inyong campus. Mangyaring makipag-ugnayan sa Administrator o IT Support."}
                 </p>
-                <div className="mt-4 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold uppercase tracking-wider border border-amber-100 flex items-center gap-2">
-                  <ShieldAlert size={14} />
-                  Please contact Super Admin
+                <div className="mt-8 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-100/80 flex items-center gap-2">
+                  <Lock size={12} />
+                  Access Locked by Administrator
                 </div>
               </div>
             ) : user?.role === 'super_admin' && !activeSchoolId && location.pathname !== '/admin/schools' ? (
@@ -453,8 +477,8 @@ const AdminLayout = () => {
                 <p className="text-slate-500 mt-2 max-w-sm font-medium">
                   Upang pamahalaan ang mga kwarto, branding, o users, kailangan mo munang pumili ng aktibong campus sa Campus Registry.
                 </p>
-                <Link 
-                  to="/admin/schools" 
+                <Link
+                  to="/admin/schools"
                   className="mt-6 px-8 py-3.5 bg-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 hover:scale-105 active:scale-95 transition-all text-xs uppercase tracking-widest"
                 >
                   Go to Campus Registry
@@ -469,24 +493,24 @@ const AdminLayout = () => {
 
       {/* MODALS */}
       <UserProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} user={user} branding={branding} logout={logout} />
-      
-      <CreateAnnouncementModal 
-        isOpen={isCreateNotifModalOpen} 
+
+      <CreateAnnouncementModal
+        isOpen={isCreateNotifModalOpen}
         onClose={() => {
-            setIsCreateNotifModalOpen(false);
-            fetchNotifications(); 
-        }} 
+          setIsCreateNotifModalOpen(false);
+          fetchNotifications();
+        }}
       />
 
-      <ReadNotificationModal 
-        isOpen={!!selectedNotification} 
-        onClose={() => setSelectedNotification(null)} 
+      <ReadNotificationModal
+        isOpen={!!selectedNotification}
+        onClose={() => setSelectedNotification(null)}
         notification={selectedNotification}
       />
 
-      <HelpTutorialModal 
-        isOpen={isHelpModalOpen} 
-        onClose={() => setIsHelpModalOpen(false)} 
+      <HelpTutorialModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
       />
     </div>
   );

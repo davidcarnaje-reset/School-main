@@ -120,7 +120,7 @@ const CashierLayout = () => {
   const isCurrentPortalEnabled = () => {
     if (activePermissions === null) return true; // Wait for load
     const rolePerms = activePermissions.filter(p => p.role.toLowerCase() === 'cashier');
-    if (rolePerms.length === 0) return true;
+    if (rolePerms.length === 0) return false;
     return rolePerms.some(p => p.is_enabled === 1);
   };
 

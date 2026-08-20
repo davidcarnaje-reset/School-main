@@ -64,7 +64,7 @@ const RoomManagement = () => {
         showNotification(res.data.message || "Failed to save room.", "error");
       }
     } catch (err) {
-      showNotification("Error connecting to server.", "error");
+      showNotification(err.response?.data?.message || "Error connecting to server.", "error");
       console.error(err);
     } finally {
       setLoading(false);

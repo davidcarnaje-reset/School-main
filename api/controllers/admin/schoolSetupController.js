@@ -20,7 +20,9 @@ export const getSchoolProfile = async (req, res) => {
          ss.fb_page, 
          ss.contact_number, 
          COALESCE(ss.prefix_k12, 'K12-') AS prefix_k12, 
-         COALESCE(ss.prefix_college, 'COL-') AS prefix_college 
+         COALESCE(ss.prefix_college, 'COL-') AS prefix_college,
+         COALESCE(ss.prefix_faculty, 'SF') AS prefix_faculty,
+         COALESCE(ss.prefix_staff, 'SA') AS prefix_staff
        FROM schools s
        LEFT JOIN school_settings ss ON s.id = ss.id
        WHERE s.id = ?`, 
@@ -49,7 +51,9 @@ export const getSchoolProfile = async (req, res) => {
         fb_page: '',
         contact_number: '',
         prefix_k12: 'K12-',
-        prefix_college: 'COL-'
+        prefix_college: 'COL-',
+        prefix_faculty: 'SF',
+        prefix_staff: 'SA'
       }
     });
   } catch (error) {
@@ -68,7 +72,9 @@ export const updateSchoolProfile = async (req, res) => {
       fb_page,
       contact_number,
       prefix_k12,
-      prefix_college
+      prefix_college,
+      prefix_faculty,
+      prefix_staff
     } = req.body;
 
     const schoolId = req.query.school_id || req.school_id || 1;
@@ -96,8 +102,8 @@ export const updateSchoolProfile = async (req, res) => {
       `INSERT INTO school_settings (
         id, school_name, theme_color, school_logo, 
         school_address, website_link, fb_page, contact_number, 
-        prefix_k12, prefix_college
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        prefix_k12, prefix_college, prefix_faculty, prefix_staff
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          school_name = COALESCE(?, school_name),
          theme_color = COALESCE(?, theme_color),
@@ -107,14 +113,16 @@ export const updateSchoolProfile = async (req, res) => {
          fb_page = ?,
          contact_number = ?,
          prefix_k12 = ?,
-         prefix_college = ?`,
+         prefix_college = ?,
+         prefix_faculty = ?,
+         prefix_staff = ?`,
       [
         schoolId, school_name, theme_color || '#2563eb', school_logo_url,
         school_address || null, website_link || null, fb_page || null, contact_number || null,
-        prefix_k12 || 'K12-', prefix_college || 'COL-',
+        prefix_k12 || 'K12-', prefix_college || 'COL-', prefix_faculty || 'SF', prefix_staff || 'SA',
         school_name, theme_color || '#2563eb', school_logo_url,
         school_address || null, website_link || null, fb_page || null, contact_number || null,
-        prefix_k12 || 'K12-', prefix_college || 'COL-'
+        prefix_k12 || 'K12-', prefix_college || 'COL-', prefix_faculty || 'SF', prefix_staff || 'SA'
       ]
     );
 
@@ -142,7 +150,9 @@ export const updateSchoolProfile = async (req, res) => {
          ss.fb_page, 
          ss.contact_number, 
          COALESCE(ss.prefix_k12, 'K12-') AS prefix_k12, 
-         COALESCE(ss.prefix_college, 'COL-') AS prefix_college 
+         COALESCE(ss.prefix_college, 'COL-') AS prefix_college,
+         COALESCE(ss.prefix_faculty, 'SF') AS prefix_faculty,
+         COALESCE(ss.prefix_staff, 'SA') AS prefix_staff
        FROM schools s
        LEFT JOIN school_settings ss ON s.id = ss.id
        WHERE s.id = ?`,
@@ -167,6 +177,7 @@ export const updateSchoolProfile = async (req, res) => {
     return res.status(500).json({ status: 'error', message: error.message });
   }
 };
+
 
 // ============================================================
 // 2. SCHOOL YEAR SETUP
@@ -416,6 +427,29 @@ export const createRoomExtended = async (req, res) => {
     }
 
     const schoolId = req.school_id || 1;
+
+    // Check for duplicate room number in the same building/school
+    if (room_number && room_number.trim() !== '') {
+      let duplicateQuery = `
+        SELECT id FROM rooms 
+        WHERE school_id = ? 
+          AND TRIM(LOWER(room_number)) = TRIM(LOWER(?))
+      `;
+      let duplicateParams = [schoolId, room_number.trim()];
+
+      if (building_id) {
+        duplicateQuery += " AND building_id = ?";
+        duplicateParams.push(parseInt(building_id, 10));
+      } else {
+        duplicateQuery += " AND building_id IS NULL";
+      }
+
+      const [dupRows] = await pool.query(duplicateQuery, duplicateParams);
+      if (dupRows.length > 0) {
+        return res.status(400).json({ status: 'error', message: "A room with this room number already exists in this building." });
+      }
+    }
+
     let finalFloor = parseInt(floor_number, 10) || 1;
 
     if (building_id) {
@@ -473,6 +507,28 @@ export const updateRoomExtended = async (req, res) => {
 
     if (!room_name || !capacity) {
       return res.status(400).json({ status: 'error', message: "Room name and capacity are required." });
+    }
+
+    // Check for duplicate room number in the same building/school (excluding current room id)
+    if (room_number && room_number.trim() !== '') {
+      let duplicateQuery = `
+        SELECT id FROM rooms 
+        WHERE school_id = ? AND id != ?
+          AND TRIM(LOWER(room_number)) = TRIM(LOWER(?))
+      `;
+      let duplicateParams = [schoolId, id, room_number.trim()];
+
+      if (building_id) {
+        duplicateQuery += " AND building_id = ?";
+        duplicateParams.push(parseInt(building_id, 10));
+      } else {
+        duplicateQuery += " AND building_id IS NULL";
+      }
+
+      const [dupRows] = await pool.query(duplicateQuery, duplicateParams);
+      if (dupRows.length > 0) {
+        return res.status(400).json({ status: 'error', message: "A room with this room number already exists in this building." });
+      }
     }
 
     let finalFloor = parseInt(floor_number, 10) || 1;

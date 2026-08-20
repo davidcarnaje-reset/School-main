@@ -33,6 +33,8 @@ import StudentDashboard from './pages/student/StudentDashboard';
 import StudentAccounting from './pages/student/StudentAccounting';
 import StudentLms from './pages/student/StudentLms';
 import StudentScholarship from './pages/student/StudentScholarship';
+import StudentGuidance from './pages/student/StudentGuidance';
+import StudentHealth from './pages/student/StudentHealth';
 
 // ==========================================
 // LMS PAGES (BAGO)
@@ -95,6 +97,19 @@ import LandingPromotions from './pages/admin/LandingPromotions';
 import SchoolManagement from './pages/admin/SchoolManagement';
 import SchoolPermissions from './pages/admin/SchoolPermissions';
 import AdminAuditLogs from './pages/admin/AdminAuditLogs';
+
+// Guidance Pages
+import GuidanceDashboard from './pages/guidance/GuidanceDashboard';
+import GuidanceCases from './pages/guidance/GuidanceCases';
+import GuidanceAppointments from './pages/guidance/GuidanceAppointments';
+import GuidanceTests from './pages/guidance/GuidanceTests';
+import GuidanceIncidentsPage from './pages/guidance/GuidanceIncidents';
+
+// Nurse Health Pages
+import NurseDashboard from './pages/health/NurseDashboard';
+import StudentHealthRecords from './pages/health/StudentHealthRecords';
+import ClinicVisits from './pages/health/ClinicVisits';
+import ClinicInventory from './pages/health/ClinicInventory';
 
 // IT Pages
 import ItDashboard from './pages/it/ItDashboard';
@@ -320,6 +335,8 @@ function App() {
             <Route path="accounting" element={<StudentAccounting />} />
             <Route path="scholarship" element={<StudentScholarship />} />
             <Route path="grades" element={<StudentGrades />} /> 
+            <Route path="guidance" element={<StudentGuidance />} />
+            <Route path="health" element={<StudentHealth />} />
           </Route>
 
 
@@ -427,6 +444,37 @@ function App() {
             <Route path="supplies" element={<CustodianSupplies />} />
             <Route path="disposal" element={<CustodianDisposal />} />
             <Route path="reports" element={<CustodianReports />} />
+          </Route>
+
+          {/* =======================================================
+              7.9. GUIDANCE PORTAL ROUTES
+              ======================================================= */}
+          <Route path="/guidance" element={
+            <ProtectedRoute allowedRoles={['guidance']}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<GuidanceDashboard />} />
+            <Route path="cases" element={<GuidanceCases />} />
+            <Route path="appointments" element={<GuidanceAppointments />} />
+            <Route path="tests" element={<GuidanceTests />} />
+            <Route path="incidents" element={<GuidanceIncidentsPage />} />
+          </Route>
+
+          {/* =======================================================
+              7.10. SCHOOL NURSE / HEALTH PORTAL ROUTES
+              ======================================================= */}
+          <Route path="/nurse" element={
+            <ProtectedRoute allowedRoles={['nurse']}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<NurseDashboard />} />
+            <Route path="records" element={<StudentHealthRecords />} />
+            <Route path="visits" element={<ClinicVisits />} />
+            <Route path="inventory" element={<ClinicInventory />} />
           </Route>
 
           {/* =======================================================

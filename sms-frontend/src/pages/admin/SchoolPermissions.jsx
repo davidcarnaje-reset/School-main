@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Loader2, ShieldCheck, AlertTriangle, Sliders, Cpu, UserCheck, Briefcase, Key, Compass, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, ShieldCheck, AlertTriangle, Sliders, Cpu, UserCheck, Briefcase, Key, Compass, GraduationCap, ChevronDown, ChevronUp, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const SchoolPermissions = () => {
@@ -14,6 +14,45 @@ const SchoolPermissions = () => {
   
   const activeSchoolId = localStorage.getItem('selected_school_id');
 
+  const DEFAULT_MODULES = [
+    { role: 'hr', module_name: 'employees', is_enabled: 0 },
+    { role: 'hr', module_name: 'payroll', is_enabled: 0 },
+    { role: 'hr', module_name: 'attendance', is_enabled: 0 },
+    { role: 'cashier', module_name: 'billing', is_enabled: 0 },
+    { role: 'cashier', module_name: 'payments', is_enabled: 0 },
+    { role: 'cashier', module_name: 'fees', is_enabled: 0 },
+    { role: 'cashier', module_name: 'scholarships', is_enabled: 0 },
+    { role: 'cashier', module_name: 'scholarship_catalog', is_enabled: 0 },
+    { role: 'cashier', module_name: 'reports', is_enabled: 0 },
+    { role: 'cashier', module_name: 'payroll', is_enabled: 0 },
+    { role: 'registrar', module_name: 'students', is_enabled: 0 },
+    { role: 'registrar', module_name: 'programs', is_enabled: 0 },
+    { role: 'registrar', module_name: 'subjects', is_enabled: 0 },
+    { role: 'registrar', module_name: 'assignments', is_enabled: 0 },
+    { role: 'registrar', module_name: 'enrollment', is_enabled: 0 },
+    { role: 'registrar', module_name: 'requests', is_enabled: 0 },
+    { role: 'registrar', module_name: 'scholarships', is_enabled: 0 },
+    { role: 'registrar', module_name: 'sections', is_enabled: 0 },
+    { role: 'registrar', module_name: 'grades', is_enabled: 0 },
+    { role: 'it', module_name: 'infrastructure', is_enabled: 0 },
+    { role: 'it', module_name: 'security', is_enabled: 0 },
+    { role: 'it', module_name: 'support', is_enabled: 0 },
+    { role: 'school_admin', module_name: 'utilities', is_enabled: 0 },
+    { role: 'school_admin', module_name: 'contracts', is_enabled: 0 },
+    { role: 'school_admin', module_name: 'facilities', is_enabled: 0 },
+    { role: 'custodian', module_name: 'inventory', is_enabled: 0 },
+    { role: 'custodian', module_name: 'maintenance', is_enabled: 0 },
+    { role: 'custodian', module_name: 'assets', is_enabled: 0 },
+    { role: 'guidance', module_name: 'cases', is_enabled: 0 },
+    { role: 'guidance', module_name: 'appointments', is_enabled: 0 },
+    { role: 'guidance', module_name: 'tests', is_enabled: 0 },
+    { role: 'guidance', module_name: 'incidents', is_enabled: 0 },
+    { role: 'nurse', module_name: 'profiles', is_enabled: 0 },
+    { role: 'nurse', module_name: 'checks', is_enabled: 0 },
+    { role: 'nurse', module_name: 'visits', is_enabled: 0 },
+    { role: 'nurse', module_name: 'inventory', is_enabled: 0 }
+  ];
+
   // Fetch school permissions on mount
   useEffect(() => {
     if (activeSchoolId) {
@@ -22,7 +61,12 @@ const SchoolPermissions = () => {
           setLoading(true);
           const res = await axios.get(`${API_BASE_URL}/schools/${activeSchoolId}/permissions`);
           if (res.data.success) {
-            setPermissions(res.data.permissions);
+            const dbPerms = res.data.permissions || [];
+            const merged = DEFAULT_MODULES.map(def => {
+              const matched = dbPerms.find(p => p.role.toLowerCase() === def.role.toLowerCase() && p.module_name.toLowerCase() === def.module_name.toLowerCase());
+              return { ...def, is_enabled: matched ? matched.is_enabled : def.is_enabled };
+            });
+            setPermissions(merged);
           }
         } catch (error) {
           console.error("Error loading school permissions:", error);
@@ -155,7 +199,15 @@ const SchoolPermissions = () => {
     facilities: "Facility Logs & Maintenance",
     inventory: "Equipment & Supplies Inventory",
     maintenance: "Asset Inspections Coordination",
-    assets: "Room Assets & Keys Logs"
+    assets: "Room Assets & Keys Logs",
+    cases: "Student Case Files",
+    appointments: "Counseling Appointments",
+    tests: "Psychological Assessments",
+    incidents: "Distress / Incident Logs",
+    profiles: "Student Health Profiles",
+    checks: "Physical Health Checks",
+    visits: "Clinic Consultation Logs",
+    inventory: "Clinic Medicine Inventory"
   };
 
   const rolesConfig = [
@@ -200,6 +252,20 @@ const SchoolPermissions = () => {
       description: 'Supplies inventories, damage inspections coordination, and classroom assets tracking.',
       icon: <Key className="text-amber-600" size={20} />,
       modules: ['inventory', 'maintenance', 'assets']
+    },
+    {
+      key: 'guidance',
+      title: 'Guidance Counselor Portal',
+      description: 'Monitor mental health cases, schedules, incident reports, and psychological tests.',
+      icon: <Heart className="text-red-500 animate-pulse" size={20} />,
+      modules: ['cases', 'appointments', 'tests', 'incidents']
+    },
+    {
+      key: 'nurse',
+      title: 'School Nurse & Health Portal',
+      description: 'Check students, record medical histories, dispense medicine, and manage clinic inventories.',
+      icon: <Heart className="text-rose-500 animate-pulse" size={20} />,
+      modules: ['profiles', 'checks', 'visits', 'inventory']
     }
   ];
 

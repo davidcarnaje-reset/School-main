@@ -30,6 +30,8 @@ const SchoolSetup = () => {
     contact_number: '',
     prefix_k12: 'K12-',
     prefix_college: 'COL-',
+    prefix_faculty: 'SF',
+    prefix_staff: 'SA',
     theme_color: '#2563eb',
     school_logo: ''
   });
@@ -66,6 +68,7 @@ const SchoolSetup = () => {
   // TAB 4: ROOMS STATES
   // -------------------------------------------------------------
   const [rooms, setRooms] = useState([]);
+  const [roomCategoryFilter, setRoomCategoryFilter] = useState('ALL');
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
   const [roomForm, setRoomForm] = useState({
@@ -78,6 +81,7 @@ const SchoolSetup = () => {
     capacity: 40,
     status: 'Active'
   });
+  const [roomModalError, setRoomModalError] = useState(null);
 
   // Global Delete Modal State
   const [deleteModal, setDeleteModal] = useState({ show: false, type: '', id: null, title: '' });
@@ -173,6 +177,8 @@ const SchoolSetup = () => {
           contact_number: res.data.data.contact_number || '',
           prefix_k12: res.data.data.prefix_k12 || 'K12-',
           prefix_college: res.data.data.prefix_college || 'COL-',
+          prefix_faculty: res.data.data.prefix_faculty || 'SF',
+          prefix_staff: res.data.data.prefix_staff || 'SA',
           theme_color: res.data.data.theme_color || '#2563eb',
           school_logo: res.data.data.school_logo || ''
         });
@@ -349,6 +355,7 @@ const SchoolSetup = () => {
   const handleSaveRoom = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setRoomModalError(null);
     try {
       let res;
       if (editingRoom) {
@@ -366,17 +373,18 @@ const SchoolSetup = () => {
           category: 'Lecture', room_type: 'Physical', capacity: 40, status: 'Active'
         });
       } else {
-        showToast(res.data?.message || "Failed to save room.", "error");
+        setRoomModalError(res.data?.message || "Failed to save room.");
       }
     } catch (err) {
       console.error(err);
-      showToast("Error saving room.", "error");
+      setRoomModalError(err.response?.data?.message || "Error saving room.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleEditRoom = (room) => {
+    setRoomModalError(null);
     setEditingRoom(room);
     setRoomForm({
       room_name: room.room_name || '',
@@ -678,6 +686,45 @@ const SchoolSetup = () => {
               </div>
             </div>
 
+            {/* PREFIXES NG EMPLOYEES */}
+            <div className="pt-4 border-t border-slate-100">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-2">
+                  <Tag size={16} className="text-blue-600" />
+                  <span>Employee ID Prefixes</span>
+                </h3>
+                <p className="text-xs text-slate-400 font-medium">
+                  Add employee ID prefixes for Academic/Faculty and Non-Academic/Staff (e.g. <code className="bg-slate-100 px-1 rounded">SF2026-0001</code> vs <code className="bg-slate-100 px-1 rounded">SA2026-0001</code>).
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
+                <div>
+                  <label className="block text-xs font-bold text-blue-900 uppercase mb-2">Faculty / Academic Prefix</label>
+                  <input
+                    type="text"
+                    value={profile.prefix_faculty}
+                    onChange={(e) => setProfile({ ...profile, prefix_faculty: e.target.value })}
+                    className="w-full p-3.5 bg-white border border-blue-200 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-800 text-sm"
+                    placeholder="Ex. SF or FAC-"
+                  />
+                  <span className="text-[10px] text-slate-400 font-bold mt-1 block">Applied to Academic / Teacher personnel</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-blue-900 uppercase mb-2">Staff / Non-Academic Prefix</label>
+                  <input
+                    type="text"
+                    value={profile.prefix_staff}
+                    onChange={(e) => setProfile({ ...profile, prefix_staff: e.target.value })}
+                    className="w-full p-3.5 bg-white border border-blue-200 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-800 text-sm"
+                    placeholder="Ex. SA or ADM-"
+                  />
+                  <span className="text-[10px] text-slate-400 font-bold mt-1 block">Applied to Cashier, Registrar, IT, HR, Custodians, and Admins</span>
+                </div>
+              </div>
+            </div>
+
             <div className="pt-4">
               <button
                 type="submit"
@@ -930,101 +977,129 @@ const SchoolSetup = () => {
       {/* ========================================================================= */}
       {/* TAB 4: ROOM MANAGEMENT (UPGRADED) */}
       {/* ========================================================================= */}
-      {activeTab === 'rooms' && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Room Management</h2>
-              <p className="text-xs text-slate-500">Configure classrooms, laboratories, floor allocation, capacity, and status.</p>
+      {activeTab === 'rooms' && (() => {
+        const filteredRooms = rooms.filter(room => roomCategoryFilter === 'ALL' || room.category === roomCategoryFilter);
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Room Management</h2>
+                <p className="text-xs text-slate-500">Configure classrooms, laboratories, floor allocation, capacity, and status.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingRoom(null);
+                  setRoomForm({
+                    room_name: '', room_number: '', building_id: '', floor_number: 1,
+                    category: 'Lecture', room_type: 'Physical', capacity: 40, status: 'Active'
+                  });
+                  setRoomModalError(null);
+                  setShowRoomModal(true);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center space-x-2 transition-all shadow-md"
+              >
+                <Plus size={16} />
+                <span>Add Room</span>
+              </button>
             </div>
-            <button
-              onClick={() => {
-                setEditingRoom(null);
-                setRoomForm({
-                  room_name: '', room_number: '', building_id: '', floor_number: 1,
-                  category: 'Lecture', room_type: 'Physical', capacity: 40, status: 'Active'
-                });
-                setShowRoomModal(true);
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center space-x-2 transition-all shadow-md"
-            >
-              <Plus size={16} />
-              <span>Add Room</span>
-            </button>
-          </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <th className="p-4">Room Name / No.</th>
-                  <th className="p-4">Building</th>
-                  <th className="p-4">Floor</th>
-                  <th className="p-4">Category</th>
-                  <th className="p-4 text-center">Capacity</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {rooms.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="p-8 text-center text-slate-400 font-medium">No rooms configured yet.</td>
+            {/* FILTER TOOLBAR */}
+            <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200 w-full md:w-auto">
+                <Sliders size={14} className="text-slate-400 ml-1" />
+                <select
+                  value={roomCategoryFilter}
+                  onChange={(e) => setRoomCategoryFilter(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer w-full md:w-auto"
+                >
+                  <option value="ALL">All Categories</option>
+                  <option value="Lecture">Lecture</option>
+                  <option value="Laboratory">Laboratory</option>
+                  <option value="AVR">AVR</option>
+                  <option value="Gymnasium">Gymnasium</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                Showing {filteredRooms.length} of {rooms.length} Rooms
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <th className="p-4">Room Name / No.</th>
+                    <th className="p-4">Building</th>
+                    <th className="p-4">Floor</th>
+                    <th className="p-4">Category</th>
+                    <th className="p-4 text-center">Capacity</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Actions</th>
                   </tr>
-                ) : (
-                  rooms.map((room) => (
-                    <tr key={room.id || room.room_id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="p-4">
-                        <div className="font-bold text-slate-800">{room.room_name}</div>
-                        {room.room_number && <div className="text-[10px] font-bold text-slate-400">Room #{room.room_number}</div>}
-                      </td>
-                      <td className="p-4 font-semibold text-slate-600">{room.building_name || '---'}</td>
-                      <td className="p-4 font-semibold text-slate-600">Floor {room.floor_number || 1}</td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          room.category === 'Laboratory'
-                            ? 'bg-purple-100 text-purple-700'
-                            : room.category === 'AVR' || room.category === 'Gymnasium'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {room.category || 'Lecture'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center font-bold text-slate-700">{room.capacity} pax</td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          room.status === 'Active'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : room.status === 'Maintenance'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {room.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right space-x-2">
-                        <button
-                          onClick={() => handleEditRoom(room)}
-                          className="p-2 text-slate-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-all"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteModal({ show: true, type: 'room', id: room.id || room.room_id, title: room.room_name })}
-                          className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-all"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {filteredRooms.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="p-8 text-center text-slate-400 font-medium">
+                        {rooms.length === 0 ? "No rooms configured yet." : "No rooms match the selected category."}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredRooms.map((room) => (
+                      <tr key={room.id || room.room_id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-4">
+                          <div className="font-bold text-slate-800">{room.room_name}</div>
+                          {room.room_number && <div className="text-[10px] font-bold text-slate-400">Room #{room.room_number}</div>}
+                        </td>
+                        <td className="p-4 font-semibold text-slate-600">{room.building_name || '---'}</td>
+                        <td className="p-4 font-semibold text-slate-600">Floor {room.floor_number || 1}</td>
+                        <td className="p-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            room.category === 'Laboratory'
+                              ? 'bg-purple-100 text-purple-700'
+                              : room.category === 'AVR' || room.category === 'Gymnasium'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {room.category || 'Lecture'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center font-bold text-slate-700">{room.capacity} pax</td>
+                        <td className="p-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            room.status === 'Active'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : room.status === 'Maintenance'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            {room.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right space-x-2">
+                          <button
+                            onClick={() => handleEditRoom(room)}
+                            className="p-2 text-slate-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-all"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteModal({ show: true, type: 'room', id: room.id || room.room_id, title: room.room_name })}
+                            className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* MODAL: ADD/EDIT SCHOOL YEAR */}
@@ -1180,6 +1255,13 @@ const SchoolSetup = () => {
               <h3 className="text-lg font-bold text-slate-800">{editingRoom ? 'Edit Room' : 'Add Room'}</h3>
               <button onClick={() => setShowRoomModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
             </div>
+
+            {roomModalError && (
+              <div className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center space-x-2 text-xs font-bold animate-in fade-in duration-200">
+                <AlertCircle size={16} className="text-red-600 shrink-0" />
+                <span>{roomModalError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSaveRoom} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">

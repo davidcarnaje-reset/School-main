@@ -3,7 +3,7 @@ import axios from 'axios';
 import { 
   UserPlus, Pencil, Trash2, X, Shield, Mail, RefreshCw, 
   Calendar, Phone, User, Search, Filter, GraduationCap, 
-  Users, CheckCircle2, AlertCircle, Eye
+  Users, CheckCircle2, AlertCircle, Eye, Copy, Check
 } from 'lucide-react'; 
 import { useAuth } from '../../context/AuthContext';
 
@@ -41,6 +41,17 @@ const UserManagement = () => {
 
   const [formData, setFormData] = useState(initialFormState);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null, name: '', isStudent: false });
+  const [successModal, setSuccessModal] = useState({
+    show: false,
+    username: '',
+    employeeNumber: '',
+    password: '',
+    email: '',
+    role: '',
+    isEdit: false,
+    message: ''
+  });
+  const [copiedField, setCopiedField] = useState(null);
 
   // -------------------------------------------------------------
   // FETCH STAFF & STUDENTS
@@ -110,9 +121,25 @@ const UserManagement = () => {
         setEmailError('');
         await fetchData(); 
         
-        setTimeout(() => {
-          alert("Success: " + response.data.message);
-        }, 100);
+        if (isEditMode) {
+          setSuccessModal({
+            show: true,
+            isEdit: true,
+            message: response.data.message || "User updated successfully."
+          });
+        } else {
+          const invitedUser = response.data.data;
+          setSuccessModal({
+            show: true,
+            isEdit: false,
+            username: invitedUser?.username || '',
+            employeeNumber: invitedUser?.employee_number || '',
+            password: invitedUser?.password || '',
+            email: invitedUser?.email || '',
+            role: invitedUser?.role || '',
+            message: response.data.message || "User invited successfully."
+          });
+        }
       } else {
         alert("Failed: " + (response.data.message || "Unknown error"));
       }
@@ -181,7 +208,7 @@ const UserManagement = () => {
     student_id: s.student_id,
     type: 'Student',
     name: `${s.first_name || ''} ${s.middle_name ? s.middle_name + ' ' : ''}${s.last_name || ''}`.trim(),
-    identifier: `ID: ${s.student_id || 'N/A'}${s.lrn ? ` (LRN: ${s.lrn})` : ''}`,
+    identifier: s.lrn ? `LRN: ${s.lrn}` : '',
     email: s.email,
     phone: s.mobile_no,
     role: 'Student',
@@ -336,6 +363,8 @@ const UserManagement = () => {
                   <option value="hr">Human Resources (HR)</option>
                   <option value="school_admin">School Admin</option>
                   <option value="custodian">Custodian</option>
+                  <option value="guidance">Guidance Counselor</option>
+                  <option value="nurse">School Nurse</option>
                   <option value="Teacher">Teacher</option>
                 </>
               )}
@@ -378,6 +407,7 @@ const UserManagement = () => {
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="p-4">Account Type</th>
+                <th className="p-4">ID / Employee No</th>
                 <th className="p-4">User / Name</th>
                 <th className="p-4">Contact Info</th>
                 <th className="p-4">Role / Level</th>
@@ -388,14 +418,14 @@ const UserManagement = () => {
             <tbody className="divide-y divide-slate-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-12 text-slate-400 italic">
+                  <td colSpan="7" className="text-center py-12 text-slate-400 italic">
                     <RefreshCw className="animate-spin inline-block mr-2" size={18} />
                     Loading accounts...
                   </td>
                 </tr>
               ) : filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-12 text-slate-400 font-medium">
+                  <td colSpan="7" className="text-center py-12 text-slate-400 font-medium">
                     No matching user accounts found. Try adjusting your search or filters.
                   </td>
                 </tr>
@@ -411,6 +441,13 @@ const UserManagement = () => {
                           : 'bg-slate-100 text-slate-700'
                       }`}>
                         {item.type}
+                      </span>
+                    </td>
+
+                    {/* ID / Employee No */}
+                    <td className="p-4">
+                      <span className="font-mono text-xs font-bold text-slate-600">
+                        {item.type === 'Student' ? (item.student_id || 'N/A') : (item.originalData?.employee_number || '-')}
                       </span>
                     </td>
 
@@ -545,14 +582,17 @@ const UserManagement = () => {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 flex items-center gap-1"><Phone size={10} /> Phone Number</label>
                   <input type="text" required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm font-bold"
-                    placeholder="09123456789" value={formData.phone_number} onChange={(e) => setFormData({...formData, phone_number: e.target.value})} />
+                    placeholder="09123456789" value={formData.phone_number} onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+                      setFormData({...formData, phone_number: val});
+                    }} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 flex items-center gap-1"><Calendar size={10} /> Birthday</label>
-                  <input type="date" required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm text-slate-600 font-bold"
+                  <input type="date" required max={new Date().toLocaleDateString('en-CA')} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm text-slate-600 font-bold"
                     value={formData.birthday} onChange={(e) => setFormData({...formData, birthday: e.target.value})} />
                 </div>
                 <div className="space-y-1">
@@ -570,6 +610,8 @@ const UserManagement = () => {
                     <option value="hr">Human Resources (HR)</option>
                     <option value="school_admin">School Admin</option>
                     <option value="custodian">Custodian</option>
+                    <option value="guidance">Guidance Counselor</option>
+                    <option value="nurse">School Nurse</option>
                     <option value="admin">Administrator</option>
                     <option value="Teacher">Teacher</option>
                   </select>
@@ -618,6 +660,75 @@ const UserManagement = () => {
               <button onClick={() => setDeleteModal({ show: false, id: null, name: '', isStudent: false })} className="flex-1 py-3.5 bg-slate-100 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 transition-all">Cancel</button>
               <button onClick={executeDelete} className="flex-1 py-3.5 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 shadow-lg shadow-red-200 transition-all">Yes, Delete</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SUCCESS / CREDENTIALS */}
+      {successModal.show && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in duration-200">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 size={32} />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 tracking-tight">
+                {successModal.isEdit ? 'Account Updated!' : 'Staff Invited Successfully!'}
+              </h3>
+              <p className="text-slate-500 text-xs leading-relaxed">
+                {successModal.isEdit 
+                  ? successModal.message 
+                  : 'Invitation email sent! Below are the generated account details for record-keeping.'}
+              </p>
+            </div>
+
+            {!successModal.isEdit && (
+              <div className="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                {/* Employee ID */}
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Employee ID / Number</span>
+                    <span className="text-sm font-black text-slate-700">{successModal.employeeNumber}</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(successModal.employeeNumber);
+                      setCopiedField('id');
+                      setTimeout(() => setCopiedField(null), 2000);
+                    }}
+                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                  >
+                    {copiedField === 'id' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                  </button>
+                </div>
+
+                {/* Username */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Username</span>
+                    <span className="text-sm font-black text-slate-700">{successModal.username}</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(successModal.username);
+                      setCopiedField('user');
+                      setTimeout(() => setCopiedField(null), 2000);
+                    }}
+                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                  >
+                    {copiedField === 'user' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button 
+              onClick={() => setSuccessModal({ ...successModal, show: false })}
+              className="w-full py-4 text-white font-black rounded-2xl shadow-xl transition-all active:scale-[0.98] text-center text-sm"
+              style={{ backgroundColor: branding.theme_color || '#2563eb' }}
+            >
+              Okay, Got it
+            </button>
           </div>
         </div>
       )}

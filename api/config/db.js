@@ -52,6 +52,13 @@ const poolConfig = {
   user,
   password,
   database,
+  waitForConnections: true,
+  connectionLimit: 10,
+  maxIdle: 10,
+  idleTimeout: 60000,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000
 };
 
 // Always apply SSL if connecting to TiDB Cloud or if DB_SSL_CA is defined
@@ -64,6 +71,11 @@ if (host.includes('tidbcloud.com') || process.env.DB_SSL_CA) {
 
 const pool = mysql.createPool(poolConfig);
 
+// Catch fatal database connection errors to prevent process crashes
+pool.on('error', (err) => {
+  console.error('⚠️ [DATABASE POOL ALERT] Connection error emitted:', err.message);
+});
+
 // Auto-patch schema for category column truncation
 (async () => {
   try {
@@ -73,4 +85,171 @@ const pool = mysql.createPool(poolConfig);
   }
 })();
 
+// Auto-patch schema for employee prefixes
+(async () => {
+  try {
+    await pool.query("ALTER TABLE school_settings ADD COLUMN prefix_faculty VARCHAR(50) NOT NULL DEFAULT 'SF'");
+  } catch (err) {
+    // Ignore if already altered
+  }
+  try {
+    await pool.query("ALTER TABLE school_settings ADD COLUMN prefix_staff VARCHAR(50) NOT NULL DEFAULT 'SA'");
+  } catch (err) {
+    // Ignore if already altered
+  }
+})();
+
+// Guidance Counselor Tables initialization
+(async () => {
+  try {
+    // 1. guidance_cases table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS guidance_cases (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        school_id INT NOT NULL DEFAULT 1,
+        student_id VARCHAR(100) NOT NULL,
+        counselor_id INT DEFAULT NULL,
+        case_title VARCHAR(255) NOT NULL,
+        case_type VARCHAR(100) NOT NULL,
+        severity ENUM('Low', 'Medium', 'High', 'Critical') DEFAULT 'Medium',
+        status ENUM('Active', 'Under Observation', 'Resolved', 'Referred') DEFAULT 'Active',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 2. guidance_sessions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS guidance_sessions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        case_id INT NOT NULL,
+        session_date DATE NOT NULL,
+        action_plan TEXT,
+        remarks TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 3. guidance_test_results table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS guidance_test_results (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        school_id INT NOT NULL DEFAULT 1,
+        student_id VARCHAR(100) NOT NULL,
+        test_type VARCHAR(100) NOT NULL,
+        raw_scores_json JSON,
+        personality_type VARCHAR(100),
+        taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 4. guidance_appointments table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS guidance_appointments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        school_id INT NOT NULL DEFAULT 1,
+        student_id VARCHAR(100) NOT NULL,
+        appointment_date DATE NOT NULL,
+        appointment_time TIME NOT NULL,
+        reason TEXT,
+        status ENUM('Pending', 'Approved', 'Cancelled', 'Completed') DEFAULT 'Pending',
+        remarks TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 5. guidance_incidents table (for student reporting / bullying distress)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS guidance_incidents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        school_id INT NOT NULL DEFAULT 1,
+        student_id VARCHAR(100) NOT NULL,
+        incident_date DATE NOT NULL,
+        details TEXT NOT NULL,
+        is_anonymous TINYINT(1) DEFAULT 0,
+        status ENUM('Reported', 'Under Review', 'Investigating', 'Action Taken', 'Archived') DEFAULT 'Reported',
+        remarks TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+  } catch (err) {
+    console.error("Guidance tables initialization failed:", err.message);
+  }
+})();
+
+// School Nurse / Health Portal Tables initialization
+(async () => {
+  try {
+    // 1. health_profiles table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS health_profiles (
+        student_id VARCHAR(100) PRIMARY KEY,
+        school_id INT NOT NULL DEFAULT 1,
+        blood_type VARCHAR(10) DEFAULT NULL,
+        allergies TEXT DEFAULT NULL,
+        chronic_illnesses TEXT DEFAULT NULL,
+        emergency_contact_name VARCHAR(255) DEFAULT NULL,
+        emergency_contact_no VARCHAR(100) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 2. health_checks table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS health_checks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        school_id INT NOT NULL DEFAULT 1,
+        student_id VARCHAR(100) NOT NULL,
+        height DECIMAL(5,2) DEFAULT NULL,
+        weight DECIMAL(5,2) DEFAULT NULL,
+        bmi DECIMAL(4,2) DEFAULT NULL,
+        blood_pressure VARCHAR(20) DEFAULT NULL,
+        temperature DECIMAL(4,2) DEFAULT NULL,
+        check_date DATE NOT NULL,
+        status ENUM('Healthy', 'Underweight', 'Overweight', 'Needs Attention') DEFAULT 'Healthy',
+        remarks TEXT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 3. clinic_visits table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS clinic_visits (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        school_id INT NOT NULL DEFAULT 1,
+        student_id VARCHAR(100) NOT NULL,
+        visit_date DATE NOT NULL,
+        visit_time TIME NOT NULL,
+        complaint TEXT NOT NULL,
+        treatment TEXT DEFAULT NULL,
+        medicine_dispensed VARCHAR(255) DEFAULT NULL,
+        medicine_qty INT DEFAULT 0,
+        outcome ENUM('Rested', 'Returned to Class', 'Sent Home', 'Referred to Hospital') DEFAULT 'Returned to Class',
+        remarks TEXT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 4. clinic_inventory table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS clinic_inventory (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        school_id INT NOT NULL DEFAULT 1,
+        medicine_name VARCHAR(255) NOT NULL,
+        stock_qty INT DEFAULT 0,
+        unit VARCHAR(50) DEFAULT 'tabs',
+        expiration_date DATE DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+  } catch (err) {
+    console.error("School Nurse tables initialization failed:", err.message);
+  }
+})();
+
 export default pool;
+

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Plus, Trash2, Edit, Check, GraduationCap, Palette, Loader2, Globe, Sliders } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import SchoolPermissionsModal from '../../components/admin/SchoolPermissionsModal';
+import CustomAlert from '../../components/shared/CustomAlert';
 
 const SchoolManagement = () => {
   const { API_BASE_URL, getLogoUrl, fetchBranding } = useAuth();
@@ -14,6 +15,9 @@ const SchoolManagement = () => {
   // Permissions Config modal states
   const [selectedSchoolForPerms, setSelectedSchoolForPerms] = useState(null);
   const [isPermsOpen, setIsPermsOpen] = useState(false);
+
+  // Success Select Modal state
+  const [successAlert, setSuccessAlert] = useState({ isOpen: false, schoolName: '' });
 
   const openPermsModal = (school) => {
     setSelectedSchoolForPerms(school);
@@ -146,9 +150,22 @@ const SchoolManagement = () => {
   const handleSelectSchool = (school) => {
     localStorage.setItem('selected_school_id', school.id);
     fetchBranding(school.id);
-    alert(`Active campus set to: ${school.name}`);
-    window.location.reload();
+    setSuccessAlert({ isOpen: true, schoolName: school.name });
   };
+
+  const handleSuccessClose = () => {
+    window.location.href = '/admin/dashboard';
+  };
+
+  useEffect(() => {
+    let timer;
+    if (successAlert.isOpen) {
+      timer = setTimeout(() => {
+        handleSuccessClose();
+      }, 2000);
+    }
+    return () => clearTimeout(timer);
+  }, [successAlert.isOpen]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -376,6 +393,15 @@ const SchoolManagement = () => {
         isOpen={isPermsOpen} 
         onClose={() => setIsPermsOpen(false)} 
         school={selectedSchoolForPerms} 
+      />
+
+      <CustomAlert 
+        isOpen={successAlert.isOpen}
+        type="success"
+        title="Campus Context Activated"
+        message={`Successfully set active campus context to:\n\n✨ ${successAlert.schoolName} ✨\n\nRedirecting you to the school dashboard...`}
+        confirmText="Go to Dashboard"
+        onClose={handleSuccessClose}
       />
     </div>
   );
