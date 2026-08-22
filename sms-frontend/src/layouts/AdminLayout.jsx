@@ -94,6 +94,8 @@ const AdminLayout = () => {
       { icon: <LayoutDashboard size={20} />, label: 'Network Reports', path: '/admin/dashboard' },
     ],
     admin: [
+      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
+      { type: 'header', label: 'Admin Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/admin/dashboard' },
       { icon: <School size={20} />, label: 'School Setup', path: '/admin/school-setup' },
       { icon: <Users size={20} />, label: 'User Management', path: '/admin/users' },
@@ -102,6 +104,8 @@ const AdminLayout = () => {
       { icon: <History size={20} />, label: 'Audit Trail Logs', path: '/admin/audit-logs' },
     ],
     registrar: [
+      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
+      { type: 'header', label: 'Registrar Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/registrar/dashboard' },
       { icon: <Sliders size={20} />, label: 'Registrar Setup', path: '/registrar/setup', module: 'setup' },
       { icon: <UserCircle size={20} />, label: 'Student Masterlist', path: '/registrar/students', module: 'students' },
@@ -118,7 +122,10 @@ const AdminLayout = () => {
       { icon: <Printer size={20} />, label: 'DepEd / CHED Reports', path: '/registrar/deped-reports', module: 'deped_reports' },
     ],
     hr: [
-      { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/hr/dashboard' },
+      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
+      { type: 'header', label: 'HR Home & Work' },
+      { icon: <Compass size={20} />, label: 'HR Home', path: '/hr/home' },
+      { icon: <LayoutDashboard size={20} />, label: 'HR Dashboard', path: '/hr/dashboard' },
       { icon: <Users size={20} />, label: 'Employee Directory', path: '/hr/employees', module: 'employees' },
       { icon: <UserCheck size={20} />, label: 'Onboarding Hires', path: '/hr/onboarding', module: 'onboarding' },
       { icon: <ClipboardList size={20} />, label: 'Attendance (DTR)', path: '/hr/attendance', module: 'attendance' },
@@ -133,6 +140,8 @@ const AdminLayout = () => {
       { icon: <BarChart2 size={20} />, label: 'HR Analytics Reports', path: '/hr/reports', module: 'reports' }
     ],
     it: [
+      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
+      { type: 'header', label: 'IT System Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/it/dashboard' },
       { icon: <LifeBuoy size={20} />, label: 'Help Desk / Tickets', path: '/it/helpdesk', module: 'helpdesk' },
       { icon: <Package size={20} />, label: 'Hardware Inventory', path: '/it/inventory', module: 'inventory' },
@@ -146,12 +155,16 @@ const AdminLayout = () => {
       { icon: <Shield size={20} />, label: 'Audit Security Logs', path: '/it/audits', module: 'audits' }
     ],
     school_admin: [
+      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
+      { type: 'header', label: 'Operations' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/school-admin/dashboard' },
       { icon: <Zap size={20} />, label: 'Utility Bills', path: '/school-admin/utilities', module: 'utilities' },
       { icon: <FileSpreadsheet size={20} />, label: 'Service Contracts', path: '/school-admin/contracts', module: 'contracts' },
       { icon: <Building size={20} />, label: 'Facilities Manage', path: '/school-admin/facilities', module: 'facilities' }
     ],
     custodian: [
+      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
+      { type: 'header', label: 'Custodian Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/custodian/dashboard' },
       { icon: <Package size={20} />, label: 'Asset Inventory', path: '/custodian/inventory', module: 'inventory' },
       { icon: <Laptop size={20} />, label: 'Equipment Borrowing', path: '/custodian/borrowing', module: 'borrowing' },
@@ -165,6 +178,8 @@ const AdminLayout = () => {
       { icon: <BarChart2 size={20} />, label: 'Reports & Audits', path: '/custodian/reports', module: 'reports' }
     ],
     guidance: [
+      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
+      { type: 'header', label: 'Guidance Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/guidance/dashboard' },
       { icon: <Users size={20} />, label: 'Student Cases', path: '/guidance/cases', module: 'cases' },
       { icon: <Calendar size={20} />, label: 'Appointments', path: '/guidance/appointments', module: 'appointments' },
@@ -172,6 +187,8 @@ const AdminLayout = () => {
       { icon: <AlertCircle size={20} />, label: 'Incident Reports', path: '/guidance/incidents', module: 'incidents' }
     ],
     nurse: [
+      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
+      { type: 'header', label: 'Nurse Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/nurse/dashboard' },
       { icon: <UserCircle size={20} />, label: 'Student Profiles', path: '/nurse/records', module: 'profiles' },
       { icon: <Plus size={20} />, label: 'Clinic Visits', path: '/nurse/visits', module: 'visits' },

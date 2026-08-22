@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
   LayoutDashboard, Calendar, LogOut, Menu, X, School, BookOpen,
   Bell, ChevronLeft, ChevronRight, RefreshCw, Megaphone, CheckCheck,
-  MoreHorizontal, Check, XSquare, BellOff, Bug
+  MoreHorizontal, Check, XSquare, BellOff, Bug, CreditCard
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TeacherProfileModal from '../components/admin/UserProfileModal';
@@ -174,6 +174,7 @@ const TeacherLayout = () => {
   const displayedNotifications = showAllInDropdown ? filteredNotifs : filteredNotifs.slice(0, 6);
 
   const currentMenu = [
+    { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
     { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/teacher/dashboard' },
     { icon: <School size={20} />, label: 'My Classes', path: '/teacher/classes' },
     { icon: <Calendar size={20} />, label: 'Daily Time Record', path: '/teacher/dtr' },

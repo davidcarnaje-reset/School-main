@@ -7,39 +7,44 @@ export const getEmployees = async (req, res) => {
     const [staffUsers] = await pool.query(`
       SELECT 
         id, 
-        COALESCE(username, CONCAT('EMP-', id)) as employee_id, 
-        COALESCE(first_name, full_name, username, 'Staff') as first_name, 
-        COALESCE(last_name, '') as last_name, 
-        COALESCE(role, 'Staff') as position, 
-        'Administration' as department, 
-        25000 as basic_salary, 
-        COALESCE(status, 'Active') as status 
+        username, 
+        first_name, 
+        last_name, 
+        role, 
+        email,
+        phone_number,
+        status 
       FROM users 
       WHERE LOWER(role) NOT IN ('student', 'super_admin')
-      ORDER BY id DESC
     `);
 
     // 2. Sync staffUsers into employees table
     for (const u of staffUsers) {
       try {
         const [empCheck] = await pool.query(
-          "SELECT id FROM employees WHERE employee_id = ? OR id = ?",
-          [u.employee_id, u.id]
+          "SELECT id FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))",
+          [u.first_name || '', u.last_name || '']
         );
         if (empCheck.length === 0) {
           const [maxIdRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
           const nextId = maxIdRows[0].maxId + 1;
+          
+          const currentYear = new Date().getFullYear();
+          const rolePrefix = (u.role || '').toLowerCase() === 'teacher' ? 'SF' : 'SA';
+          const employeeNumber = `${rolePrefix}${currentYear}-${String(nextId).padStart(4, '0')}`;
+
           await pool.query(
-            `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status) 
-             VALUES (?, ?, ?, ?, ?, ?, 25000, ?)`,
+            `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status, phone_number, email) 
+             VALUES (?, ?, ?, ?, ?, 'Administration', 25000, ?, ?, ?)`,
             [
               nextId,
-              u.employee_id,
-              u.first_name,
-              u.last_name,
-              u.position.toUpperCase() + ' STAFF',
-              u.department,
-              u.status === 'Inactive' ? 'Inactive' : 'Active'
+              employeeNumber,
+              u.first_name || '',
+              u.last_name || '',
+              (u.role || 'STAFF').toUpperCase() + ' STAFF',
+              u.status === 'Inactive' ? 'Inactive' : 'Active',
+              u.phone_number || null,
+              u.email || null
             ]
           );
         }
@@ -51,48 +56,11 @@ export const getEmployees = async (req, res) => {
     // 3. Select all from employees table
     const [empRows] = await pool.query("SELECT * FROM employees ORDER BY id DESC");
     
-    // Combine staffUsers and empRows so staff members are ALWAYS returned
-    const existingEmployeeIds = new Set((empRows || []).map(e => String(e.employee_id || '').toLowerCase()));
-    
-    const combined = [...(empRows || [])];
-    staffUsers.forEach(u => {
-      if (!existingEmployeeIds.has(String(u.employee_id).toLowerCase())) {
-        combined.push({
-          id: u.id,
-          employee_id: u.employee_id,
-          first_name: u.first_name,
-          last_name: u.last_name,
-          position: u.position ? (u.position.toUpperCase() + ' STAFF') : 'Staff',
-          department: u.department,
-          basic_salary: 25000,
-          status: u.status
-        });
-      }
-    });
-
-    const currentYear = new Date().getFullYear();
-
-    const formatted = combined
-      .filter(emp => {
-        const pos = (emp.position || '').toLowerCase();
-        const dept = (emp.department || '').toLowerCase();
-        return !pos.includes('super_admin') && !pos.includes('super admin') && !dept.includes('super_admin');
-      })
-      .map((emp, index) => {
-        const rawId = String(emp.employee_id || '');
-        const hasEmpFormat = rawId.startsWith('EMP-');
-        const formattedId = hasEmpFormat 
-          ? rawId 
-          : `EMP-${currentYear}-${String(emp.id || (index + 1)).padStart(4, '0')}`;
-
-        return {
-          ...emp,
-          employee_id: formattedId,
-          first_name: emp.first_name || '',
-          last_name: emp.last_name || '',
-          basic_salary: parseFloat(emp.basic_salary) || 25000
-        };
-      });
+    // Format salaries
+    const formatted = empRows.map(emp => ({
+      ...emp,
+      basic_salary: parseFloat(emp.basic_salary) || 25000
+    }));
 
     return res.json(formatted);
   } catch (error) {

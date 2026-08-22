@@ -338,4 +338,53 @@ export const updateUserProfile = async (req, res) => {
   }
 };
 
-export default { getUsers, createUser, updateUser, deleteUser, checkEmail, updateUserProfile };
+// GET staff birthdays sorted by proximity
+export const getStaffBirthdays = async (req, res) => {
+  try {
+    const schoolId = req.school_id || 1;
+    const [rows] = await pool.query(
+      `SELECT first_name, last_name, full_name, role, birthday, profile_image 
+       FROM users 
+       WHERE school_id = ? AND LOWER(role) != 'student' AND birthday IS NOT NULL AND status = 'Active'`,
+      [schoolId]
+    );
+
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1;
+    const currentDay = today.getDate();
+
+    // Map and format birthdays, then sort by month/day proximity
+    const formatted = (rows || []).map(u => {
+      const bDate = new Date(u.birthday);
+      const bMonth = bDate.getMonth() + 1;
+      const bDay = bDate.getDate();
+      
+      // Calculate days until next birthday
+      let daysUntil = 0;
+      const nextBday = new Date(today.getFullYear(), bMonth - 1, bDay);
+      if (nextBday < today) {
+        nextBday.setFullYear(today.getFullYear() + 1);
+      }
+      const diffTime = Math.abs(nextBday - today);
+      daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return {
+        first_name: u.first_name,
+        last_name: u.last_name,
+        full_name: u.full_name,
+        role: u.role,
+        birthday: u.birthday,
+        bMonth,
+        bDay,
+        daysUntil
+      };
+    }).sort((a, b) => a.daysUntil - b.daysUntil);
+
+    return res.status(200).json({ success: true, birthdays: formatted });
+  } catch (error) {
+    console.error("getStaffBirthdays error:", error);
+    return res.status(500).json({ success: false, message: "Database Error: " + error.message });
+  }
+};
+
+export default { getUsers, createUser, updateUser, deleteUser, checkEmail, updateUserProfile, getStaffBirthdays };

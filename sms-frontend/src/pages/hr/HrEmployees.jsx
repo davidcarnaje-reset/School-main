@@ -1,166 +1,548 @@
-import React, { useState } from 'react';
-import { Users, PlusCircle, Search, Mail, UserCheck, Send, CheckCircle2, UserPlus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { 
+  Users, Search, UserPlus, Shield, Mail, Edit, Phone, 
+  Award, X, FileText, CheckCircle, AlertCircle, Upload 
+} from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const HrEmployees = () => {
+  const { API_BASE_URL, branding } = useAuth();
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [employees, setEmployees] = useState([
-    { id: "EMP-041", name: "Jobel Jobert", email: "jobel.it@school.edu", role: "IT", status: "Active", triggers: ["IT Account Created", "Payroll Set up"] },
-    { id: "EMP-042", name: "Clara Santos", email: "clara.registrar@school.edu", role: "Registrar", status: "Active", triggers: ["IT Account Created", "Payroll Set up"] },
-    { id: "EMP-043", name: "Prof. Del Rosario", email: "delrosario.teach@school.edu", role: "Teacher", status: "Active", triggers: ["IT Account Created", "Payroll Set up", "Faculty Classroom Load Assigned"] }
-  ]);
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [editingEmp, setEditingEmp] = useState(null);
+  
+  // State for complete employee profile + statutory details + documents checklist
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    position: 'TEACHER',
+    department: 'Administration',
+    basic_salary: 25000,
+    status: 'Active',
+    phone_number: '',
+    employment_history: 'Hired Active',
 
-  const [showForm, setShowForm] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState('IT');
+    // Government Statutory IDs
+    sss_number: '',
+    philhealth_number: '',
+    pagibig_number: '',
+    tin_number: '',
+    hmo_covered: 'No',
+    hmo_details: '',
 
-  const handleHireEmployee = (e) => {
-    e.preventDefault();
-    if (!newName || !newEmail) return;
+    // Documents Checklist Status
+    psa_status: 'Pending',
+    psa_file: '',
+    coe_status: 'Pending',
+    coe_file: '',
+    nbi_status: 'Pending',
+    nbi_file: '',
+    sss_doc_status: 'Pending',
+    sss_doc_file: '',
+    philhealth_doc_status: 'Pending',
+    philhealth_doc_file: '',
+    pagibig_doc_status: 'Pending',
+    pagibig_doc_file: '',
+    tin_doc_status: 'Pending',
+    tin_doc_file: ''
+  });
 
-    // Build automated triggers based on selected role
-    const triggers = ["IT Account request sent", "Payroll configuration queued"];
-    if (newRole.toLowerCase() === 'teacher') {
-      triggers.push("Faculty assignment setup requested (Registrar)");
+  const themeColor = branding?.theme_color || '#2563eb';
+
+  const fetchEmployees = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/cashier/payroll/employees`);
+      setEmployees(res.data || []);
+    } catch (error) {
+      console.error("Error fetching EIS employees:", error);
+    } finally {
+      setLoading(false);
     }
-    triggers.push("Performance evaluation setup dispatched to Dept Head");
+  };
 
-    const newEmp = {
-      id: `EMP-0${Math.floor(44 + Math.random() * 100)}`,
-      name: newName,
-      email: newEmail,
-      role: newRole,
-      status: "Active",
-      triggers
-    };
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
-    setEmployees([newEmp, ...employees]);
-    setNewName('');
-    setNewEmail('');
-    setShowForm(false);
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
 
-    alert(
-      `Hired successfully!\n\nAutomated workflows triggered:\n1. IT Portal account generation\n2. Finance payroll record queue\n3. ${newRole === 'Teacher' ? 'Registrar Classroom Load Mapping\n4. ' : ''}Evaluation check setup`
-    );
+  const handleHireSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axios.post(`${API_BASE_URL}/employee-portal/hire`, formData);
+      if (res.data?.success) {
+        alert(res.data.message || `EIS Action completed: Hired/Modified ${formData.first_name} ${formData.last_name}.`);
+        fetchEmployees();
+        setShowModal(false);
+        setEditingEmp(null);
+        resetForm();
+      } else {
+        alert(res.data?.message || "Error registering employee.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Error submitting EIS form.");
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      first_name: '',
+      last_name: '',
+      email: '',
+      position: 'TEACHER',
+      department: 'Faculty',
+      basic_salary: 25000,
+      status: 'Active',
+      phone_number: '',
+      employment_history: 'Hired Active',
+      employment_status: 'Probationary',
+
+      sss_number: '',
+      philhealth_number: '',
+      pagibig_number: '',
+      tin_number: '',
+      hmo_covered: 'No',
+      hmo_details: '',
+
+      psa_status: 'Pending',
+      psa_file: '',
+      coe_status: 'Pending',
+      coe_file: '',
+      nbi_status: 'Pending',
+      nbi_file: '',
+      sss_doc_status: 'Pending',
+      sss_doc_file: '',
+      philhealth_doc_status: 'Pending',
+      philhealth_doc_file: '',
+      pagibig_doc_status: 'Pending',
+      pagibig_doc_file: '',
+      tin_doc_status: 'Pending',
+      tin_doc_file: ''
+    });
+  };
+
+  const handleEditClick = (emp) => {
+    setEditingEmp(emp);
+    
+    // Parse mock statutory data if none exists
+    setFormData({
+      first_name: emp.first_name || '',
+      last_name: emp.last_name || '',
+      email: emp.email || '',
+      position: emp.position || 'TEACHER',
+      department: emp.department || 'Faculty',
+      basic_salary: emp.basic_salary || 25000,
+      status: emp.status || 'Active',
+      phone_number: emp.phone_number || '',
+      employment_history: emp.employment_history || 'Promoted',
+      employment_status: emp.employment_status || 'Probationary',
+
+      sss_number: emp.sss_number || '03-9384729-1',
+      philhealth_number: emp.philhealth_number || '12-094837264-9',
+      pagibig_number: emp.pagibig_number || '1210-9483-9284',
+      tin_number: emp.tin_number || '321-094-837-000',
+      hmo_covered: emp.hmo_covered || 'Yes',
+      hmo_details: emp.hmo_details || 'Maxicare Premium Plan',
+
+      psa_status: emp.psa_status || 'Submitted',
+      psa_file: emp.psa_file || 'psa_cert_copy.pdf',
+      coe_status: emp.coe_status || 'Submitted',
+      coe_file: emp.coe_file || 'coe_previous_company.pdf',
+      nbi_status: emp.nbi_status || 'Pending',
+      nbi_file: emp.nbi_file || '',
+      sss_doc_status: emp.sss_doc_status || 'Submitted',
+      sss_doc_file: emp.sss_doc_file || 'sss_static_card.jpg',
+      philhealth_doc_status: emp.philhealth_doc_status || 'Submitted',
+      philhealth_doc_file: emp.philhealth_doc_file || 'philhealth_mdrf.pdf',
+      pagibig_doc_status: emp.pagibig_doc_status || 'Pending',
+      pagibig_doc_file: emp.pagibig_doc_file || '',
+      tin_doc_status: emp.tin_doc_status || 'Submitted',
+      tin_doc_file: emp.tin_doc_file || 'tin_id_scan.png'
+    });
+    setShowModal(true);
   };
 
   const filtered = employees.filter(e => 
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.role.toLowerCase().includes(search.toLowerCase())
+    `${e.first_name} ${e.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
+    (e.position || '').toLowerCase().includes(search.toLowerCase()) ||
+    (e.department || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
       
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <Users className="text-blue-600" size={32} />
-            Employee Management
+            <Users className="text-blue-600" size={32} style={{ color: themeColor }} />
+            Employee Information System (EIS)
           </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Register new faculty, configure department roles, and track automated inter-departmental triggers.</p>
+          <p className="text-sm font-medium text-slate-500 mt-1">Stores personal details, job titles, department assignments, contact info, and employment history logs.</p>
         </div>
         <button 
-          onClick={() => setShowForm(!showForm)}
-          className="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-blue-200 transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+          onClick={() => { resetForm(); setEditingEmp(null); setShowModal(true); }}
+          className="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-blue-200 transition-all flex items-center gap-2 hover:scale-[1.02]"
+          style={{ backgroundColor: themeColor }}
         >
           <UserPlus size={16} />
-          Hire New Employee
+          Hire / Register Employee
         </button>
       </div>
 
-      {/* NEW HIRE FORM MODAL */}
-      {showForm && (
-        <div className="p-6 bg-blue-50/50 border border-blue-100 rounded-3xl space-y-4 animate-in slide-in-from-top-3 duration-300">
-          <h3 className="text-sm font-black text-slate-800 tracking-tight">Enter New Hire Profile Details</h3>
-          <form onSubmit={handleHireEmployee} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 block mb-2">Full Name</label>
-              <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} required placeholder="e.g. Jobel Jobert" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors" />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 block mb-2">Email Address</label>
-              <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required placeholder="e.g. jobel@school.edu" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors" />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 block mb-2">Position / Role</label>
-              <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors">
-                <option value="IT">IT Portal Staff</option>
-                <option value="Registrar">Registrar Administrator</option>
-                <option value="Cashier">Finance Cashier</option>
-                <option value="Teacher">Academic Teacher (Faculty)</option>
-                <option value="Custodian">Custodian Staff</option>
-                <option value="School Admin">School Operations Admin</option>
-              </select>
-            </div>
-            <button type="submit" className="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-md shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98]">
-              Approve & Trigger Setup
-            </button>
-          </form>
-        </div>
-      )}
-
       {/* FILTER SEARCH BAR */}
-      <div className="bg-white rounded-[2rem] border border-slate-100 p-4 shadow-xl flex items-center gap-3">
+      <div className="bg-white rounded-[2rem] border border-slate-100 p-4 shadow-sm flex items-center gap-3">
         <Search className="text-slate-400" size={20} />
         <input 
           type="text" 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search employees by name, position role..."
+          placeholder="Search employees by name, job position role, or department..."
           className="w-full text-sm bg-transparent focus:outline-none placeholder-slate-400 font-medium text-slate-700"
         />
       </div>
 
       {/* DIRECTORY TABLE */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee ID</th>
-                <th className="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Name Details</th>
-                <th className="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Job Position</th>
-                <th className="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Automated Inter-Dept Status</th>
-                <th className="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Uptime status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((emp) => (
-                <tr key={emp.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                  <td className="py-4 pr-4">
-                    <span className="text-xs font-mono font-bold text-slate-400">{emp.id}</span>
-                  </td>
-                  <td className="py-4 pr-4">
-                    <p className="text-sm font-bold text-slate-700">{emp.name}</p>
-                    <span className="text-xs text-slate-400 font-semibold">{emp.email}</span>
-                  </td>
-                  <td className="py-4 pr-4">
-                    <span className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-full">{emp.role}</span>
-                  </td>
-                  <td className="py-4 pr-4 max-w-xs">
-                    <div className="flex flex-wrap gap-1.5">
-                      {emp.triggers.map((t, idx) => (
-                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
-                          <CheckCircle2 size={10} />
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      {emp.status}
-                    </span>
-                  </td>
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-sm">
+        {loading ? (
+          <p className="text-xs text-slate-400 font-bold text-center py-10 animate-pulse">Loading Employee Information Records...</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 text-slate-400">
+                  <th className="py-4 text-[10px] font-black uppercase tracking-widest">Employee ID</th>
+                  <th className="py-4 text-[10px] font-black uppercase tracking-widest">Name Details</th>
+                  <th className="py-4 text-[10px] font-black uppercase tracking-widest">Job Position & Dept</th>
+                  <th className="py-4 text-[10px] font-black uppercase tracking-widest">Contact & Salary</th>
+                  <th className="py-4 text-[10px] font-black uppercase tracking-widest">History Log</th>
+                  <th className="py-4 text-[10px] font-black uppercase tracking-widest">Status</th>
+                  <th className="py-4 text-[10px] font-black uppercase tracking-widest text-center">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((emp) => (
+                  <tr key={emp.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                    <td className="py-4 pr-4">
+                      <span className="text-xs font-mono font-bold text-slate-400">{emp.employee_id}</span>
+                    </td>
+                    <td className="py-4 pr-4">
+                      <p className="text-sm font-bold text-slate-700">{emp.first_name} {emp.last_name}</p>
+                      <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-0.5"><Mail size={12}/> {emp.email}</span>
+                    </td>
+                    <td className="py-4 pr-4">
+                      <div className="space-y-1">
+                        <span className="inline-block text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full">{emp.position}</span>
+                        <p className="text-[10px] text-slate-400 font-semibold">{emp.department || 'Administration'}</p>
+                      </div>
+                    </td>
+                    <td className="py-4 pr-4">
+                      <p className="text-xs font-mono font-bold text-slate-700">₱{emp.basic_salary?.toLocaleString()}</p>
+                      {emp.phone_number && <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-0.5"><Phone size={12}/> {emp.phone_number}</span>}
+                    </td>
+                    <td className="py-4 pr-4">
+                      <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded font-black flex items-center gap-1 w-fit"><Award size={10}/> {emp.employment_history || 'Hired Active'}</span>
+                    </td>
+                    <td className="py-4">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        emp.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                      }`}>
+                        {emp.status}
+                      </span>
+                    </td>
+                    <td className="py-4 text-center">
+                      <button onClick={() => handleEditClick(emp)} className="p-2 hover:bg-slate-55 rounded-xl text-slate-500 hover:text-blue-600 transition-all inline-block"><Edit size={16} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {/* POP-UP DETAILED HIRE / REGISTER EMPLOYEE MODAL (Matches User Request) */}
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[99] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in duration-200">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-black text-slate-800 uppercase tracking-tight text-base">
+                  {editingEmp ? `Update Employee: ${editingEmp.first_name} ${editingEmp.last_name}` : "Hire / Register New Employee Profile"}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Employee Information System (EIS) & Document Auditing</p>
+              </div>
+              <button onClick={() => { setShowModal(false); setEditingEmp(null); }} className="p-2 text-slate-400 hover:text-red-500"><X size={20}/></button>
+            </div>
+
+            {/* Modal Body (Scrollable content with 3 columns/categories) */}
+            <form onSubmit={handleHireSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 text-xs font-semibold text-slate-700">
+              
+              {/* GROUP 1: BASIC & JOB DETAILS */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-450 border-b border-slate-100 pb-2">1. Basic & Job Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">First Name *</label>
+                    <input type="text" name="first_name" value={formData.first_name} onChange={handleInputChange} required placeholder="e.g. Jobel" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Last Name *</label>
+                    <input type="text" name="last_name" value={formData.last_name} onChange={handleInputChange} required placeholder="e.g. Jobert" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Email Address *</label>
+                    <input type="email" name="email" value={formData.email} onChange={handleInputChange} required placeholder="e.g. jobel@school.edu" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Phone Contact</label>
+                    <input type="text" name="phone_number" value={formData.phone_number} onChange={handleInputChange} placeholder="e.g. 0917-123-4567" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Job Title / Position</label>
+                    <select name="position" value={formData.position} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+                      <option value="TEACHER">Academic Teacher</option>
+                      <option value="IT STAFF">IT Support Staff</option>
+                      <option value="REGISTRAR STAFF">Registrar Officer</option>
+                      <option value="CASHIER STAFF">Finance Cashier</option>
+                      <option value="CUSTODIAN STAFF">Facilities Custodian</option>
+                      <option value="NURSE STAFF">Clinic Nurse</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Department</label>
+                    <select name="department" value={formData.department} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+                      <option value="Faculty">Faculty (Academic)</option>
+                      <option value="Administration">Operations Administration</option>
+                      <option value="IT Office">IT System Office</option>
+                      <option value="Finance Cashier">Cashier Finance Dept</option>
+                      <option value="Registrar Academics">Registrar Academic Dept</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Employment Status</label>
+                    <select name="employment_status" value={formData.employment_status} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+                      <option value="Probationary">Probationary</option>
+                      <option value="Regular">Regular / Permanent</option>
+                      <option value="Contractual">Contractual</option>
+                      <option value="Part-time">Part-time</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Basic Monthly Pay (₱) *</label>
+                    <input type="number" name="basic_salary" value={formData.basic_salary} onChange={handleInputChange} required className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Uptime Status</label>
+                    <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+                      <option value="Active">Active Duty</option>
+                      <option value="Suspended">Suspended</option>
+                      <option value="Inactive">Terminated / Inactive</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Employment Log History</label>
+                    <input type="text" name="employment_history" value={formData.employment_history} onChange={handleInputChange} placeholder="e.g. Hired on probation, Promoted" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+              </div>
+
+              {/* GROUP 2: GOVERNMENT IDs & STATUTORY NUMBERS */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-450 border-b border-slate-100 pb-2">2. Statutory Identifications (SSS, Philhealth, Pag-IBIG, TIN, HMO)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  {/* SSS */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">SSS Number</label>
+                    <input type="text" name="sss_number" value={formData.sss_number} onChange={handleInputChange} placeholder="00-0000000-0" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono" />
+                  </div>
+
+                  {/* Philhealth */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">PhilHealth Number</label>
+                    <input type="text" name="philhealth_number" value={formData.philhealth_number} onChange={handleInputChange} placeholder="00-000000000-0" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono" />
+                  </div>
+
+                  {/* Pag-IBIG */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Pag-IBIG HDMF Number</label>
+                    <input type="text" name="pagibig_number" value={formData.pagibig_number} onChange={handleInputChange} placeholder="0000-0000-0000" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono" />
+                  </div>
+
+                  {/* TIN */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">TIN Number</label>
+                    <input type="text" name="tin_number" value={formData.tin_number} onChange={handleInputChange} placeholder="000-000-000-000" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono" />
+                  </div>
+
+                  {/* HMO Cover */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">HMO Coverage Plan</label>
+                    <select name="hmo_covered" value={formData.hmo_covered} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+                      <option value="No">Not Covered</option>
+                      <option value="Yes">Yes, Active HMO</option>
+                    </select>
+                  </div>
+
+                  {/* HMO Provider info */}
+                  {formData.hmo_covered === 'Yes' && (
+                    <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                      <label className="text-[10px] font-black uppercase text-slate-400">HMO Plan / Card Number</label>
+                      <input type="text" name="hmo_details" value={formData.hmo_details} onChange={handleInputChange} placeholder="e.g. Maxicare Platinum 120k" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                    </div>
+                  )}
+
+                </div>
+              </div>
+
+              {/* GROUP 3: DOCUMENTS CHECKLIST */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-450 border-b border-slate-100 pb-2">3. Requirements Document Verification checklist</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  {/* PSA */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800">PSA Birth Certificate</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Accrued copy of PSA birth certification</p>
+                      {formData.psa_file && <span className="inline-block mt-1 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono text-[9px]">📎 {formData.psa_file}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <select name="psa_status" value={formData.psa_status} onChange={handleInputChange} className="p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none">
+                        <option value="Submitted">Submitted</option>
+                        <option value="Pending">Pending</option>
+                      </select>
+                      <input type="text" name="psa_file" value={formData.psa_file} onChange={handleInputChange} placeholder="Filename" className="w-24 p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none" />
+                    </div>
+                  </div>
+
+                  {/* COE */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800">Certificate of Employment (COE)</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Previous employment clearance verification</p>
+                      {formData.coe_file && <span className="inline-block mt-1 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono text-[9px]">📎 {formData.coe_file}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <select name="coe_status" value={formData.coe_status} onChange={handleInputChange} className="p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none">
+                        <option value="Submitted">Submitted</option>
+                        <option value="Pending">Pending</option>
+                        <option value="N/A">N/A</option>
+                      </select>
+                      <input type="text" name="coe_file" value={formData.coe_file} onChange={handleInputChange} placeholder="Filename" className="w-24 p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none" />
+                    </div>
+                  </div>
+
+                  {/* NBI */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800">NBI Clearance copy</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Valid NBI clearance record</p>
+                      {formData.nbi_file && <span className="inline-block mt-1 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono text-[9px]">📎 {formData.nbi_file}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <select name="nbi_status" value={formData.nbi_status} onChange={handleInputChange} className="p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none">
+                        <option value="Submitted">Submitted</option>
+                        <option value="Pending">Pending</option>
+                      </select>
+                      <input type="text" name="nbi_file" value={formData.nbi_file} onChange={handleInputChange} placeholder="Filename" className="w-24 p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none" />
+                    </div>
+                  </div>
+
+                  {/* SSS Doc */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800">SSS card / Static copy</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Proof of SSS account parameters</p>
+                      {formData.sss_doc_file && <span className="inline-block mt-1 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono text-[9px]">📎 {formData.sss_doc_file}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <select name="sss_doc_status" value={formData.sss_doc_status} onChange={handleInputChange} className="p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none">
+                        <option value="Submitted">Submitted</option>
+                        <option value="Pending">Pending</option>
+                      </select>
+                      <input type="text" name="sss_doc_file" value={formData.sss_doc_file} onChange={handleInputChange} placeholder="Filename" className="w-24 p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none" />
+                    </div>
+                  </div>
+
+                  {/* Philhealth Doc */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800">Philhealth MDRF copy</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Philhealth MDRF registration paper</p>
+                      {formData.philhealth_doc_file && <span className="inline-block mt-1 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono text-[9px]">📎 {formData.philhealth_doc_file}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <select name="philhealth_doc_status" value={formData.philhealth_doc_status} onChange={handleInputChange} className="p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none">
+                        <option value="Submitted">Submitted</option>
+                        <option value="Pending">Pending</option>
+                      </select>
+                      <input type="text" name="philhealth_doc_file" value={formData.philhealth_doc_file} onChange={handleInputChange} placeholder="Filename" className="w-24 p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none" />
+                    </div>
+                  </div>
+
+                  {/* Pag-IBIG Doc */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800">Pag-IBIG MDF copy</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Pag-IBIG MDF printed summary document</p>
+                      {formData.pagibig_doc_file && <span className="inline-block mt-1 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono text-[9px]">📎 {formData.pagibig_doc_file}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <select name="pagibig_doc_status" value={formData.pagibig_doc_status} onChange={handleInputChange} className="p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none">
+                        <option value="Submitted">Submitted</option>
+                        <option value="Pending">Pending</option>
+                      </select>
+                      <input type="text" name="pagibig_doc_file" value={formData.pagibig_doc_file} onChange={handleInputChange} placeholder="Filename" className="w-24 p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none" />
+                    </div>
+                  </div>
+
+                  {/* TIN Doc */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between md:col-span-2">
+                    <div>
+                      <p className="font-bold text-slate-800">TIN Card / Form 1902</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">TIN identification card copy or BIR 1902 Form</p>
+                      {formData.tin_doc_file && <span className="inline-block mt-1 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono text-[9px]">📎 {formData.tin_doc_file}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <select name="tin_doc_status" value={formData.tin_doc_status} onChange={handleInputChange} className="p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none">
+                        <option value="Submitted">Submitted</option>
+                        <option value="Pending">Pending</option>
+                      </select>
+                      <input type="text" name="tin_doc_file" value={formData.tin_doc_file} onChange={handleInputChange} placeholder="Filename" className="w-24 p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none" />
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                <button type="button" onClick={() => { setShowModal(false); setEditingEmp(null); }} className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-all">Cancel</button>
+                <button type="submit" className="px-6 py-3.5 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-xl transition-all" style={{ backgroundColor: themeColor }}>Save Profile</button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

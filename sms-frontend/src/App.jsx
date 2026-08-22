@@ -125,9 +125,13 @@ import ItReports from './pages/it/ItReports';
 import ItAuditLogs from './pages/it/ItAuditLogs';
 
 // HR Pages
+import HrHome from './pages/hr/HrHome';
 import HrDashboard from './pages/hr/HrDashboard';
 import HrEmployees from './pages/hr/HrEmployees';
 import HrOnboarding from './pages/hr/HrOnboarding';
+
+// Employee Portal Page
+import EmployeePortal from './pages/shared/EmployeePortal';
 import HrAttendance from './pages/hr/HrAttendance';
 import HrLeave from './pages/hr/HrLeave';
 import HrPayrollSupport from './pages/hr/HrPayrollSupport';
@@ -371,7 +375,8 @@ function App() {
               <AdminLayout />
             </ProtectedRoute>
           }>
-            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route index element={<Navigate to="home" replace />} />
+            <Route path="home" element={<HrHome />} />
             <Route path="dashboard" element={<HrDashboard />} />
             <Route path="employees" element={<HrEmployees />} />
             <Route path="onboarding" element={<HrOnboarding />} />
@@ -505,6 +510,13 @@ function App() {
           <Route path="/lms/exam/:activityId" element={
             <ProtectedRoute allowedRoles={['student']}>
               <LmsTakeExam />
+            </ProtectedRoute>
+          } />
+
+          {/* Employee Payroll & Self-Service Portal (Access blocked for students) */}
+          <Route path="/employee-portal" element={
+            <ProtectedRoute allowedRoles={['admin', 'super_admin', 'registrar', 'hr', 'it', 'school_admin', 'custodian', 'guidance', 'nurse', 'teacher', 'cashier']}>
+              <EmployeePortal />
             </ProtectedRoute>
           } />
 

@@ -538,7 +538,7 @@ const StudentGuidance = () => {
         <div className="space-y-6 animate-in fade-in duration-300 max-w-xl mx-auto">
           <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
             <div className="text-center space-y-2">
-              <ShieldAlert className="text-red-500 mx-auto" size={40} className="animate-pulse" />
+              <ShieldAlert className="text-red-500 mx-auto animate-pulse" size={40} />
               <h2 className="text-lg font-bold text-slate-800">Report distress / Bullying incident</h2>
               <p className="text-xs text-slate-500 font-semibold">
                 If you are going through a personal struggle or witnessed bullying, tell us. Your safety is our absolute priority.

@@ -87,6 +87,8 @@ const CashierLayout = () => {
   }, [user]);
 
   const menuItems = [
+    { icon: CreditCard, label: "My Payroll Portal", path: "/employee-portal" },
+    { type: "header", label: "Cashier Dashboard" },
     { icon: LayoutDashboard, label: "Dashboard", path: "/cashier/dashboard" },
 
     { type: "header", label: "Billing & Transactions" },

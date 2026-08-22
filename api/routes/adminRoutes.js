@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { getBranding, updateBranding, getSchoolSettings, saveSchoolSettings } from '../controllers/admin/brandingController.js';
 
-import { getUsers, createUser, updateUser, deleteUser, updateUserProfile } from '../controllers/admin/user.js';
+import { getUsers, createUser, updateUser, deleteUser, updateUserProfile, getStaffBirthdays } from '../controllers/admin/user.js';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '../controllers/admin/room.js';
 import { getAdminPromotions, createPromotion, deletePromotion } from '../controllers/admin/promotion.js';
 import { getAuditLogs } from '../controllers/admin/auditLogsController.js';
@@ -101,6 +101,7 @@ router.get('/users', getUsers);
 router.post('/users', createUser);
 router.put('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
+router.get('/birthdays', getStaffBirthdays);
 
 // Legacy User Management routing alias
 router.get('/get_users.php', getUsers);

@@ -15,6 +15,7 @@ import settingsRoutes from './routes/settingsRoutes.js';
 import schoolRoutes from './routes/schoolRoutes.js';
 import guidanceRoutes from './routes/guidanceRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
+import employeePortalRoutes from './routes/employeePortalRoutes.js';
 import { getPublicPromotions } from './controllers/admin/promotion.js';
 
 // I-load ang environment variables
@@ -94,6 +95,9 @@ app.use('/api/guidance', guidanceRoutes);
 
 // 7.8. School Health & Clinic Portal
 app.use('/api/health', healthRoutes);
+
+// 7.9. Employee Payroll & Self-Service Portal
+app.use('/api/employee-portal', employeePortalRoutes);
 
 // 8. Health & Utility Endpoints (for Vercel)
 app.use('/api/test', smokeTestRoutes);
