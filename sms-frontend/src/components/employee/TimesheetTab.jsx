@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Clock, Calendar, CheckCircle2, ShieldAlert } from 'lucide-react';
 
-const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjustment, themeColor }) => {
+const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjustment, themeColor, employeeShift }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedDayDetail, setSelectedDayDetail] = useState(null);
 
   const monthsList = [
     "January", "February", "March", "April", "May", "June", 
@@ -135,7 +136,8 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
               return (
                 <div 
                   key={idx} 
-                  className={`aspect-square p-2.5 rounded-2xl border flex flex-col justify-between transition-all ${
+                  onClick={() => setSelectedDayDetail({ day, log })}
+                  className={`aspect-square p-2.5 rounded-2xl border flex flex-col justify-between transition-all cursor-pointer hover:border-blue-300 hover:scale-105 active:scale-95 ${
                     log 
                       ? 'bg-white border-slate-150 shadow-sm hover:shadow-md' 
                       : 'bg-slate-50/30 border-slate-100'
@@ -198,6 +200,92 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
         </div>
 
       </div>
+
+      {/* SHIFT DETAILS MODAL */}
+      {selectedDayDetail && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-2xl w-full max-w-md space-y-6 relative animate-in zoom-in-95 duration-200">
+            {/* CLOSE BUTTON */}
+            <button 
+              onClick={() => setSelectedDayDetail(null)} 
+              className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-700"
+            >
+              <X size={18} />
+            </button>
+
+            {/* HEADER */}
+            <div className="space-y-1.5 border-b border-slate-100 pb-4">
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5" style={{ color: themeColor }}>
+                <Calendar size={12} /> Day Details & Shift Record
+              </span>
+              <h3 className="text-xl font-black text-slate-800">
+                {monthsList[selectedMonth]} {selectedDayDetail.day}, {selectedYear}
+              </h3>
+            </div>
+
+            {/* ASSIGNED SHIFT */}
+            <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Work Shift</p>
+              <div>
+                <p className="font-bold text-slate-800 text-sm">{employeeShift?.shift_name || "Standard Academic Shift"}</p>
+                <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                  Prescribed hours: <span className="font-mono font-bold text-slate-700">{employeeShift?.time_in || "08:00 AM"} - {employeeShift?.time_out || "05:00 PM"}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* LOG TIMINGS */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Attendance Logs</p>
+              {selectedDayDetail.log ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 border border-emerald-100 bg-emerald-50/20 rounded-2xl">
+                    <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">Clock In</p>
+                    <p className="text-sm font-mono font-bold text-slate-800 mt-1">{formatTimeAMPM(selectedDayDetail.log.time_in)}</p>
+                  </div>
+                  <div className="p-4 border border-slate-100 bg-slate-50/50 rounded-2xl">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Clock Out</p>
+                    <p className="text-sm font-mono font-bold text-slate-800 mt-1">{selectedDayDetail.log.time_out ? formatTimeAMPM(selectedDayDetail.log.time_out) : "No log"}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400 font-semibold text-xs py-6">
+                  No clock-in/out record found for this day. (Off-duty / Weekend / Absent)
+                </div>
+              )}
+            </div>
+
+            {/* STATUS BADGE & OVERTIME */}
+            {selectedDayDetail.log && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verification Status</p>
+                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                    selectedDayDetail.log.status === 'On Time' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                  }`}>
+                    {selectedDayDetail.log.status}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Overtime Hours</p>
+                  <p className="text-xs font-mono font-bold text-slate-800 mt-1">
+                    {parseFloat(selectedDayDetail.log.ot_hours || 0) > 0 ? `${parseFloat(selectedDayDetail.log.ot_hours)} hrs` : "None filed"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ACTION */}
+            <button 
+              onClick={() => setSelectedDayDetail(null)} 
+              className="w-full py-3 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg transition-all"
+              style={{ backgroundColor: themeColor }}
+            >
+              Close Details
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

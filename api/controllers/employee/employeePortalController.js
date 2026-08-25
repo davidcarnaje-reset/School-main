@@ -538,3 +538,84 @@ export const hireEmployee = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// GET ALL EMPLOYEE SHIFTS
+export const getEmployeeShifts = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        u.id AS user_id, 
+        u.full_name, 
+        u.role, 
+        es.shift_id, 
+        es.shift_name, 
+        es.time_in, 
+        es.time_out
+      FROM users u
+      LEFT JOIN employee_shifts es ON u.id = es.user_id
+      WHERE u.role != 'student' AND u.status = 'Active'
+      ORDER BY u.full_name ASC
+    `);
+    return res.status(200).json({ success: true, shifts: rows });
+  } catch (error) {
+    console.error("getEmployeeShifts error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ASSIGN EMPLOYEE SHIFT
+export const assignEmployeeShift = async (req, res) => {
+  const { user_id, shift_id, shift_name, time_in, time_out } = req.body;
+  if (!user_id || !shift_id || !shift_name || !time_in || !time_out) {
+    return res.status(400).json({ success: false, message: "Missing required fields." });
+  }
+  try {
+    await pool.query(`
+      INSERT INTO employee_shifts (user_id, shift_id, shift_name, time_in, time_out)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        shift_id = VALUES(shift_id),
+        shift_name = VALUES(shift_name),
+        time_in = VALUES(time_in),
+        time_out = VALUES(time_out)
+    `, [user_id, shift_id, shift_name, time_in, time_out]);
+
+    return res.status(200).json({ success: true, message: "Shift assigned successfully!" });
+  } catch (error) {
+    console.error("assignEmployeeShift error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET SPECIFIC USER SHIFT
+export const getMyShift = async (req, res) => {
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required." });
+  }
+  try {
+    const [userRows] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+    const userId = userRows[0].id;
+    const [shiftRows] = await pool.query("SELECT * FROM employee_shifts WHERE user_id = ?", [userId]);
+    if (shiftRows.length === 0) {
+      // Default standard shift if none assigned
+      return res.status(200).json({
+        success: true,
+        shift: {
+          shift_id: 'SH-01',
+          shift_name: 'Standard Academic Shift',
+          time_in: '08:00 AM',
+          time_out: '05:00 PM'
+        }
+      });
+    }
+    return res.status(200).json({ success: true, shift: shiftRows[0] });
+  } catch (error) {
+    console.error("getMyShift error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+

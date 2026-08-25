@@ -18,6 +18,7 @@ const HrAttendance = () => {
 
   const [shiftForm, setShiftForm] = useState({ name: '', timeIn: '08:00', timeOut: '17:00', gracePeriod: '15 mins' });
   const themeColor = branding?.theme_color || '#2563eb';
+  const [employeeShifts, setEmployeeShifts] = useState([]);
 
   const fetchDtrLogs = async () => {
     setLoading(true);
@@ -66,8 +67,41 @@ const HrAttendance = () => {
     }
   };
 
+  const fetchEmployeeShifts = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/employee-portal/shifts`);
+      if (res.data?.success) {
+        setEmployeeShifts(res.data.shifts || []);
+      }
+    } catch (err) {
+      console.error("Error loading employee shifts:", err);
+    }
+  };
+
+  const handleAssignShift = async (userId, shiftId) => {
+    const sh = shifts.find(s => s.id === shiftId);
+    if (!sh) return;
+    try {
+      const res = await axios.post(`${API_BASE_URL}/employee-portal/shifts`, {
+        user_id: userId,
+        shift_id: sh.id,
+        shift_name: sh.name,
+        time_in: sh.timeIn,
+        time_out: sh.timeOut
+      });
+      if (res.data?.success) {
+        alert("Employee shift updated successfully!");
+        fetchEmployeeShifts();
+      }
+    } catch (err) {
+      console.error("Error assigning shift:", err);
+      alert("Failed to assign shift.");
+    }
+  };
+
   useEffect(() => {
     fetchDtrLogs();
+    fetchEmployeeShifts();
   }, []);
 
   const handleAddShift = (e) => {
@@ -250,6 +284,55 @@ const HrAttendance = () => {
               </div>
               <button type="submit" className="w-full py-3 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg transition-all" style={{ backgroundColor: themeColor }}>Create Shift Scheme</button>
             </form>
+          </div>
+
+          {/* EMPLOYEE SHIFT ASSIGNMENTS */}
+          <div className="lg:col-span-12 bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-6">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+              <Users size={16} className="text-slate-400" /> Employee Shift Assignments
+            </h3>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs font-semibold">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400">
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider">Employee Name</th>
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider">Role</th>
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider">Current Assigned Shift</th>
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider">Assign New Shift</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employeeShifts.map((emp) => (
+                    <tr key={emp.user_id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/20">
+                      <td className="py-3.5 pr-2 font-bold text-slate-800">{emp.full_name}</td>
+                      <td className="py-3.5 pr-2 uppercase text-[10px] text-slate-450">{emp.role}</td>
+                      <td className="py-3.5 pr-2">
+                        {emp.shift_name ? (
+                          <div>
+                            <span className="font-bold text-slate-700">{emp.shift_name}</span>
+                            <span className="text-[10px] text-slate-400 block font-mono mt-0.5">{emp.time_in} - {emp.time_out}</span>
+                          </div>
+                        ) : (
+                          <span className="text-amber-600 font-bold italic">Standard Shift (Default)</span>
+                        )}
+                      </td>
+                      <td className="py-3.5">
+                        <select
+                          value={emp.shift_id || 'SH-01'}
+                          onChange={(e) => handleAssignShift(emp.user_id, e.target.value)}
+                          className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                        >
+                          {shifts.filter(s => s.status === 'Active').map(s => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.timeIn} - {s.timeOut})</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
         </div>

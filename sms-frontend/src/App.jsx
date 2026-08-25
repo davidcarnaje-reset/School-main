@@ -286,6 +286,7 @@ function App() {
             <Route path="schools" element={<SchoolManagement />} />
             <Route path="permissions" element={<SchoolPermissions />} />
             <Route path="audit-logs" element={<AdminAuditLogs />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* 4. CASHIER ROUTES */}
@@ -303,6 +304,7 @@ function App() {
             <Route path="scholarship-catalog" element={<ScholarshipCatalog />} />
             <Route path="reports" element={<CollectionReports />} />  
             <Route path="payroll" element={<Payroll />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* 5. LMS / TEACHER ROUTES */}
@@ -323,6 +325,7 @@ function App() {
             <Route path="activities/:classId" element={<TeacherActivities />} />
             <Route path="/teacher/activities/create-exam" element={<CreateExam />} />
           <Route path="activities/:activityId/grading" element={<TeacherActivityGrading />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* =======================================================
@@ -365,6 +368,7 @@ function App() {
             <Route path="grades" element={<StudentGradesView />} />
             <Route path="deped-reports" element={<DepEdReportsModule />} />
             <Route path="setup" element={<RegistrarSetup />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* =======================================================
@@ -390,6 +394,7 @@ function App() {
             <Route path="clearance" element={<HrClearance />} />
             <Route path="benefits" element={<HrBenefits />} />
             <Route path="reports" element={<HrReports />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* =======================================================
@@ -427,6 +432,7 @@ function App() {
             <Route path="utilities" element={<SchoolAdminUtilities />} />
             <Route path="contracts" element={<SchoolAdminContracts />} />
             <Route path="facilities" element={<SchoolAdminFacilities />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* =======================================================
@@ -449,6 +455,7 @@ function App() {
             <Route path="supplies" element={<CustodianSupplies />} />
             <Route path="disposal" element={<CustodianDisposal />} />
             <Route path="reports" element={<CustodianReports />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* =======================================================
@@ -465,6 +472,7 @@ function App() {
             <Route path="appointments" element={<GuidanceAppointments />} />
             <Route path="tests" element={<GuidanceTests />} />
             <Route path="incidents" element={<GuidanceIncidentsPage />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* =======================================================
@@ -480,6 +488,7 @@ function App() {
             <Route path="records" element={<StudentHealthRecords />} />
             <Route path="visits" element={<ClinicVisits />} />
             <Route path="inventory" element={<ClinicInventory />} />
+            <Route path="helpdesk" element={<ItHelpDesk />} />
           </Route>
 
           {/* =======================================================

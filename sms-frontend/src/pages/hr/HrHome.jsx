@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Megaphone, Cake, Calendar, Gift, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import CreateAnnouncementModal from '../../components/shared/CreateAnnouncementModal';
 
 const HrHome = () => {
   const { branding, API_BASE_URL, user } = useAuth();
@@ -9,6 +10,7 @@ const HrHome = () => {
   const [birthdays, setBirthdays] = useState([]);
   const [loading, setLoading] = useState(true);
   const themeColor = branding?.theme_color || '#2563eb';
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -77,12 +79,20 @@ const HrHome = () => {
         
         {/* LEFT COLUMN: ANNOUNCEMENTS NEWS FEED (8 Cols) */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h2 className="text-xl font-black text-slate-850 tracking-tight flex items-center gap-2">
               <Megaphone className="text-indigo-600" size={24} />
               Announcements & Memos
             </h2>
-            <span className="text-xs text-slate-400 font-bold font-mono">{announcements.length} Active Notices</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsCreateOpen(true)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:scale-105 active:scale-95 shadow-md shadow-indigo-200 flex items-center gap-2"
+              >
+                <Megaphone size={14} /> Post Announcement
+              </button>
+              <span className="text-xs text-slate-400 font-bold font-mono">{announcements.length} Active Notices</span>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -197,6 +207,13 @@ const HrHome = () => {
 
       </div>
 
+      <CreateAnnouncementModal
+        isOpen={isCreateOpen}
+        onClose={() => {
+          setIsCreateOpen(false);
+          fetchData();
+        }}
+      />
     </div>
   );
 };

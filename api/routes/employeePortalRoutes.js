@@ -15,7 +15,10 @@ import {
   createAccomplishment,
   getEmployeeNotifications,
   markEmployeeNotificationRead,
-  hireEmployee
+  hireEmployee,
+  getEmployeeShifts,
+  assignEmployeeShift,
+  getMyShift
 } from '../controllers/employee/employeePortalController.js';
 
 const router = express.Router();
@@ -53,5 +56,10 @@ router.post('/notifications/read', markEmployeeNotificationRead);
 
 // Hire/Register Employee (EIS)
 router.post('/hire', hireEmployee);
+
+// Employee Shifts Scheduling
+router.get('/shifts', getEmployeeShifts);
+router.post('/shifts', assignEmployeeShift);
+router.get('/my-shift', getMyShift);
 
 export default router;

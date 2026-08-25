@@ -93,7 +93,7 @@ async function migrate() {
       for (const mod of newHrModules) {
         await connection.execute(`
           INSERT INTO school_role_modules (school_id, role, module_name, is_enabled)
-          VALUES (?, 'hr', ?, 0)
+          VALUES (?, 'hr', ?, 1)
         `, [school.id, mod]);
       }
     }

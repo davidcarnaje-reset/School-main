@@ -10,7 +10,7 @@ import {
   Server, Shield, LifeBuoy, Zap, FileSpreadsheet, Building, Package, Wrench, Key, Sliders,
   Laptop, HelpCircle, BarChart2, Activity, ShieldAlert, Lock,
   UserCheck, FolderOpen, AlertCircle, CheckCircle2, Heart, Trash2,
-  Calendar, Clock, Sparkles, Printer, Plus
+  Calendar, Clock, Sparkles, Printer, Plus, LayoutGrid, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import UserProfileModal from '../components/admin/UserProfileModal';
@@ -25,6 +25,17 @@ const AdminLayout = () => {
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
+  const rolePrefix = user?.role === 'super_admin' ? 'admin' : user?.role;
+  const isAppRouteActive = location.pathname === '/employee-portal' || (rolePrefix && location.pathname === `/${rolePrefix}/helpdesk`);
+  const [isAppsOpen, setIsAppsOpen] = useState(isAppRouteActive);
+
+  useEffect(() => {
+    const prefix = user?.role === 'super_admin' ? 'admin' : user?.role;
+    if (location.pathname === '/employee-portal' || (prefix && location.pathname === `/${prefix}/helpdesk`)) {
+      setIsAppsOpen(true);
+    }
+  }, [location.pathname, user]);
 
   // ==========================================
   // 🚀 NOTIFICATION STATES
@@ -94,7 +105,6 @@ const AdminLayout = () => {
       { icon: <LayoutDashboard size={20} />, label: 'Network Reports', path: '/admin/dashboard' },
     ],
     admin: [
-      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
       { type: 'header', label: 'Admin Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/admin/dashboard' },
       { icon: <School size={20} />, label: 'School Setup', path: '/admin/school-setup' },
@@ -104,7 +114,6 @@ const AdminLayout = () => {
       { icon: <History size={20} />, label: 'Audit Trail Logs', path: '/admin/audit-logs' },
     ],
     registrar: [
-      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
       { type: 'header', label: 'Registrar Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/registrar/dashboard' },
       { icon: <Sliders size={20} />, label: 'Registrar Setup', path: '/registrar/setup', module: 'setup' },
@@ -122,14 +131,13 @@ const AdminLayout = () => {
       { icon: <Printer size={20} />, label: 'DepEd / CHED Reports', path: '/registrar/deped-reports', module: 'deped_reports' },
     ],
     hr: [
-      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
       { type: 'header', label: 'HR Home & Work' },
       { icon: <Compass size={20} />, label: 'HR Home', path: '/hr/home' },
       { icon: <LayoutDashboard size={20} />, label: 'HR Dashboard', path: '/hr/dashboard' },
       { icon: <Users size={20} />, label: 'Employee Directory', path: '/hr/employees', module: 'employees' },
       { icon: <UserCheck size={20} />, label: 'Onboarding Hires', path: '/hr/onboarding', module: 'onboarding' },
       { icon: <ClipboardList size={20} />, label: 'Attendance (DTR)', path: '/hr/attendance', module: 'attendance' },
-      { icon: <FileText size={20} />, label: 'Leave Requests', path: '/hr/leave', module: 'leave' },
+      { icon: <FileText size={20} />, label: 'Service Requests', path: '/hr/leave', module: 'leave' },
       { icon: <Banknote size={20} />, label: 'Payroll Support', path: '/hr/payroll-support', module: 'payroll_support' },
       { icon: <Award size={20} />, label: 'Evaluations (KPI)', path: '/hr/performance', module: 'performance' },
       { icon: <BookOpen size={20} />, label: 'Staff Training', path: '/hr/training', module: 'training' },
@@ -140,7 +148,6 @@ const AdminLayout = () => {
       { icon: <BarChart2 size={20} />, label: 'HR Analytics Reports', path: '/hr/reports', module: 'reports' }
     ],
     it: [
-      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
       { type: 'header', label: 'IT System Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/it/dashboard' },
       { icon: <LifeBuoy size={20} />, label: 'Help Desk / Tickets', path: '/it/helpdesk', module: 'helpdesk' },
@@ -155,7 +162,6 @@ const AdminLayout = () => {
       { icon: <Shield size={20} />, label: 'Audit Security Logs', path: '/it/audits', module: 'audits' }
     ],
     school_admin: [
-      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
       { type: 'header', label: 'Operations' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/school-admin/dashboard' },
       { icon: <Zap size={20} />, label: 'Utility Bills', path: '/school-admin/utilities', module: 'utilities' },
@@ -163,7 +169,6 @@ const AdminLayout = () => {
       { icon: <Building size={20} />, label: 'Facilities Manage', path: '/school-admin/facilities', module: 'facilities' }
     ],
     custodian: [
-      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
       { type: 'header', label: 'Custodian Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/custodian/dashboard' },
       { icon: <Package size={20} />, label: 'Asset Inventory', path: '/custodian/inventory', module: 'inventory' },
@@ -178,7 +183,6 @@ const AdminLayout = () => {
       { icon: <BarChart2 size={20} />, label: 'Reports & Audits', path: '/custodian/reports', module: 'reports' }
     ],
     guidance: [
-      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
       { type: 'header', label: 'Guidance Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/guidance/dashboard' },
       { icon: <Users size={20} />, label: 'Student Cases', path: '/guidance/cases', module: 'cases' },
@@ -187,7 +191,6 @@ const AdminLayout = () => {
       { icon: <AlertCircle size={20} />, label: 'Incident Reports', path: '/guidance/incidents', module: 'incidents' }
     ],
     nurse: [
-      { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
       { type: 'header', label: 'Nurse Modules' },
       { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/nurse/dashboard' },
       { icon: <UserCircle size={20} />, label: 'Student Profiles', path: '/nurse/records', module: 'profiles' },
@@ -346,6 +349,77 @@ const AdminLayout = () => {
                 </Link>
               );
             })}
+
+            {/* APPS DROPDOWN */}
+            <div className="space-y-1 mt-2 border-t border-slate-800 pt-2">
+              <button
+                onClick={() => setIsAppsOpen(!isAppsOpen)}
+                className={`w-full flex items-center p-3 rounded-2xl transition-all text-slate-400 hover:bg-slate-800 hover:text-white ${
+                  isCollapsed ? 'lg:justify-center gap-0' : 'justify-between gap-4'
+                } ${
+                  location.pathname === '/employee-portal' || (rolePrefix && location.pathname === `/${rolePrefix}/helpdesk`)
+                    ? 'bg-slate-800 text-white font-bold'
+                    : ''
+                }`}
+                title={isCollapsed ? "Apps & Services" : ""}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="shrink-0">
+                    <LayoutGrid size={20} />
+                  </div>
+                  <span className={`font-bold text-sm whitespace-nowrap truncate transition-all duration-300 ${isCollapsed ? 'lg:hidden lg:w-0 lg:opacity-0' : 'opacity-100'}`}>
+                    Apps
+                  </span>
+                </div>
+                {!isCollapsed && (
+                  <div className="shrink-0">
+                    {isAppsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                )}
+              </button>
+
+              {isAppsOpen && (
+                <div className={`space-y-1.5 transition-all duration-300 ${isCollapsed ? 'lg:pl-0' : 'pl-6'}`}>
+                  {/* Payroll Portal */}
+                  <Link
+                    to="/employee-portal"
+                    className={`flex items-center p-2.5 rounded-xl transition-all ${
+                      location.pathname === '/employee-portal'
+                        ? 'text-white shadow-md'
+                        : 'text-slate-450 hover:bg-slate-850 hover:text-white'
+                    } ${isCollapsed ? 'lg:justify-center gap-0' : 'gap-3'}`}
+                    style={location.pathname === '/employee-portal' ? { backgroundColor: branding.theme_color || '#2563eb' } : {}}
+                    title={isCollapsed ? "My Payroll Portal" : ""}
+                  >
+                    <div className="shrink-0">
+                      <CreditCard size={18} />
+                    </div>
+                    <span className={`font-semibold text-xs whitespace-nowrap truncate transition-all duration-300 ${isCollapsed ? 'lg:hidden lg:w-0 lg:opacity-0' : 'opacity-100'}`}>
+                      Payroll Portal
+                    </span>
+                  </Link>
+
+                  {/* IT Help Desk */}
+                  <Link
+                    to={`/${rolePrefix}/helpdesk`}
+                    className={`flex items-center p-2.5 rounded-xl transition-all ${
+                      rolePrefix && location.pathname === `/${rolePrefix}/helpdesk`
+                        ? 'text-white shadow-md'
+                        : 'text-slate-455 hover:bg-slate-850 hover:text-white'
+                    } ${isCollapsed ? 'lg:justify-center gap-0' : 'gap-3'}`}
+                    style={(rolePrefix && location.pathname === `/${rolePrefix}/helpdesk`) ? { backgroundColor: branding.theme_color || '#2563eb' } : {}}
+                    title={isCollapsed ? "IT Support Ticketing" : ""}
+                  >
+                    <div className="shrink-0">
+                      <LifeBuoy size={18} />
+                    </div>
+                    <span className={`font-semibold text-xs whitespace-nowrap truncate transition-all duration-300 ${isCollapsed ? 'lg:hidden lg:w-0 lg:opacity-0' : 'opacity-100'}`}>
+                      IT Help Desk
+                    </span>
+                  </Link>
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* FOOTER */}

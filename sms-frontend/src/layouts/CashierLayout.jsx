@@ -18,7 +18,11 @@ import {
   Banknote,
   ShieldAlert,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  LayoutGrid,
+  ChevronDown,
+  ChevronUp,
+  LifeBuoy
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import CreateAnnouncementModal from "../components/shared/CreateAnnouncementModal";
@@ -30,6 +34,15 @@ const CashierLayout = () => {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return JSON.parse(localStorage.getItem('cashierSidebarCollapsed')) ?? false;
   });
+  
+  const isAppRouteActive = location.pathname === '/employee-portal' || location.pathname === '/cashier/helpdesk';
+  const [isAppsOpen, setIsAppsOpen] = useState(isAppRouteActive);
+
+  useEffect(() => {
+    if (location.pathname === '/employee-portal' || location.pathname === '/cashier/helpdesk') {
+      setIsAppsOpen(true);
+    }
+  }, [location.pathname]);
   const [isCreateNotifModalOpen, setIsCreateNotifModalOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -87,7 +100,6 @@ const CashierLayout = () => {
   }, [user]);
 
   const menuItems = [
-    { icon: CreditCard, label: "My Payroll Portal", path: "/employee-portal" },
     { type: "header", label: "Cashier Dashboard" },
     { icon: LayoutDashboard, label: "Dashboard", path: "/cashier/dashboard" },
 
@@ -245,6 +257,100 @@ const CashierLayout = () => {
                 </Link>
               );
             })}
+
+            {/* APPS DROPDOWN */}
+            <div className="space-y-1 mt-3 border-t border-white/10 pt-3">
+              <button
+                onClick={() => setIsAppsOpen(!isAppsOpen)}
+                title={isCollapsed ? "Apps" : undefined}
+                className={`w-full flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-4 justify-between'} py-3 rounded-full font-bold transition-all duration-300 ease-in-out group ${
+                  location.pathname === '/employee-portal' || location.pathname === '/cashier/helpdesk'
+                    ? "bg-white/10 text-white"
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                }`}
+              >
+                <div className="flex items-center">
+                  <LayoutGrid
+                    size={18}
+                    className={`shrink-0 transition-transform duration-300 ${
+                      location.pathname === '/employee-portal' || location.pathname === '/cashier/helpdesk' ? "scale-110 text-white" : "text-slate-500 group-hover:scale-110"
+                    }`}
+                  />
+                  {!isCollapsed && (
+                    <span className="tracking-tight text-xs uppercase italic text-[11px] ml-3 truncate">
+                      Apps
+                    </span>
+                  )}
+                </div>
+                {!isCollapsed && (
+                  <span className="text-slate-500 group-hover:text-slate-300">
+                    {isAppsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </span>
+                )}
+              </button>
+
+              {isAppsOpen && (
+                <div className={`space-y-1 transition-all duration-300 ${isCollapsed ? 'lg:pl-0' : 'pl-4'}`}>
+                  {/* Payroll Portal */}
+                  <Link
+                    to="/employee-portal"
+                    title={isCollapsed ? "Payroll Portal" : undefined}
+                    onClick={() => setIsSidebarOpen(false)}
+                    className={`flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-3'} py-2.5 rounded-full font-bold transition-all duration-250 group ${
+                      location.pathname === '/employee-portal'
+                        ? "text-white shadow-md scale-[1.02]"
+                        : "text-slate-400 hover:text-slate-300 hover:bg-white/5"
+                    }`}
+                    style={
+                      location.pathname === '/employee-portal'
+                        ? { backgroundColor: branding?.theme_color || '#2563eb' }
+                        : {}
+                    }
+                  >
+                    <CreditCard
+                      size={16}
+                      className={`shrink-0 transition-transform duration-300 ${
+                        location.pathname === '/employee-portal' ? "scale-110" : "group-hover:scale-110"
+                      }`}
+                    />
+                    {!isCollapsed && (
+                      <span className="tracking-tight text-[10px] uppercase ml-2.5 truncate">
+                        Payroll Portal
+                      </span>
+                    )}
+                  </Link>
+
+                  {/* IT Help Desk */}
+                  <Link
+                    to="/cashier/helpdesk"
+                    title={isCollapsed ? "IT Help Desk" : undefined}
+                    onClick={() => setIsSidebarOpen(false)}
+                    className={`flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-3'} py-2.5 rounded-full font-bold transition-all duration-250 group ${
+                      location.pathname === '/cashier/helpdesk'
+                        ? "text-white shadow-md scale-[1.02]"
+                        : "text-slate-400 hover:text-slate-300 hover:bg-white/5"
+                    }`}
+                    style={
+                      location.pathname === '/cashier/helpdesk'
+                        ? { backgroundColor: branding?.theme_color || '#2563eb' }
+                        : {}
+                    }
+                  >
+                    <LifeBuoy
+                      size={16}
+                      className={`shrink-0 transition-transform duration-300 ${
+                        location.pathname === '/cashier/helpdesk' ? "scale-110" : "group-hover:scale-110"
+                      }`}
+                    />
+                    {!isCollapsed && (
+                      <span className="tracking-tight text-[10px] uppercase ml-2.5 truncate">
+                        IT Help Desk
+                      </span>
+                    )}
+                  </Link>
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* LOGOUT */}

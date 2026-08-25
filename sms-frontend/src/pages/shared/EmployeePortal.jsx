@@ -21,6 +21,7 @@ const EmployeePortal = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Personal');
   const [loading, setLoading] = useState(true);
+  const [employeeShift, setEmployeeShift] = useState(null);
 
   // Core employee state
   const [employeeInfo, setEmployeeInfo] = useState(null);
@@ -45,7 +46,7 @@ const EmployeePortal = () => {
   const [approvalRemarks, setApprovalRemarks] = useState({});
 
   const themeColor = branding?.theme_color || '#2563eb';
-  const isManager = ['hr', 'admin', 'super_admin', 'cashier'].includes(user?.role?.toLowerCase());
+  const isManager = ['admin', 'super_admin', 'cashier'].includes(user?.role?.toLowerCase());
 
   const fetchPortalData = async () => {
     setLoading(true);
@@ -69,6 +70,16 @@ const EmployeePortal = () => {
       const timesheetRes = await axios.get(`${API_BASE_URL}/employee-portal/timesheet?email=${email}`);
       if (timesheetRes.data?.success) {
         setTimesheet(timesheetRes.data.logs || []);
+      }
+
+      // Fetch shift assignment
+      try {
+        const shiftRes = await axios.get(`${API_BASE_URL}/employee-portal/my-shift?email=${email}`);
+        if (shiftRes.data?.success) {
+          setEmployeeShift(shiftRes.data.shift);
+        }
+      } catch (err) {
+        console.error("Error loading my shift:", err);
       }
 
       // 4. Fetch requests
@@ -344,6 +355,11 @@ const EmployeePortal = () => {
             <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
               Employee Portal Active
             </span>
+            {employeeShift && (
+              <span className="px-3 py-1 bg-indigo-50 border border-indigo-150 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
+                Shift: {employeeShift.time_in} - {employeeShift.time_out}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-6">
@@ -396,6 +412,7 @@ const EmployeePortal = () => {
               setTimeAdjForm={setTimeAdjForm}
               handleTimeAdjustment={handleTimeAdjustment}
               themeColor={themeColor}
+              employeeShift={employeeShift}
             />
           )}
 

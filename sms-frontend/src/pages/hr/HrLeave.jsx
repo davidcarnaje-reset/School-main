@@ -4,10 +4,11 @@ import { Clipboard, Check, X, FileText, Calendar, Sparkles, RefreshCw } from 'lu
 import { useAuth } from '../../context/AuthContext';
 
 const HrLeave = () => {
-  const { API_BASE_URL, branding } = useAuth();
+  const { API_BASE_URL, branding, user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [remarks, setRemarks] = useState({});
+  const [requestTypeFilter, setRequestTypeFilter] = useState('All');
 
   // Leave balance tracking for active staff (standard configuration)
   const [balances, setBalances] = useState([
@@ -23,12 +24,10 @@ const HrLeave = () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/employee-portal/approvals`);
       if (res.data?.success) {
-        // Filter only Leave requests
-        const filtered = (res.data.requests || []).filter(r => r.request_type === 'Leave');
-        setRequests(filtered);
+        setRequests(res.data.requests || []);
       }
     } catch (error) {
-      console.error("Error loading leave requests:", error);
+      console.error("Error loading requests:", error);
     } finally {
       setLoading(false);
     }
@@ -45,7 +44,7 @@ const HrLeave = () => {
         id,
         status,
         remarks: actionRemarks,
-        approved_by_email: 'hr@school.edu' // HR actor
+        approved_by_email: user?.email || 'hr@school.edu' // HR actor
       });
       if (res.data?.success) {
         alert(`Leave request has been ${status.toLowerCase()}!`);
@@ -64,30 +63,63 @@ const HrLeave = () => {
       <div>
         <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
           <Clipboard className="text-blue-600" size={32} style={{ color: themeColor }} />
-          Leave & Absence Management
+          Employee Service Requests
         </h1>
-        <p className="text-sm font-medium text-slate-500 mt-1">Handles applications for vacation or sick leave, tracks leave balances compliance, and coordinates manager approvals.</p>
+        <p className="text-sm font-medium text-slate-500 mt-1">Handles and coordinates manager approvals for employee applications such as leaves, overtime, rest day requests, change times, change shifts, undertime, and official business.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* LEAVE APPLICATIONS QUEUE */}
         <div className="lg:col-span-8 bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-1">
-              <FileText size={16} className="text-slate-400" /> Leave Application Queue
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-100 pb-4">
+            <h3 className="text-sm font-black text-slate-850 tracking-tight flex items-center gap-2">
+              <FileText size={16} className="text-slate-400" /> Request Applications Queue
             </h3>
-            <button onClick={fetchLeaveRequests} className="p-2 hover:bg-slate-50 rounded-xl transition-all text-slate-400 hover:text-blue-600"><RefreshCw size={14} /></button>
+            <div className="flex items-center gap-3">
+              <select
+                value={requestTypeFilter}
+                onChange={(e) => setRequestTypeFilter(e.target.value)}
+                className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+              >
+                <option value="All">All Request Types</option>
+                <option value="Leave">Leave Requests</option>
+                <option value="Overtime">Overtime</option>
+                <option value="Time Adjustment">Time Adjustment</option>
+                <option value="Rest Day">Rest Day Requests</option>
+                <option value="Official Business">Official Business</option>
+                <option value="Undertime">Undertime</option>
+                <option value="Offset">Offset</option>
+                <option value="Change Time">Change Time</option>
+              </select>
+              <button 
+                onClick={fetchLeaveRequests} 
+                className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-500 hover:text-blue-600 border border-slate-200"
+                title="Refresh Queue"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
           </div>
           
           {loading ? (
-            <p className="text-xs text-slate-400 text-center py-10 font-bold">Querying leave queue...</p>
+            <p className="text-xs text-slate-400 text-center py-10 font-bold">Querying request queue...</p>
           ) : requests.length === 0 ? (
-            <p className="text-xs text-slate-400 font-bold text-center py-10">No pending leave applications in queue.</p>
+            <p className="text-xs text-slate-400 font-bold text-center py-10">No applications in queue.</p>
           ) : (
             <div className="space-y-4">
-              {requests.map((r) => {
-                let d = { request_date: r.created_at, notes: '', entries: [] };
+              {(() => {
+                const filteredRequests = requests.filter(r => {
+                  if (requestTypeFilter === 'All') return true;
+                  return r.request_type === requestTypeFilter;
+                });
+
+                if (filteredRequests.length === 0) {
+                  return <p className="text-xs text-slate-400 font-bold text-center py-10">No pending {requestTypeFilter} applications in queue.</p>;
+                }
+
+                return filteredRequests.map((r) => {
+                  let d = { request_date: r.created_at, notes: '', entries: [] };
                 try {
                   d = typeof r.details === 'string' ? JSON.parse(r.details) : r.details;
                 } catch(e) {
@@ -96,13 +128,27 @@ const HrLeave = () => {
 
                 const firstEntry = d.entries?.[0] || {};
 
-                return (
-                  <div key={r.id} className="p-5 border border-slate-100 rounded-3xl bg-slate-50/50 flex flex-col md:flex-row justify-between md:items-center gap-4 hover:border-slate-200 transition-all">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-mono font-bold text-slate-400">ID #{r.id}</span>
-                        <h4 className="text-sm font-bold text-slate-800">{r.first_name} {r.last_name} ({r.position})</h4>
-                      </div>
+                  const getBadgeStyle = (type) => {
+                    switch (type) {
+                      case 'Leave': return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                      case 'Overtime': return 'bg-amber-50 text-amber-700 border border-amber-100';
+                      case 'Time Adjustment': return 'bg-blue-50 text-blue-700 border border-blue-100';
+                      case 'Rest Day': return 'bg-indigo-50 text-indigo-700 border border-indigo-100';
+                      case 'Official Business': return 'bg-purple-50 text-purple-700 border border-purple-100';
+                      default: return 'bg-slate-50 text-slate-700 border border-slate-150';
+                    }
+                  };
+
+                  return (
+                    <div key={r.id} className="p-5 border border-slate-100 rounded-3xl bg-slate-50/50 flex flex-col md:flex-row justify-between md:items-center gap-4 hover:border-slate-200 transition-all">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-mono font-bold text-slate-400">ID #{r.id}</span>
+                          <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${getBadgeStyle(r.request_type)}`}>
+                            {r.request_type}
+                          </span>
+                          <h4 className="text-sm font-bold text-slate-800">{r.first_name} {r.last_name} ({r.position})</h4>
+                        </div>
                       
                       <p className="text-xs text-slate-500 font-semibold mt-1 flex items-center gap-1">
                         <Calendar size={12} className="text-slate-400" /> Duration: <strong>{firstEntry.dateFrom ? `${new Date(firstEntry.dateFrom).toLocaleDateString()} - ${new Date(firstEntry.dateTo).toLocaleDateString()}` : r.details}</strong>
@@ -134,8 +180,9 @@ const HrLeave = () => {
                       )}
                     </div>
                   </div>
-                );
-              })}
+                 );
+                });
+              })()}
             </div>
           )}
         </div>

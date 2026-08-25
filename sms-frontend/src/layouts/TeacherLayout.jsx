@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
   LayoutDashboard, Calendar, LogOut, Menu, X, School, BookOpen,
   Bell, ChevronLeft, ChevronRight, RefreshCw, Megaphone, CheckCheck,
-  MoreHorizontal, Check, XSquare, BellOff, Bug, CreditCard
+  MoreHorizontal, Check, XSquare, BellOff, Bug, CreditCard, LayoutGrid, ChevronDown, ChevronUp, LifeBuoy
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TeacherProfileModal from '../components/admin/UserProfileModal';
@@ -37,6 +37,15 @@ const TeacherLayout = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [teachingClasses, setTeachingClasses] = useState([]);
   const [isCollapsed, setIsCollapsed] = useState(() => JSON.parse(localStorage.getItem('teacherSidebarCollapsed')) ?? true);
+
+  const isAppRouteActive = location.pathname === '/employee-portal' || location.pathname === '/teacher/helpdesk';
+  const [isAppsOpen, setIsAppsOpen] = useState(isAppRouteActive);
+
+  useEffect(() => {
+    if (location.pathname === '/employee-portal' || location.pathname === '/teacher/helpdesk') {
+      setIsAppsOpen(true);
+    }
+  }, [location.pathname]);
 
   const [isNotifyOpen, setIsNotifyOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState('all');
@@ -174,7 +183,6 @@ const TeacherLayout = () => {
   const displayedNotifications = showAllInDropdown ? filteredNotifs : filteredNotifs.slice(0, 6);
 
   const currentMenu = [
-    { icon: <CreditCard size={20} />, label: 'My Payroll Portal', path: '/employee-portal' },
     { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/teacher/dashboard' },
     { icon: <School size={20} />, label: 'My Classes', path: '/teacher/classes' },
     { icon: <Calendar size={20} />, label: 'Daily Time Record', path: '/teacher/dtr' },
@@ -326,6 +334,89 @@ const TeacherLayout = () => {
               </div>
             </div>
           )}
+
+          {/* APPS DROPDOWN */}
+          <div className="space-y-1 mt-2 border-t border-slate-200/50 pt-2">
+            <button
+              onClick={() => setIsAppsOpen(!isAppsOpen)}
+              className={`w-full flex items-center p-3.5 rounded-2xl transition-all duration-300 group ${
+                isCollapsed ? 'lg:justify-center lg:px-0' : 'lg:px-4 lg:gap-4'
+              } px-4 py-3 gap-4 ${
+                location.pathname === '/employee-portal' || location.pathname === '/teacher/helpdesk'
+                  ? 'bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+              title={isCollapsed ? "Apps & Services" : ""}
+            >
+              <span className={`w-6 h-6 flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${
+                location.pathname === '/employee-portal' || location.pathname === '/teacher/helpdesk' ? 'text-slate-900' : 'text-slate-500'
+              }`}>
+                <LayoutGrid size={20} />
+              </span>
+              <span className={`font-bold text-sm transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${
+                isCollapsed ? 'lg:hidden' : ''
+              }`}>
+                Apps
+              </span>
+              {!isCollapsed && (
+                <span className="ml-auto shrink-0 text-slate-400">
+                  {isAppsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </span>
+              )}
+            </button>
+
+            {isAppsOpen && (
+              <div className={`space-y-1.5 transition-all duration-300 ${isCollapsed ? 'lg:pl-0' : 'pl-6'}`}>
+                {/* Payroll Portal */}
+                <Link
+                  to="/employee-portal"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className={`flex items-center rounded-xl transition-all duration-250 group ${
+                    isCollapsed ? 'lg:justify-center lg:px-0' : 'lg:px-3 lg:gap-3'
+                  } px-3 py-2 gap-3 ${
+                    location.pathname === '/employee-portal' ? 'text-white shadow-sm border border-white/40' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                  style={location.pathname === '/employee-portal' ? { backgroundColor: themeColor } : {}}
+                  title={isCollapsed ? "My Payroll Portal" : ""}
+                >
+                  <span className={`w-5 h-5 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                    location.pathname === '/employee-portal' ? 'text-white' : 'text-slate-550'
+                  }`}>
+                    <CreditCard size={18} />
+                  </span>
+                  <span className={`font-semibold text-xs transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${
+                    isCollapsed ? 'lg:hidden' : ''
+                  }`}>
+                    Payroll Portal
+                  </span>
+                </Link>
+
+                {/* IT Help Desk */}
+                <Link
+                  to="/teacher/helpdesk"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className={`flex items-center rounded-xl transition-all duration-250 group ${
+                    isCollapsed ? 'lg:justify-center lg:px-0' : 'lg:px-3 lg:gap-3'
+                  } px-3 py-2 gap-3 ${
+                    location.pathname === '/teacher/helpdesk' ? 'text-white shadow-sm border border-white/40' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                  style={location.pathname === '/teacher/helpdesk' ? { backgroundColor: themeColor } : {}}
+                  title={isCollapsed ? "IT Support Ticketing" : ""}
+                >
+                  <span className={`w-5 h-5 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                    location.pathname === '/teacher/helpdesk' ? 'text-white' : 'text-slate-550'
+                  }`}>
+                    <LifeBuoy size={18} />
+                  </span>
+                  <span className={`font-semibold text-xs transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${
+                    isCollapsed ? 'lg:hidden' : ''
+                  }`}>
+                    IT Help Desk
+                  </span>
+                </Link>
+              </div>
+            )}
+          </div>
         </nav>
 
         <button onClick={() => setIsCollapsed(!isCollapsed)} className="hidden lg:flex absolute -right-3.5 top-24 w-7 h-7 bg-white text-slate-800 rounded-full items-center justify-center shadow-md border border-slate-200 hover:scale-110 transition-transform z-50">

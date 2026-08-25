@@ -99,6 +99,24 @@ pool.on('error', (err) => {
   }
 })();
 
+// Auto-patch schema for employee shifts
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS employee_shifts (
+        user_id INT PRIMARY KEY,
+        shift_id VARCHAR(50) NOT NULL,
+        shift_name VARCHAR(100) NOT NULL,
+        time_in VARCHAR(50) NOT NULL,
+        time_out VARCHAR(50) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch (err) {
+    console.error("Failed to initialize employee_shifts table:", err.message);
+  }
+})();
+
 // Guidance Counselor Tables initialization
 (async () => {
   try {

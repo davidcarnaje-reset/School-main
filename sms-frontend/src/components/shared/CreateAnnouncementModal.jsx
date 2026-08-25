@@ -185,6 +185,12 @@ const CreateAnnouncementModal = ({ isOpen, onClose }) => {
                     <option value="teacher">All Teachers</option>
                     <option value="registrar">All Registrars</option>
                     <option value="cashier">All Cashiers</option>
+                    <option value="hr">All HR Staff</option>
+                    <option value="it">All IT Staff</option>
+                    <option value="custodian">All Custodian Staff</option>
+                    <option value="guidance">All Guidance Staff</option>
+                    <option value="nurse">All Nurse/Health Staff</option>
+                    <option value="school_admin">All School Admins</option>
                     <option value="admin">All Admins</option>
                   </select>
                 </div>
@@ -199,6 +205,12 @@ const CreateAnnouncementModal = ({ isOpen, onClose }) => {
                       <option value="teacher">Teachers</option>
                       <option value="registrar">Registrars</option>
                       <option value="cashier">Cashiers</option>
+                      <option value="hr">HR Staff</option>
+                      <option value="it">IT Staff</option>
+                      <option value="custodian">Custodian Staff</option>
+                      <option value="guidance">Guidance Staff</option>
+                      <option value="nurse">Nurse/Health Staff</option>
+                      <option value="school_admin">School Admins</option>
                       <option value="admin">Admins</option>
                     </select>
                   </div>
