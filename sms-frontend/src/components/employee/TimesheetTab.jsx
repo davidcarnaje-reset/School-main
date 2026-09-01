@@ -1,10 +1,71 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Clock, Calendar, CheckCircle2, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, X, Clock, Calendar, CheckCircle2, ShieldAlert, LogIn, LogOut, MapPin } from 'lucide-react';
+import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjustment, themeColor, employeeShift }) => {
+  const { user, API_BASE_URL } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDayDetail, setSelectedDayDetail] = useState(null);
+  
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [clockLoading, setClockLoading] = useState(false);
+  const [clockStatus, setClockStatus] = useState('');
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayLog = Array.isArray(timesheet) ? timesheet.find(l => (l.log_date?.split('T')[0] === todayStr || l.log_date === todayStr)) : null;
+
+  const handleClockLog = (logType) => {
+    setClockLoading(true);
+    setClockStatus('Verifying GPS location...');
+
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      setClockLoading(false);
+      setClockStatus('');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setClockStatus('Saving DTR record...');
+        try {
+          const res = await axios.post(`${API_BASE_URL}/employee-portal/log-clock`, {
+            email: user?.email || user?.username,
+            log_type: logType,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          });
+
+          if (res.data?.success) {
+            alert(res.data.message || `Successfully logged ${logType.replace('_', ' ')}!`);
+            window.location.reload();
+          } else {
+            alert(res.data?.message || "Failed to log DTR time.");
+          }
+        } catch (err) {
+          console.error("Clock log error:", err);
+          alert(err.response?.data?.message || "Failed to log DTR time. Please check your location permissions.");
+        } finally {
+          setClockLoading(false);
+          setClockStatus('');
+        }
+      },
+      (err) => {
+        console.error("GPS error:", err);
+        alert("Please ALLOW Location Services on your device to log your DTR time.");
+        setClockLoading(false);
+        setClockStatus('');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const monthsList = [
     "January", "February", "March", "April", "May", "June", 
@@ -77,6 +138,54 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
 
   return (
     <div className="space-y-6">
+      
+      {/* LIVE DTR CLOCK & TIME IN / TIME OUT ACTION BANNER */}
+      <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-center md:text-left">
+            <span className="text-xs font-bold text-slate-400 tracking-widest uppercase flex items-center justify-center md:justify-start gap-2 mb-1">
+              <Calendar size={14} />
+              {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
+            <div className="text-4xl md:text-5xl font-black text-slate-800 tracking-tight font-sans">
+              {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </div>
+            <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
+              <span className="text-xs text-slate-500 font-bold flex items-center gap-1">
+                <MapPin size={13} className="text-emerald-500" /> GPS Location Geofence Active
+              </span>
+            </div>
+            {clockStatus && <p className="text-xs font-bold text-blue-600 mt-2 animate-pulse">{clockStatus}</p>}
+          </div>
+
+          <div className="flex gap-4 w-full md:w-auto">
+            <button
+              onClick={() => handleClockLog('time_in')}
+              disabled={clockLoading || Boolean(todayLog?.time_in)}
+              className="flex-1 md:flex-none flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed group min-w-[130px]"
+            >
+              <LogIn size={28} className="mb-1 text-emerald-500 group-hover:scale-110 transition-transform" />
+              <span className="font-extrabold text-xs tracking-wider">TIME IN</span>
+              <span className="text-[10px] font-bold text-slate-400 mt-1 font-mono">
+                {todayLog?.time_in ? formatTimeAMPM(todayLog.time_in) : '--:--'}
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleClockLog('time_out')}
+              disabled={clockLoading || !todayLog?.time_in || Boolean(todayLog?.time_out)}
+              className="flex-1 md:flex-none flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50 text-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed group min-w-[130px]"
+            >
+              <LogOut size={28} className="mb-1 text-rose-500 group-hover:scale-110 transition-transform" />
+              <span className="font-extrabold text-xs tracking-wider">TIME OUT</span>
+              <span className="text-[10px] font-bold text-slate-400 mt-1 font-mono">
+                {todayLog?.time_out ? formatTimeAMPM(todayLog.time_out) : '--:--'}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* INTERACTIVE CALENDAR WORKSPACE */}

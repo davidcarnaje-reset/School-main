@@ -18,6 +18,7 @@ import {
   ArrowLeft, // DAGDAG ITO
   FileText, // DAGDAG ITO
   CheckCircle, // DAGDAG ITO
+  Clock
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -141,6 +142,23 @@ const Payroll = () => {
 
   const [selectedPeriod, setSelectedPeriod] = useState(null);
   const [payrollEntries, setPayrollEntries] = useState([]);
+  const [timesheetModal, setTimesheetModal] = useState({ open: false, empName: '', period: null, logs: [], loading: false });
+
+  const handleOpenTimesheetModal = async (empId, empName) => {
+    if (!selectedPeriod?.id) return;
+    setTimesheetModal({ open: true, empName, period: selectedPeriod, logs: [], loading: true });
+    try {
+      const res = await axios.get(`${API_BASE_URL}/cashier/payroll/employee-timesheet?employee_id=${empId}&period_id=${selectedPeriod.id}`);
+      if (res.data?.status === 'success') {
+        setTimesheetModal(prev => ({ ...prev, logs: res.data.logs || [], loading: false }));
+      } else {
+        setTimesheetModal(prev => ({ ...prev, loading: false }));
+      }
+    } catch (err) {
+      console.error("Error fetching employee timesheet:", err);
+      setTimesheetModal(prev => ({ ...prev, loading: false }));
+    }
+  };
 
   const handleStartProcess = async (period) => {
     setLoading(true);
@@ -1211,6 +1229,13 @@ const Payroll = () => {
                           <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider group-hover:text-blue-500 transition-colors">
                             {entry.position}
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenTimesheetModal(entry.employee_id, `${entry.first_name} ${entry.last_name}`)}
+                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 mt-1.5 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-xl border border-blue-200/60 transition-all"
+                          >
+                            <Clock size={12} /> View DTR Timesheet
+                          </button>
                         </div>
                       </div>
                     </td>
@@ -1299,6 +1324,100 @@ const Payroll = () => {
                   .toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EMPLOYEE DTR TIMESHEET INSPECTION MODAL */}
+      {timesheetModal.open && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[3rem] border border-slate-100 p-8 shadow-2xl w-full max-w-2xl space-y-6 relative animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            {/* CLOSE BUTTON */}
+            <button 
+              onClick={() => setTimesheetModal({ open: false, empName: '', period: null, logs: [], loading: false })}
+              className="absolute top-6 right-6 p-3 hover:bg-slate-100 rounded-2xl transition-all text-slate-400 hover:text-slate-700"
+            >
+              <X size={20} />
+            </button>
+
+            {/* HEADER */}
+            <div className="border-b border-slate-100 pb-4">
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5 mb-1">
+                <Clock size={14} /> Employee DTR Timesheet Audit
+              </span>
+              <h3 className="text-2xl font-black text-slate-900 uppercase italic">
+                {timesheetModal.empName}
+              </h3>
+              <p className="text-xs font-bold text-slate-400 mt-1">
+                Period: {timesheetModal.period?.start_date} — {timesheetModal.period?.end_date}
+              </p>
+            </div>
+
+            {/* LOGS TABLE / CONTENT */}
+            {timesheetModal.loading ? (
+              <div className="text-center py-12 text-slate-400 font-bold text-xs animate-pulse">
+                Fetching DTR logs for this employee...
+              </div>
+            ) : timesheetModal.logs.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-slate-400 font-semibold text-xs">
+                No DTR Time In / Time Out logs recorded during this period.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
+                  <div>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Total Days Logged</span>
+                    <span className="text-lg font-black text-slate-800 italic">{timesheetModal.logs.length} Days</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Total Overtime</span>
+                    <span className="text-lg font-black text-blue-600 italic">
+                      {timesheetModal.logs.reduce((acc, curr) => acc + (parseFloat(curr.ot_hours) || 0), 0)} hrs
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">DTR Records</span>
+                    <span className="text-lg font-black text-emerald-600 italic">Verified GPS</span>
+                  </div>
+                </div>
+
+                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-wider border-b border-slate-100">
+                        <th className="p-4">Date</th>
+                        <th className="p-4 text-center">Time In</th>
+                        <th className="p-4 text-center">Time Out</th>
+                        <th className="p-4 text-center">OT Hours</th>
+                        <th className="p-4 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
+                      {timesheetModal.logs.map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-50/60">
+                          <td className="p-4 font-mono">{log.log_date?.split('T')[0]}</td>
+                          <td className="p-4 text-center text-emerald-600 font-mono">{log.time_in || '--:--'}</td>
+                          <td className="p-4 text-center text-slate-600 font-mono">{log.time_out || '--:--'}</td>
+                          <td className="p-4 text-center text-blue-600 font-mono">{log.ot_hours || '0.00'}</td>
+                          <td className="p-4 text-center">
+                            <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase bg-emerald-50 text-emerald-600">
+                              {log.status || 'On Time'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setTimesheetModal({ open: false, empName: '', period: null, logs: [], loading: false })}
+              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-black transition-all shadow-lg"
+            >
+              Close Timesheet Audit
+            </button>
           </div>
         </div>
       )}

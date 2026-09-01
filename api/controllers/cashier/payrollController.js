@@ -233,23 +233,64 @@ export const processPayrollInit = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Fetch period start and end dates
+    const [periodRows] = await connection.query("SELECT start_date, end_date FROM payroll_periods WHERE id = ?", [parseInt(period_id, 10)]);
+    const period = periodRows[0] || null;
+
     // 1. Get active employees
     const [activeEmployees] = await connection.query("SELECT id FROM employees WHERE status = 'Active'");
     const empIds = (activeEmployees || []).map(emp => emp.id);
 
-    // 2. Insert ignore into payroll_entries (check if already exists)
+    // 2. Insert ignore and calculate DTR metrics from employee_dtr for each employee
     for (const empId of empIds) {
+      let daysWorked = 0;
+      let otHours = 0;
+      let lateMins = 0;
+
+      if (period?.start_date && period?.end_date) {
+        const [dtrMetrics] = await connection.query(
+          `SELECT 
+             COUNT(CASE WHEN time_in IS NOT NULL THEN 1 END) AS days_cnt,
+             COALESCE(SUM(ot_hours), 0) AS total_ot,
+             COALESCE(SUM(CASE 
+               WHEN time_in IS NOT NULL AND TIME(time_in) > '08:00:00' 
+               THEN TIMESTAMPDIFF(MINUTE, '08:00:00', TIME(time_in)) 
+               ELSE 0 
+             END), 0) AS total_late
+           FROM employee_dtr 
+           WHERE employee_id = ? AND log_date BETWEEN ? AND ?`,
+          [empId, period.start_date, period.end_date]
+        );
+
+        if (dtrMetrics.length > 0) {
+          daysWorked = parseInt(dtrMetrics[0].days_cnt, 10) || 0;
+          otHours = parseFloat(dtrMetrics[0].total_ot) || 0;
+          lateMins = parseInt(dtrMetrics[0].total_late, 10) || 0;
+        }
+      }
+
       const [existing] = await connection.query(
-        "SELECT id FROM payroll_entries WHERE period_id = ? AND employee_id = ?",
+        "SELECT id, days_worked, overtime_hours, late_minutes FROM payroll_entries WHERE period_id = ? AND employee_id = ?",
         [parseInt(period_id, 10), empId]
       );
+
       if (existing.length === 0) {
         const [maxIdRows] = await connection.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM payroll_entries FOR UPDATE");
         const nextId = maxIdRows[0].maxId + 1;
 
         await connection.query(
-          "INSERT INTO payroll_entries (id, period_id, employee_id, days_worked, overtime_hours, late_minutes, net_pay, status) VALUES (?, ?, ?, 0, 0, 0, 0, 'Pending')",
-          [nextId, parseInt(period_id, 10), empId]
+          "INSERT INTO payroll_entries (id, period_id, employee_id, days_worked, overtime_hours, late_minutes, net_pay, status) VALUES (?, ?, ?, ?, ?, ?, 0, 'Pending')",
+          [nextId, parseInt(period_id, 10), empId, daysWorked, otHours, lateMins]
+        );
+      } else {
+        // Update DTR metrics if current value is 0 or needs refreshing from DTR logs
+        await connection.query(
+          `UPDATE payroll_entries SET 
+             days_worked = GREATEST(days_worked, ?), 
+             overtime_hours = GREATEST(overtime_hours, ?), 
+             late_minutes = GREATEST(late_minutes, ?) 
+           WHERE period_id = ? AND employee_id = ?`,
+          [daysWorked, otHours, lateMins, parseInt(period_id, 10), empId]
         );
       }
     }
@@ -279,6 +320,29 @@ export const processPayrollInit = async (req, res) => {
     return res.status(500).json({ status: "error", message: error.message });
   } finally {
     connection.release();
+  }
+};
+
+export const getEmployeePayrollTimesheet = async (req, res) => {
+  const { employee_id, period_id } = req.query;
+  try {
+    const [periodRows] = await pool.query("SELECT start_date, end_date FROM payroll_periods WHERE id = ?", [parseInt(period_id, 10)]);
+    if (periodRows.length === 0) {
+      return res.status(404).json({ status: "error", message: "Payroll period not found." });
+    }
+    const { start_date, end_date } = periodRows[0];
+
+    const [logs] = await pool.query(
+      `SELECT * FROM employee_dtr 
+       WHERE employee_id = ? AND log_date BETWEEN ? AND ? 
+       ORDER BY log_date ASC`,
+      [parseInt(employee_id, 10), start_date, end_date]
+    );
+
+    return res.json({ status: "success", period: periodRows[0], logs });
+  } catch (error) {
+    console.error("getEmployeePayrollTimesheet error:", error);
+    return res.status(500).json({ status: "error", message: error.message });
   }
 };
 

@@ -207,7 +207,7 @@ const SchoolPermissions = () => {
     profiles: "Student Health Profiles",
     checks: "Physical Health Checks",
     visits: "Clinic Consultation Logs",
-    inventory: "Clinic Medicine Inventory"
+    clinic_inventory: "Clinic Medicine Inventory"
   };
 
   const rolesConfig = [

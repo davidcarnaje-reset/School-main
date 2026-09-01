@@ -76,32 +76,40 @@ export const logDtr = async (req, res) => {
   }
 
   try {
-    // Geofencing Coordinates: Norzagaray Area / Obando Area school grounds
-    const schoolLat = 14.9079167; 
-    const schoolLng = 121.0331667; 
-    const maxDistanceMeters = 150; 
+    // 🟢 Fetch dynamic school location settings set by Main Admin
+    const [settingsRows] = await pool.query(
+      "SELECT dtr_latitude, dtr_longitude, dtr_radius, dtr_geofence_enabled FROM school_settings WHERE id = 1 LIMIT 1"
+    );
+
+    const schoolSettings = settingsRows[0] || {};
+    const schoolLat = parseFloat(schoolSettings.dtr_latitude) || 14.9079167;
+    const schoolLng = parseFloat(schoolSettings.dtr_longitude) || 121.0331667;
+    const maxDistanceMeters = parseInt(schoolSettings.dtr_radius, 10) || 150;
+    const geofenceEnabled = schoolSettings.dtr_geofence_enabled === undefined ? true : Boolean(schoolSettings.dtr_geofence_enabled);
 
     const userLat = parseFloat(latitude);
     const userLng = parseFloat(longitude);
 
-    // Haversine formula matching PHP math
-    const deg2rad = (deg) => (deg * Math.PI) / 180;
-    const rad2deg = (rad) => (rad * 180) / Math.PI;
+    if (geofenceEnabled) {
+      // Haversine formula matching PHP math
+      const deg2rad = (deg) => (deg * Math.PI) / 180;
+      const rad2deg = (rad) => (rad * 180) / Math.PI;
 
-    const theta = userLng - schoolLng;
-    let dist = Math.sin(deg2rad(userLat)) * Math.sin(deg2rad(schoolLat)) +
-               Math.cos(deg2rad(userLat)) * Math.cos(deg2rad(schoolLat)) * Math.cos(deg2rad(theta));
-    
-    dist = Math.acos(Math.min(1, Math.max(-1, dist)));
-    dist = rad2deg(dist);
-    const miles = dist * 60 * 1.1515;
-    const distanceInMeters = (miles * 1.609344) * 1000;
+      const theta = userLng - schoolLng;
+      let dist = Math.sin(deg2rad(userLat)) * Math.sin(deg2rad(schoolLat)) +
+                 Math.cos(deg2rad(userLat)) * Math.cos(deg2rad(schoolLat)) * Math.cos(deg2rad(theta));
+      
+      dist = Math.acos(Math.min(1, Math.max(-1, dist)));
+      dist = rad2deg(dist);
+      const miles = dist * 60 * 1.1515;
+      const distanceInMeters = (miles * 1.609344) * 1000;
 
-    if (distanceInMeters > maxDistanceMeters) {
-      return res.json({
-        status: "error",
-        message: `Access Denied. You are ${Math.round(distanceInMeters)} meters away. You must be at the school premises to log your time.`
-      });
+      if (distanceInMeters > maxDistanceMeters) {
+        return res.json({
+          status: "error",
+          message: `Access Denied. You are ${Math.round(distanceInMeters)} meters away from the allowed location (${maxDistanceMeters}m limit). You must be within the school premises to log your time.`
+        });
+      }
     }
 
     const teacherId = parseInt(teacher_id, 10);
@@ -112,7 +120,7 @@ export const logDtr = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      // Check daily entry
+      // Check daily entry in teacher_dtr
       const [records] = await connection.query(
         "SELECT id, time_in, time_out FROM teacher_dtr WHERE teacher_id = ? AND record_date = ? LIMIT 1",
         [teacherId, today]
@@ -125,6 +133,26 @@ export const logDtr = async (req, res) => {
             "INSERT INTO teacher_dtr (teacher_id, record_date, time_in) VALUES (?, ?, ?)",
             [teacherId, today, timeStr]
           );
+
+          // Sync into employee_dtr for employee/payroll timesheet integration
+          const [empCheck] = await connection.query(
+            `SELECT e.id FROM employees e 
+             JOIN users u ON (TRIM(LOWER(e.first_name)) = TRIM(LOWER(u.first_name)) AND TRIM(LOWER(e.last_name)) = TRIM(LOWER(u.last_name))) 
+             WHERE u.id = ? LIMIT 1`,
+            [teacherId]
+          );
+          const matchedEmpId = empCheck.length > 0 ? empCheck[0].id : teacherId;
+
+          const [maxEmpDtr] = await connection.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employee_dtr");
+          const nextEmpDtrId = maxEmpDtr[0].maxId + 1;
+
+          await connection.query(
+            `INSERT INTO employee_dtr (id, employee_id, log_date, time_in, time_out, ot_hours, status)
+             VALUES (?, ?, ?, ?, NULL, 0.00, 'On Time')
+             ON DUPLICATE KEY UPDATE time_in = VALUES(time_in), status = 'On Time'`,
+            [nextEmpDtrId, matchedEmpId, today, timeStr]
+          );
+
           await connection.commit();
           await logAuditTrail(
             teacherId,
@@ -145,6 +173,21 @@ export const logDtr = async (req, res) => {
               "UPDATE teacher_dtr SET time_out = ? WHERE id = ?",
               [timeStr, record.id]
             );
+
+            // Sync time_out into employee_dtr
+            const [empCheck] = await connection.query(
+              `SELECT e.id FROM employees e 
+               JOIN users u ON (TRIM(LOWER(e.first_name)) = TRIM(LOWER(u.first_name)) AND TRIM(LOWER(e.last_name)) = TRIM(LOWER(u.last_name))) 
+               WHERE u.id = ? LIMIT 1`,
+              [teacherId]
+            );
+            const matchedEmpId = empCheck.length > 0 ? empCheck[0].id : teacherId;
+
+            await connection.query(
+              "UPDATE employee_dtr SET time_out = ? WHERE employee_id = ? AND log_date = ?",
+              [timeStr, matchedEmpId, today]
+            );
+
             await connection.commit();
             await logAuditTrail(
               teacherId,

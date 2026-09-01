@@ -136,6 +136,106 @@ export const addTimeLog = async (req, res) => {
   }
 };
 
+// Employee Live Clock In / Clock Out with GPS Geofencing
+export const logEmployeeClock = async (req, res) => {
+  const { email, log_type, latitude, longitude } = req.body;
+
+  if (!email || !log_type || latitude === undefined || longitude === undefined) {
+    return res.status(400).json({ success: false, message: "Incomplete data or location missing." });
+  }
+
+  try {
+    const empId = await getOrCreateEmployeeId(email);
+    if (!empId) return res.status(404).json({ success: false, message: "Employee record not found." });
+
+    // Fetch dynamic school geofence settings
+    const [settingsRows] = await pool.query(
+      "SELECT dtr_latitude, dtr_longitude, dtr_radius, dtr_geofence_enabled FROM school_settings WHERE id = 1 LIMIT 1"
+    );
+
+    const schoolSettings = settingsRows[0] || {};
+    const schoolLat = parseFloat(schoolSettings.dtr_latitude) || 14.9079167;
+    const schoolLng = parseFloat(schoolSettings.dtr_longitude) || 121.0331667;
+    const maxDistanceMeters = parseInt(schoolSettings.dtr_radius, 10) || 150;
+    const geofenceEnabled = schoolSettings.dtr_geofence_enabled === undefined ? true : Boolean(schoolSettings.dtr_geofence_enabled);
+
+    const userLat = parseFloat(latitude);
+    const userLng = parseFloat(longitude);
+
+    if (geofenceEnabled) {
+      const deg2rad = (deg) => (deg * Math.PI) / 180;
+      const rad2deg = (rad) => (rad * 180) / Math.PI;
+
+      const theta = userLng - schoolLng;
+      let dist = Math.sin(deg2rad(userLat)) * Math.sin(deg2rad(schoolLat)) +
+                 Math.cos(deg2rad(userLat)) * Math.cos(deg2rad(schoolLat)) * Math.cos(deg2rad(theta));
+      
+      dist = Math.acos(Math.min(1, Math.max(-1, dist)));
+      dist = rad2deg(dist);
+      const miles = dist * 60 * 1.1515;
+      const distanceInMeters = (miles * 1.609344) * 1000;
+
+      if (distanceInMeters > maxDistanceMeters) {
+        return res.status(400).json({
+          success: false,
+          message: `Access Denied. You are ${Math.round(distanceInMeters)} meters away from the allowed area (${maxDistanceMeters}m limit). Must be at school premises.`
+        });
+      }
+    }
+
+    const todayDate = new Date();
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const logDate = dateFormatter.format(todayDate);
+
+    const timeFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const timeStr = timeFormatter.format(todayDate);
+
+    const [existing] = await pool.query(
+      "SELECT id, time_in, time_out FROM employee_dtr WHERE employee_id = ? AND log_date = ? LIMIT 1",
+      [empId, logDate]
+    );
+
+    if (log_type === 'time_in') {
+      if (existing.length > 0 && existing[0].time_in) {
+        return res.status(400).json({ success: false, message: "You have already timed in today." });
+      }
+
+      const [maxRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employee_dtr");
+      const nextId = maxRows[0].maxId + 1;
+
+      await pool.query(`
+        INSERT INTO employee_dtr (id, employee_id, log_date, time_in, time_out, ot_hours, status)
+        VALUES (?, ?, ?, ?, NULL, 0.00, 'On Time')
+        ON DUPLICATE KEY UPDATE time_in = VALUES(time_in), status = 'On Time'
+      `, [nextId, empId, logDate, timeStr]);
+
+      return res.status(200).json({ success: true, message: `Timed in successfully at ${timeStr}` });
+
+    } else if (log_type === 'time_out') {
+      if (existing.length === 0 || !existing[0].time_in) {
+        return res.status(400).json({ success: false, message: "Cannot Time Out without a Time In record today." });
+      }
+      if (existing[0].time_out) {
+        return res.status(400).json({ success: false, message: "You have already timed out today." });
+      }
+
+      await pool.query(
+        "UPDATE employee_dtr SET time_out = ? WHERE id = ?",
+        [timeStr, existing[0].id]
+      );
+
+      return res.status(200).json({ success: true, message: `Timed out successfully at ${timeStr}` });
+
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid log type." });
+    }
+
+  } catch (error) {
+    console.error("logEmployeeClock error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // 3. FILE A PORTAL REQUEST
 export const createRequest = async (req, res) => {
   const { email, request_type, details } = req.body;
@@ -415,6 +515,19 @@ export const hireEmployee = async (req, res) => {
   } = req.body;
 
   try {
+    // 0. Email and Phone Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: 'Invalid email address provided.' });
+    }
+
+    if (phone_number) {
+      const cleanPhone = String(phone_number).replace(/\D/g, '');
+      if (cleanPhone.length !== 11) {
+        return res.status(400).json({ success: false, message: 'Phone contact must be exactly 11 digits (PH standard: 09XXXXXXXXX).' });
+      }
+    }
+
     const schoolId = req.school_id || 1;
     let employeeNumber = '';
 

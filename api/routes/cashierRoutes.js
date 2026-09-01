@@ -33,7 +33,8 @@ import {
   processPayrollInit, 
   savePayroll, 
   getCompletedPeriods, 
-  getCompletedPayroll 
+  getCompletedPayroll,
+  getEmployeePayrollTimesheet 
 } from '../controllers/cashier/payrollController.js';
 
 const router = express.Router();
@@ -101,5 +102,7 @@ router.get('/process_payroll_init.php', processPayrollInit);
 router.post('/save_payroll.php', savePayroll);
 router.get('/get_completed_periods.php', getCompletedPeriods);
 router.get('/get_completed_payroll.php', getCompletedPayroll);
+router.get('/payroll/employee-timesheet', getEmployeePayrollTimesheet);
+router.get('/get_employee_payroll_timesheet.php', getEmployeePayrollTimesheet);
 
 export default router;

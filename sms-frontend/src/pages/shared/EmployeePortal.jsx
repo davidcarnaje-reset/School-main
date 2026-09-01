@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   User, Calendar, CreditCard, Clipboard, CheckSquare, 
-  Wallet, Award, Bell, ArrowLeft, Loader2, X, Menu
+  Wallet, Award, Bell, ArrowLeft, Loader2, X, Menu,
+  CheckCircle, AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -45,6 +46,14 @@ const EmployeePortal = () => {
   // Interactive Payslip modal
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [approvalRemarks, setApprovalRemarks] = useState({});
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 4000);
+  };
 
   const themeColor = branding?.theme_color || '#2563eb';
   const isManager = ['admin', 'super_admin', 'cashier'].includes(user?.role?.toLowerCase());
@@ -165,11 +174,16 @@ const EmployeePortal = () => {
       });
 
       if (requestRes.data?.success) {
-        alert("Time adjustment request submitted! It will show up on your DTR once approved.");
+        showToast("Time adjustment request submitted! It will show up on your DTR once approved.", "success");
         setTimeAdjForm({ log_date: new Date().toISOString().split('T')[0], time_in: '08:00', time_out: '17:00', ot_hours: 0, reason: '' });
         fetchPortalData();
+      } else {
+        showToast(requestRes.data?.message || "Failed to submit time adjustment.", "error");
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      showToast("Error submitting time adjustment request.", "error");
+    }
   };
 
   // Handle WFH Accomplishment log
@@ -297,6 +311,16 @@ const EmployeePortal = () => {
   return (
     <div className="flex h-screen bg-slate-50 relative font-sans overflow-hidden">
       
+      {/* FIXED TOP FLOATING TOAST BANNER */}
+      {toast.show && (
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-6 py-4 rounded-2xl shadow-2xl border flex items-center space-x-3 text-sm font-black tracking-tight animate-in slide-in-from-top-6 duration-300 backdrop-blur-md ${
+          toast.type === 'success' ? 'bg-slate-900/95 text-emerald-400 border-emerald-500/30 shadow-slate-900/20' : 'bg-slate-900/95 text-rose-400 border-rose-500/30 shadow-slate-900/20'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={20} className="text-emerald-400" /> : <AlertCircle size={20} className="text-rose-400" />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 

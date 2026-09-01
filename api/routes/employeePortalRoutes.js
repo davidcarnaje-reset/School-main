@@ -3,6 +3,7 @@ import {
   getPersonalInfo,
   getTimesheet,
   addTimeLog,
+  logEmployeeClock,
   createRequest,
   getMyRequests,
   getAllRequestsForApproval,
@@ -34,6 +35,7 @@ router.get('/personal', getPersonalInfo);
 // Attendance / Timesheet
 router.get('/timesheet', getTimesheet);
 router.post('/timelog', addTimeLog);
+router.post('/log-clock', logEmployeeClock);
 
 // Request Filing
 router.get('/requests', getMyRequests);

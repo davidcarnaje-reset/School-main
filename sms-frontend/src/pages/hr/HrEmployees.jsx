@@ -15,7 +15,50 @@ const HrEmployees = () => {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingEmp, setEditingEmp] = useState(null);
+
+  // Field error states for validation
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   
+  // Helper to validate email format
+  const isValidEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  // Formatters for PH Statutory IDs with Automatic Dashes & Digit Restrictions
+  const formatSSS = (val) => {
+    if (!val) return '';
+    const digits = String(val).replace(/\D/g, '').slice(0, 10);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 9) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}-${digits.slice(2, 9)}-${digits.slice(9)}`;
+  };
+
+  const formatPhilHealth = (val) => {
+    if (!val) return '';
+    const digits = String(val).replace(/\D/g, '').slice(0, 12);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 11) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}-${digits.slice(2, 11)}-${digits.slice(11)}`;
+  };
+
+  const formatPagIBIG = (val) => {
+    if (!val) return '';
+    const digits = String(val).replace(/\D/g, '').slice(0, 12);
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 8) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8)}`;
+  };
+
+  const formatTIN = (val) => {
+    if (!val) return '';
+    const digits = String(val).replace(/\D/g, '').slice(0, 12);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    if (digits.length <= 9) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 9)}-${digits.slice(9)}`;
+  };
+
   // State for complete employee profile + statutory details + documents checklist
   const [formData, setFormData] = useState({
     first_name: '',
@@ -76,14 +119,82 @@ const HrEmployees = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+
+    if (name === 'phone_number') {
+      // Allow only numbers and limit to 11 digits (PH Standard)
+      const cleanVal = value.replace(/\D/g, '').slice(0, 11);
+      setFormData(prev => ({ ...prev, phone_number: cleanVal }));
+
+      if (cleanVal.length > 0 && cleanVal.length < 11) {
+        setPhoneError('Phone contact must be exactly 11 digits (PH standard, e.g. 09171234567)');
+      } else if (cleanVal.length === 11 && !cleanVal.startsWith('09') && !cleanVal.startsWith('0')) {
+        setPhoneError('Phone contact must be a valid PH number starting with 09');
+      } else {
+        setPhoneError('');
+      }
+      return;
+    }
+
+    if (name === 'email') {
+      setFormData(prev => ({ ...prev, email: value }));
+      if (value && !isValidEmail(value)) {
+        setEmailError('Please enter a valid email address (e.g. name@domain.com)');
+      } else {
+        setEmailError('');
+      }
+      return;
+    }
+
+    if (name === 'sss_number') {
+      setFormData(prev => ({ ...prev, sss_number: formatSSS(value) }));
+      return;
+    }
+
+    if (name === 'philhealth_number') {
+      setFormData(prev => ({ ...prev, philhealth_number: formatPhilHealth(value) }));
+      return;
+    }
+
+    if (name === 'pagibig_number') {
+      setFormData(prev => ({ ...prev, pagibig_number: formatPagIBIG(value) }));
+      return;
+    }
+
+    if (name === 'tin_number') {
+      setFormData(prev => ({ ...prev, tin_number: formatTIN(value) }));
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
       [name]: value
-    });
+    }));
   };
 
   const handleHireSubmit = async (e) => {
     e.preventDefault();
+
+    // 1. Email Validation Checker
+    if (!formData.email || !isValidEmail(formData.email)) {
+      setEmailError('Please enter a valid email address (e.g. name@domain.com)');
+      alert('Invalid Email: Please provide a valid email address.');
+      return;
+    }
+
+    // 2. PH Phone Number 11 Digits Validation
+    if (formData.phone_number) {
+      if (formData.phone_number.length !== 11) {
+        setPhoneError('Phone contact must be exactly 11 digits (PH standard: 09XXXXXXXXX)');
+        alert('Invalid Phone Contact: Philippine standard phone numbers must be exactly 11 digits (e.g. 09171234567).');
+        return;
+      }
+      if (!formData.phone_number.startsWith('09') && !formData.phone_number.startsWith('0')) {
+        setPhoneError('Phone contact must start with 09 (e.g. 09171234567)');
+        alert('Invalid PH Phone Number: Mobile contact must start with 09 (e.g. 09171234567).');
+        return;
+      }
+    }
+
     try {
       const res = await axios.post(`${API_BASE_URL}/employee-portal/hire`, formData);
       if (res.data?.success) {
@@ -102,6 +213,8 @@ const HrEmployees = () => {
   };
 
   const resetForm = () => {
+    setEmailError('');
+    setPhoneError('');
     setFormData({
       first_name: '',
       middle_name: '',
@@ -143,6 +256,8 @@ const HrEmployees = () => {
 
   const handleEditClick = (emp) => {
     setEditingEmp(emp);
+    setEmailError('');
+    setPhoneError('');
     
     // Parse mock statutory data if none exists
     setFormData({
@@ -160,10 +275,10 @@ const HrEmployees = () => {
       employment_status: emp.employment_status || 'Probationary',
       salary_type: emp.salary_type || 'Monthly',
 
-      sss_number: emp.sss_number || '03-9384729-1',
-      philhealth_number: emp.philhealth_number || '12-094837264-9',
-      pagibig_number: emp.pagibig_number || '1210-9483-9284',
-      tin_number: emp.tin_number || '321-094-837-000',
+      sss_number: formatSSS(emp.sss_number || '03-9384729-1'),
+      philhealth_number: formatPhilHealth(emp.philhealth_number || '12-094837264-9'),
+      pagibig_number: formatPagIBIG(emp.pagibig_number || '1210-9483-9284'),
+      tin_number: formatTIN(emp.tin_number || '321-094-837-000'),
       hmo_covered: emp.hmo_covered || 'Yes',
       hmo_details: emp.hmo_details || 'Maxicare Premium Plan',
 
@@ -328,11 +443,48 @@ const HrEmployees = () => {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase text-slate-400">Email Address *</label>
-                    <input type="email" name="email" value={formData.email} onChange={handleInputChange} required placeholder="e.g. jobel@school.edu" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                    <input 
+                      type="email" 
+                      name="email" 
+                      value={formData.email} 
+                      onChange={handleInputChange} 
+                      required 
+                      placeholder="e.g. jobel@school.edu" 
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none transition-all ${
+                        emailError ? 'border-red-400 bg-red-50/50 text-red-900 focus:border-red-500' : 'border-slate-150 text-slate-700 focus:border-blue-500'
+                      }`} 
+                    />
+                    {emailError && (
+                      <p className="text-[10px] text-red-500 font-bold flex items-center gap-1 animate-in fade-in">
+                        <span>⚠️</span> {emailError}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Phone Contact</label>
-                    <input type="text" name="phone_number" value={formData.phone_number} onChange={handleInputChange} placeholder="e.g. 0917-123-4567" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Phone Contact</label>
+                      <span className={`text-[9px] font-bold ${formData.phone_number?.length === 11 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        {formData.phone_number?.length || 0}/11 digits
+                      </span>
+                    </div>
+                    <input 
+                      type="text" 
+                      name="phone_number" 
+                      value={formData.phone_number} 
+                      onChange={handleInputChange} 
+                      maxLength={11}
+                      placeholder="e.g. 09171234567" 
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none transition-all ${
+                        phoneError ? 'border-red-400 bg-red-50/50 text-red-900 focus:border-red-500' : 'border-slate-150 text-slate-700 focus:border-blue-500'
+                      }`} 
+                    />
+                    {phoneError ? (
+                      <p className="text-[10px] text-red-500 font-bold flex items-center gap-1 animate-in fade-in">
+                        <span>⚠️</span> {phoneError}
+                      </p>
+                    ) : (
+                      <p className="text-[9px] text-slate-400 font-semibold">Standard PH 11-digit mobile (e.g. 09171234567)</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase text-slate-400">Job Title / Position</label>
@@ -399,26 +551,38 @@ const HrEmployees = () => {
                   
                   {/* SSS */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">SSS Number</label>
-                    <input type="text" name="sss_number" value={formData.sss_number} onChange={handleInputChange} placeholder="00-0000000-0" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono" />
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase text-slate-400">SSS Number</label>
+                      <span className="text-[9px] text-slate-400 font-bold">XX-XXXXXXX-X</span>
+                    </div>
+                    <input type="text" name="sss_number" value={formData.sss_number} onChange={handleInputChange} maxLength={12} placeholder="00-0000000-0" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono tracking-wider" />
                   </div>
 
                   {/* Philhealth */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">PhilHealth Number</label>
-                    <input type="text" name="philhealth_number" value={formData.philhealth_number} onChange={handleInputChange} placeholder="00-000000000-0" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono" />
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase text-slate-400">PhilHealth Number</label>
+                      <span className="text-[9px] text-slate-400 font-bold">XX-XXXXXXXXX-X</span>
+                    </div>
+                    <input type="text" name="philhealth_number" value={formData.philhealth_number} onChange={handleInputChange} maxLength={14} placeholder="00-000000000-0" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono tracking-wider" />
                   </div>
 
                   {/* Pag-IBIG */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Pag-IBIG HDMF Number</label>
-                    <input type="text" name="pagibig_number" value={formData.pagibig_number} onChange={handleInputChange} placeholder="0000-0000-0000" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono" />
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Pag-IBIG HDMF Number</label>
+                      <span className="text-[9px] text-slate-400 font-bold">XXXX-XXXX-XXXX</span>
+                    </div>
+                    <input type="text" name="pagibig_number" value={formData.pagibig_number} onChange={handleInputChange} maxLength={14} placeholder="0000-0000-0000" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono tracking-wider" />
                   </div>
 
                   {/* TIN */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">TIN Number</label>
-                    <input type="text" name="tin_number" value={formData.tin_number} onChange={handleInputChange} placeholder="000-000-000-000" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono" />
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase text-slate-400">TIN Number</label>
+                      <span className="text-[9px] text-slate-400 font-bold">XXX-XXX-XXX-XXX</span>
+                    </div>
+                    <input type="text" name="tin_number" value={formData.tin_number} onChange={handleInputChange} maxLength={15} placeholder="000-000-000-000" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 font-mono tracking-wider" />
                   </div>
 
                   {/* HMO Cover */}

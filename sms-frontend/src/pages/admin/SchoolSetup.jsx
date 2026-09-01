@@ -7,6 +7,7 @@ import {
   Tag, Info, Check, X, Sliders, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import DtrMapPicker from '../../components/admin/DtrMapPicker';
 
 const SchoolSetup = () => {
   const { API_BASE_URL, getLogoUrl, user, fetchBranding } = useAuth();
@@ -33,7 +34,11 @@ const SchoolSetup = () => {
     prefix_faculty: 'SF',
     prefix_staff: 'SA',
     theme_color: '#2563eb',
-    school_logo: ''
+    school_logo: '',
+    dtr_latitude: '14.90791670',
+    dtr_longitude: '121.03316670',
+    dtr_radius: 150,
+    dtr_geofence_enabled: 1
   });
   const [selectedLogoFile, setSelectedLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -180,7 +185,11 @@ const SchoolSetup = () => {
           prefix_faculty: res.data.data.prefix_faculty || 'SF',
           prefix_staff: res.data.data.prefix_staff || 'SA',
           theme_color: res.data.data.theme_color || '#2563eb',
-          school_logo: res.data.data.school_logo || ''
+          school_logo: res.data.data.school_logo || '',
+          dtr_latitude: (res.data.data.dtr_latitude !== null && res.data.data.dtr_latitude !== undefined && res.data.data.dtr_latitude !== '') ? String(res.data.data.dtr_latitude) : '14.90791670',
+          dtr_longitude: (res.data.data.dtr_longitude !== null && res.data.data.dtr_longitude !== undefined && res.data.data.dtr_longitude !== '') ? String(res.data.data.dtr_longitude) : '121.03316670',
+          dtr_radius: res.data.data.dtr_radius !== undefined && res.data.data.dtr_radius !== null ? res.data.data.dtr_radius : 150,
+          dtr_geofence_enabled: res.data.data.dtr_geofence_enabled !== undefined && res.data.data.dtr_geofence_enabled !== null ? res.data.data.dtr_geofence_enabled : 1
         });
       }
     } catch (err) {
@@ -189,11 +198,34 @@ const SchoolSetup = () => {
   };
 
   const handleLogoFileChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (file) {
       setSelectedLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
     }
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      showToast("Geolocation is not supported by your browser.", "error");
+      return;
+    }
+    showToast("Detecting your current GPS location...", "info");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setProfile(prev => ({
+          ...prev,
+          dtr_latitude: pos.coords.latitude.toFixed(7),
+          dtr_longitude: pos.coords.longitude.toFixed(7)
+        }));
+        showToast("School location coordinates updated to your current position!", "success");
+      },
+      (err) => {
+        console.error("GPS error:", err);
+        showToast("Failed to detect location. Please check browser permissions.", "error");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const handleSaveProfile = async (e) => {
@@ -447,12 +479,12 @@ const SchoolSetup = () => {
         </div>
       </div>
 
-      {/* TOAST NOTIFICATION */}
+      {/* TOAST NOTIFICATION - FIXED TOP FLOATING BANNER */}
       {notification.show && (
-        <div className={`p-4 rounded-2xl shadow-lg border flex items-center space-x-3 text-sm font-bold animate-in slide-in-from-top duration-300 ${
-          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-6 py-4 rounded-2xl shadow-2xl border flex items-center space-x-3 text-sm font-black tracking-tight animate-in slide-in-from-top-6 duration-300 backdrop-blur-md ${
+          notification.type === 'success' ? 'bg-slate-900/95 text-emerald-400 border-emerald-500/30 shadow-slate-900/20' : 'bg-slate-900/95 text-rose-400 border-rose-500/30 shadow-slate-900/20'
         }`}>
-          {notification.type === 'success' ? <CheckCircle size={20}/> : <AlertCircle size={20}/>}
+          {notification.type === 'success' ? <CheckCircle size={20} className="text-emerald-400" /> : <AlertCircle size={20} className="text-rose-400" />}
           <span>{notification.message}</span>
         </div>
       )}
@@ -644,6 +676,117 @@ const SchoolSetup = () => {
                     placeholder="+63 912 345 6789 / (02) 8123-4567"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* DTR LOCATION & GEOFENCING BOUNDARY SETTINGS */}
+            <div className="pt-4 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-2">
+                    <MapPin size={16} className="text-emerald-600" />
+                    <span>DTR Geofence & Location Boundary Settings</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    Set the exact school GPS location and allowable radius boundary for employee and teacher Time In / Time Out.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  className="flex items-center space-x-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-4 py-2.5 rounded-xl border border-emerald-200 text-xs font-bold transition-all shadow-sm"
+                >
+                  <MapPin size={14} />
+                  <span>Use My Current Location</span>
+                </button>
+              </div>
+
+              <div className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200/80 space-y-6">
+                
+                {/* GEOFENCE ENABLED TOGGLE */}
+                <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 uppercase">Enable GPS Location Verification</h4>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      When enabled, users must be within the specified radius to log DTR time in/out.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(profile.dtr_geofence_enabled)}
+                      onChange={(e) => setProfile({ ...profile, dtr_geofence_enabled: e.target.checked ? 1 : 0 })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+
+                {/* INTERACTIVE LEAFLET MAP PINPOINT PICKER */}
+                <DtrMapPicker
+                  latitude={profile.dtr_latitude}
+                  longitude={profile.dtr_longitude}
+                  radius={profile.dtr_radius}
+                  onLocationChange={(lat, lng) => {
+                    setProfile(prev => ({
+                      ...prev,
+                      dtr_latitude: lat,
+                      dtr_longitude: lng
+                    }));
+                  }}
+                  onCurrentLocationClick={handleUseCurrentLocation}
+                />
+
+                {/* LAT, LNG & RADIUS */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-2">School Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={profile.dtr_latitude}
+                      onChange={(e) => setProfile({ ...profile, dtr_latitude: e.target.value })}
+                      className="w-full p-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-mono font-bold text-slate-800 text-sm"
+                      placeholder="Ex. 14.9079167"
+                    />
+                    <span className="text-[10px] text-slate-400 font-medium mt-1 block">GPS Latitude Coordinate</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-2">School Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={profile.dtr_longitude}
+                      onChange={(e) => setProfile({ ...profile, dtr_longitude: e.target.value })}
+                      className="w-full p-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-mono font-bold text-slate-800 text-sm"
+                      placeholder="Ex. 121.0331667"
+                    />
+                    <span className="text-[10px] text-slate-400 font-medium mt-1 block">GPS Longitude Coordinate</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Allowed Radius (Meters)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="10"
+                        max="10000"
+                        required
+                        value={profile.dtr_radius}
+                        onChange={(e) => setProfile({ ...profile, dtr_radius: e.target.value })}
+                        className="w-full p-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-800 text-sm pr-12"
+                        placeholder="150"
+                      />
+                      <span className="absolute right-4 top-3.5 text-xs font-bold text-slate-400">m</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1 block">Max distance allowed from school center</span>
+                  </div>
+                </div>
+
               </div>
             </div>
 

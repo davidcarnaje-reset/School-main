@@ -8,54 +8,41 @@ import { logAuditTrail } from '../../utils/auditLogger.js';
 // ============================================================
 export const getSchoolProfile = async (req, res) => {
   try {
-    const schoolId = req.query.school_id || req.school_id || 1;
-    const [rows] = await pool.query(
-      `SELECT 
-         s.id, 
-         COALESCE(ss.school_name, s.name) AS school_name, 
-         COALESCE(ss.school_logo, s.logo) AS school_logo, 
-         COALESCE(ss.theme_color, s.theme_color, '#2563eb') AS theme_color, 
-         ss.school_address, 
-         ss.website_link, 
-         ss.fb_page, 
-         ss.contact_number, 
-         COALESCE(ss.prefix_k12, 'K12-') AS prefix_k12, 
-         COALESCE(ss.prefix_college, 'COL-') AS prefix_college,
-         COALESCE(ss.prefix_faculty, 'SF') AS prefix_faculty,
-         COALESCE(ss.prefix_staff, 'SA') AS prefix_staff
-       FROM schools s
-       LEFT JOIN school_settings ss ON s.id = ss.id
-       WHERE s.id = ?`, 
-      [schoolId]
-    );
-
-    if (rows.length > 0) {
-      return res.json({ status: 'success', data: rows[0] });
-    }
-
-    // Fallback if even schools table row was not found
+    const targetSchoolId = req.query.school_id || req.school_id || 1;
+    const schoolId = parseInt(targetSchoolId, 10) || 1;
+    
+    // First try fetching school_settings directly for this schoolId or fallback to id=1
     const [ssRows] = await pool.query("SELECT * FROM school_settings WHERE id = ?", [schoolId]);
-    if (ssRows.length > 0) {
-      return res.json({ status: 'success', data: ssRows[0] });
+    let settings = ssRows[0];
+    if (!settings && schoolId !== 1) {
+      const [fallbackSs] = await pool.query("SELECT * FROM school_settings WHERE id = 1");
+      settings = fallbackSs[0];
     }
 
-    return res.json({
-      status: 'success',
-      data: {
-        id: schoolId,
-        school_name: 'SMS Portal',
-        school_logo: null,
-        theme_color: '#2563eb',
-        school_address: '',
-        website_link: '',
-        fb_page: '',
-        contact_number: '',
-        prefix_k12: 'K12-',
-        prefix_college: 'COL-',
-        prefix_faculty: 'SF',
-        prefix_staff: 'SA'
-      }
-    });
+    const [schools] = await pool.query("SELECT * FROM schools WHERE id = ?", [schoolId]);
+    const school = schools[0] || {};
+
+    const profileData = {
+      id: schoolId,
+      school_name: settings?.school_name || school?.name || 'SMS Portal',
+      school_logo: settings?.school_logo || school?.logo || null,
+      theme_color: settings?.theme_color || school?.theme_color || '#2563eb',
+      school_address: settings?.school_address || null,
+      website_link: settings?.website_link || null,
+      fb_page: settings?.fb_page || null,
+      contact_number: settings?.contact_number || null,
+      prefix_k12: settings?.prefix_k12 || 'K12-',
+      prefix_college: settings?.prefix_college || 'COL-',
+      prefix_faculty: settings?.prefix_faculty || 'SF',
+      prefix_staff: settings?.prefix_staff || 'SA',
+      dtr_latitude: (settings?.dtr_latitude !== null && settings?.dtr_latitude !== undefined && settings?.dtr_latitude !== '') ? String(settings.dtr_latitude) : '14.90791670',
+      dtr_longitude: (settings?.dtr_longitude !== null && settings?.dtr_longitude !== undefined && settings?.dtr_longitude !== '') ? String(settings.dtr_longitude) : '121.03316670',
+      dtr_radius: settings?.dtr_radius !== undefined && settings?.dtr_radius !== null ? settings.dtr_radius : 150,
+      dtr_geofence_enabled: settings?.dtr_geofence_enabled !== undefined && settings?.dtr_geofence_enabled !== null ? settings.dtr_geofence_enabled : 1
+    };
+
+    return res.json({ status: 'success', data: profileData });
+
   } catch (error) {
     console.error("getSchoolProfile error:", error);
     return res.status(500).json({ status: 'error', message: error.message });
@@ -74,10 +61,16 @@ export const updateSchoolProfile = async (req, res) => {
       prefix_k12,
       prefix_college,
       prefix_faculty,
-      prefix_staff
+      prefix_staff,
+      dtr_latitude,
+      dtr_longitude,
+      dtr_radius,
+      dtr_geofence_enabled
     } = req.body;
 
-    const schoolId = req.query.school_id || req.school_id || 1;
+    const targetSchoolId = req.query.school_id || req.body.school_id || req.school_id || 1;
+    const schoolId = parseInt(targetSchoolId, 10) || 1;
+
     let school_logo_url = null;
 
     if (req.file) {
@@ -97,34 +90,54 @@ export const updateSchoolProfile = async (req, res) => {
       school_logo_url = `${publicUrl}/branding/${uniqueFileName}`;
     }
 
-    // 1. Upsert into school_settings
-    await pool.query(
-      `INSERT INTO school_settings (
-        id, school_name, theme_color, school_logo, 
-        school_address, website_link, fb_page, contact_number, 
-        prefix_k12, prefix_college, prefix_faculty, prefix_staff
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         school_name = COALESCE(?, school_name),
-         theme_color = COALESCE(?, theme_color),
-         school_logo = COALESCE(?, school_logo),
-         school_address = ?,
-         website_link = ?,
-         fb_page = ?,
-         contact_number = ?,
-         prefix_k12 = ?,
-         prefix_college = ?,
-         prefix_faculty = ?,
-         prefix_staff = ?`,
-      [
-        schoolId, school_name, theme_color || '#2563eb', school_logo_url,
-        school_address || null, website_link || null, fb_page || null, contact_number || null,
-        prefix_k12 || 'K12-', prefix_college || 'COL-', prefix_faculty || 'SF', prefix_staff || 'SA',
-        school_name, theme_color || '#2563eb', school_logo_url,
-        school_address || null, website_link || null, fb_page || null, contact_number || null,
-        prefix_k12 || 'K12-', prefix_college || 'COL-', prefix_faculty || 'SF', prefix_staff || 'SA'
-      ]
-    );
+    const parsedLat = parseFloat(dtr_latitude);
+    const parsedLng = parseFloat(dtr_longitude);
+    const parsedRad = parseInt(dtr_radius, 10);
+
+    const latVal = !isNaN(parsedLat) ? parsedLat : 14.90791670;
+    const lngVal = !isNaN(parsedLng) ? parsedLng : 121.03316670;
+    const radVal = !isNaN(parsedRad) ? parsedRad : 150;
+    const geoVal = (dtr_geofence_enabled === true || dtr_geofence_enabled === 1 || dtr_geofence_enabled === '1' || dtr_geofence_enabled === 'true') ? 1 : 0;
+
+    // Upsert into school_settings for specific schoolId AND id=1 to ensure system-wide DTR location settings stay synced
+    const targetIdsToUpdate = Array.from(new Set([schoolId, 1]));
+
+    for (const sid of targetIdsToUpdate) {
+      await pool.query(
+        `INSERT INTO school_settings (
+          id, school_name, theme_color, school_logo, 
+          school_address, website_link, fb_page, contact_number, 
+          prefix_k12, prefix_college, prefix_faculty, prefix_staff,
+          dtr_latitude, dtr_longitude, dtr_radius, dtr_geofence_enabled
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           school_name = COALESCE(?, school_name),
+           theme_color = COALESCE(?, theme_color),
+           school_logo = COALESCE(?, school_logo),
+           school_address = ?,
+           website_link = ?,
+           fb_page = ?,
+           contact_number = ?,
+           prefix_k12 = ?,
+           prefix_college = ?,
+           prefix_faculty = ?,
+           prefix_staff = ?,
+           dtr_latitude = ?,
+           dtr_longitude = ?,
+           dtr_radius = ?,
+           dtr_geofence_enabled = ?`,
+        [
+          sid, school_name, theme_color || '#2563eb', school_logo_url,
+          school_address || null, website_link || null, fb_page || null, contact_number || null,
+          prefix_k12 || 'K12-', prefix_college || 'COL-', prefix_faculty || 'SF', prefix_staff || 'SA',
+          latVal, lngVal, radVal, geoVal,
+          school_name, theme_color || '#2563eb', school_logo_url,
+          school_address || null, website_link || null, fb_page || null, contact_number || null,
+          prefix_k12 || 'K12-', prefix_college || 'COL-', prefix_faculty || 'SF', prefix_staff || 'SA',
+          latVal, lngVal, radVal, geoVal
+        ]
+      );
+    }
 
     // 2. Sync to schools table as well
     if (school_logo_url) {
