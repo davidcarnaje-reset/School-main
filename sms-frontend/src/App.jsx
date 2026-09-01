@@ -133,6 +133,7 @@ import HrOnboarding from './pages/hr/HrOnboarding';
 // Employee Portal Page
 import EmployeePortal from './pages/shared/EmployeePortal';
 import HrAttendance from './pages/hr/HrAttendance';
+import HrSchedules from './pages/hr/HrSchedules';
 import HrLeave from './pages/hr/HrLeave';
 import HrPayrollSupport from './pages/hr/HrPayrollSupport';
 import HrPerformance from './pages/hr/HrPerformance';
@@ -385,6 +386,7 @@ function App() {
             <Route path="employees" element={<HrEmployees />} />
             <Route path="onboarding" element={<HrOnboarding />} />
             <Route path="attendance" element={<HrAttendance />} />
+            <Route path="schedules" element={<HrSchedules />} />
             <Route path="leave" element={<HrLeave />} />
             <Route path="payroll-support" element={<HrPayrollSupport />} />
             <Route path="performance" element={<HrPerformance />} />

@@ -5,7 +5,7 @@ import { sendStaffInvitationEmail } from '../../utils/emailEngine.js';
 
 // Helper to get or create employee ID corresponding to user email
 const getOrCreateEmployeeId = async (userEmail) => {
-  const [users] = await pool.query("SELECT id, first_name, last_name, role, status FROM users WHERE email = ?", [userEmail]);
+  const [users] = await pool.query("SELECT id, first_name, last_name, role, status FROM users WHERE email = ? OR username = ?", [userEmail, userEmail]);
   if (users.length === 0) return null;
   const u = users[0];
   
@@ -46,8 +46,8 @@ export const getPersonalInfo = async (req, res) => {
       SELECT e.*, u.email, u.phone_number, u.birthday, u.profile_image 
       FROM employees e
       JOIN users u ON TRIM(LOWER(u.first_name)) = TRIM(LOWER(e.first_name)) AND TRIM(LOWER(u.last_name)) = TRIM(LOWER(e.last_name))
-      WHERE u.email = ?
-    `, [email]);
+      WHERE u.email = ? OR u.username = ? OR u.id = ?
+    `, [email, email, email]);
 
     if (empRows.length === 0) {
       // Sync it
@@ -58,8 +58,8 @@ export const getPersonalInfo = async (req, res) => {
         SELECT e.*, u.email, u.phone_number, u.birthday, u.profile_image 
         FROM employees e
         JOIN users u ON TRIM(LOWER(u.first_name)) = TRIM(LOWER(e.first_name)) AND TRIM(LOWER(u.last_name)) = TRIM(LOWER(e.last_name))
-        WHERE u.email = ?
-      `, [email]);
+        WHERE u.email = ? OR u.username = ? OR u.id = ?
+      `, [email, email, email]);
       return res.status(200).json({ success: true, employee: retryRows[0] });
     }
 
@@ -202,7 +202,7 @@ export const getAllRequestsForApproval = async (req, res) => {
 export const updateRequestStatus = async (req, res) => {
   const { id, status, remarks, approved_by_email } = req.body;
   try {
-    const [adminUser] = await pool.query("SELECT id FROM users WHERE email = ?", [approved_by_email]);
+    const [adminUser] = await pool.query("SELECT id FROM users WHERE email = ? OR username = ?", [approved_by_email, approved_by_email]);
     const adminId = adminUser.length > 0 ? adminUser[0].id : null;
 
     await pool.query(`
@@ -378,7 +378,9 @@ export const markEmployeeNotificationRead = async (req, res) => {
 export const hireEmployee = async (req, res) => {
   const {
     first_name,
+    middle_name,
     last_name,
+    suffix,
     email,
     position,
     department,
@@ -387,6 +389,7 @@ export const hireEmployee = async (req, res) => {
     phone_number,
     employment_history,
     employment_status,
+    salary_type,
 
     sss_number,
     philhealth_number,
@@ -424,7 +427,9 @@ export const hireEmployee = async (req, res) => {
       const username = email.split('@')[0];
       const tempPassword = 'Temp_' + Math.random().toString(36).substring(2, 10) + '!';
       const hashedPassword = await bcrypt.hash(tempPassword, 10);
-      const fullName = `${first_name} ${last_name}`;
+      const middleInitial = middle_name ? `${middle_name.trim().charAt(0)}.` : '';
+      const suffixStr = suffix ? ` ${suffix.trim()}` : '';
+      const fullName = `${first_name.trim()} ${middleInitial} ${last_name.trim()}${suffixStr}`.replace(/\s+/g, ' ');
       const verificationToken = 'token_' + Math.random().toString(36).substring(2, 15);
 
       const [idRows] = await pool.query("SELECT MAX(id) as maxId FROM users");
@@ -434,9 +439,9 @@ export const hireEmployee = async (req, res) => {
       const mappedRole = position.toLowerCase().includes('teacher') ? 'teacher' : position.toLowerCase().split(' ')[0] || 'staff';
 
       await pool.query(
-        `INSERT INTO users (id, username, password, first_name, last_name, full_name, email, phone_number, role, status, is_verified, verification_token, school_id) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-        [nextUserId, username, hashedPassword, first_name, last_name, fullName, email, phone_number || null, mappedRole, status, verificationToken, schoolId]
+        `INSERT INTO users (id, username, password, first_name, middle_name, last_name, suffix, full_name, email, phone_number, role, status, is_verified, verification_token, school_id) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        [nextUserId, username, hashedPassword, first_name, middle_name || null, last_name, suffix || null, fullName, email, phone_number || null, mappedRole, status, verificationToken, schoolId]
       );
 
       // Get Prefix & generate employee number
@@ -471,6 +476,15 @@ export const hireEmployee = async (req, res) => {
       }
     } else {
       nextUserId = userRows[0].id;
+      const middleInitial = middle_name ? `${middle_name.trim().charAt(0)}.` : '';
+      const suffixStr = suffix ? ` ${suffix.trim()}` : '';
+      const fullName = `${first_name.trim()} ${middleInitial} ${last_name.trim()}${suffixStr}`.replace(/\s+/g, ' ');
+
+      // Update phone_number, middle_name, suffix, full_name in users table if changed
+      await pool.query(
+        "UPDATE users SET phone_number = ?, middle_name = ?, suffix = ?, full_name = ? WHERE id = ?",
+        [phone_number || null, middle_name || null, suffix || null, fullName, nextUserId]
+      );
     }
 
     // 2. Insert or update record in employees table
@@ -486,39 +500,42 @@ export const hireEmployee = async (req, res) => {
 
       await pool.query(
         `INSERT INTO employees (
-          id, employee_id, first_name, last_name, position, department, basic_salary, status, phone_number,
+          id, employee_id, first_name, middle_name, last_name, suffix, position, department, basic_salary, status, phone_number,
           sss_number, philhealth_number, pagibig_number, tin_number, hmo_covered, hmo_details,
           psa_status, psa_file, coe_status, coe_file, nbi_status, nbi_file,
           sss_doc_status, sss_doc_file, philhealth_doc_status, philhealth_doc_file,
-          pagibig_doc_status, pagibig_doc_file, tin_doc_status, tin_doc_file, employment_history, employment_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          pagibig_doc_status, pagibig_doc_file, tin_doc_status, tin_doc_file, employment_history, employment_status,
+          salary_type
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          nextEmpId, employeeNumber, first_name, last_name, position, department, parseFloat(basic_salary), status, phone_number || null,
+          nextEmpId, employeeNumber, first_name, middle_name || null, last_name, suffix || null, position, department, parseFloat(basic_salary), status, phone_number || null,
           sss_number || null, philhealth_number || null, pagibig_number || null, tin_number || null, hmo_covered || 'No', hmo_details || null,
           psa_status || 'Pending', psa_file || null, coe_status || 'Pending', coe_file || null, nbi_status || 'Pending', nbi_file || null,
           sss_doc_status || 'Pending', sss_doc_file || null, philhealth_doc_status || 'Pending', philhealth_doc_file || null,
           pagibig_doc_status || 'Pending', pagibig_doc_file || null, tin_doc_status || 'Pending', tin_doc_file || null, employment_history || 'Hired Active',
-          employment_status || 'Probationary'
+          employment_status || 'Probationary',
+          salary_type || 'Monthly'
         ]
       );
     } else {
       const empDbId = empCheck[0].id;
       await pool.query(
         `UPDATE employees SET
-          position = ?, department = ?, basic_salary = ?, status = ?, phone_number = ?,
+          middle_name = ?, suffix = ?, position = ?, department = ?, basic_salary = ?, status = ?, phone_number = ?,
           sss_number = ?, philhealth_number = ?, pagibig_number = ?, tin_number = ?, hmo_covered = ?, hmo_details = ?,
           psa_status = ?, psa_file = ?, coe_status = ?, coe_file = ?, nbi_status = ?, nbi_file = ?,
           sss_doc_status = ?, sss_doc_file = ?, philhealth_doc_status = ?, philhealth_doc_file = ?,
           pagibig_doc_status = ?, pagibig_doc_file = ?, tin_doc_status = ?, tin_doc_file = ?, employment_history = ?,
-          employment_status = ?
+          employment_status = ?, salary_type = ?
          WHERE id = ?`,
         [
-          position, department, parseFloat(basic_salary), status, phone_number || null,
+          middle_name || null, suffix || null, position, department, parseFloat(basic_salary), status, phone_number || null,
           sss_number || null, philhealth_number || null, pagibig_number || null, tin_number || null, hmo_covered || 'No', hmo_details || null,
           psa_status || 'Pending', psa_file || null, coe_status || 'Pending', coe_file || null, nbi_status || 'Pending', nbi_file || null,
           sss_doc_status || 'Pending', sss_doc_file || null, philhealth_doc_status || 'Pending', philhealth_doc_file || null,
           pagibig_doc_status || 'Pending', pagibig_doc_file || null, tin_doc_status || 'Pending', tin_doc_file || null, employment_history || 'Hired Active',
           employment_status || 'Probationary',
+          salary_type || 'Monthly',
           empDbId
         ]
       );
@@ -550,7 +567,8 @@ export const getEmployeeShifts = async (req, res) => {
         es.shift_id, 
         es.shift_name, 
         es.time_in, 
-        es.time_out
+        es.time_out,
+        es.work_days
       FROM users u
       LEFT JOIN employee_shifts es ON u.id = es.user_id
       WHERE u.role != 'student' AND u.status = 'Active'
@@ -565,20 +583,21 @@ export const getEmployeeShifts = async (req, res) => {
 
 // ASSIGN EMPLOYEE SHIFT
 export const assignEmployeeShift = async (req, res) => {
-  const { user_id, shift_id, shift_name, time_in, time_out } = req.body;
+  const { user_id, shift_id, shift_name, time_in, time_out, work_days = 'Monday - Friday' } = req.body;
   if (!user_id || !shift_id || !shift_name || !time_in || !time_out) {
     return res.status(400).json({ success: false, message: "Missing required fields." });
   }
   try {
     await pool.query(`
-      INSERT INTO employee_shifts (user_id, shift_id, shift_name, time_in, time_out)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO employee_shifts (user_id, shift_id, shift_name, time_in, time_out, work_days)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         shift_id = VALUES(shift_id),
         shift_name = VALUES(shift_name),
         time_in = VALUES(time_in),
-        time_out = VALUES(time_out)
-    `, [user_id, shift_id, shift_name, time_in, time_out]);
+        time_out = VALUES(time_out),
+        work_days = VALUES(work_days)
+    `, [user_id, shift_id, shift_name, time_in, time_out, work_days]);
 
     return res.status(200).json({ success: true, message: "Shift assigned successfully!" });
   } catch (error) {
@@ -594,7 +613,7 @@ export const getMyShift = async (req, res) => {
     return res.status(400).json({ success: false, message: "Email is required." });
   }
   try {
-    const [userRows] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
+    const [userRows] = await pool.query("SELECT id FROM users WHERE email = ? OR username = ?", [email, email]);
     if (userRows.length === 0) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
@@ -608,13 +627,107 @@ export const getMyShift = async (req, res) => {
           shift_id: 'SH-01',
           shift_name: 'Standard Academic Shift',
           time_in: '08:00 AM',
-          time_out: '05:00 PM'
+          time_out: '05:00 PM',
+          work_days: 'Monday - Friday'
         }
       });
     }
     return res.status(200).json({ success: true, shift: shiftRows[0] });
   } catch (error) {
     console.error("getMyShift error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET SHIFT TEMPLATES
+export const getShiftTemplates = async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM shift_templates ORDER BY id DESC");
+    return res.status(200).json({ success: true, templates: rows });
+  } catch (error) {
+    console.error("getShiftTemplates error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// CREATE SHIFT TEMPLATE
+export const createShiftTemplate = async (req, res) => {
+  const { shift_name, time_in, time_out, work_days = 'Monday - Friday' } = req.body;
+  if (!shift_name || !time_in || !time_out) {
+    return res.status(400).json({ success: false, message: "Missing required fields." });
+  }
+  try {
+    await pool.query(
+      "INSERT INTO shift_templates (shift_name, time_in, time_out, work_days) VALUES (?, ?, ?, ?)",
+      [shift_name, time_in, time_out, work_days]
+    );
+    return res.status(200).json({ success: true, message: "Shift template created successfully!" });
+  } catch (error) {
+    console.error("createShiftTemplate error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// DELETE SHIFT TEMPLATE
+export const deleteShiftTemplate = async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query("DELETE FROM shift_templates WHERE id = ?", [id]);
+    return res.status(200).json({ success: true, message: "Shift template deleted successfully!" });
+  } catch (error) {
+    console.error("deleteShiftTemplate error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// UNASSIGN EMPLOYEE SHIFT
+export const removeEmployeeShift = async (req, res) => {
+  const { user_id } = req.body;
+  if (!user_id) {
+    return res.status(400).json({ success: false, message: "user_id is required." });
+  }
+  try {
+    await pool.query("DELETE FROM employee_shifts WHERE user_id = ?", [user_id]);
+    return res.status(200).json({ success: true, message: "Shift assignment removed successfully." });
+  } catch (error) {
+    console.error("removeEmployeeShift error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET ALL EMPLOYEE DTR LOGS (HR VIEW)
+export const getAllDtrLogs = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        d.id,
+        d.log_date,
+        d.time_in,
+        d.time_out,
+        d.ot_hours,
+        d.status,
+        u.first_name,
+        u.last_name,
+        u.role
+      FROM employee_dtr d
+      JOIN employees e ON d.employee_id = e.employee_id
+      LEFT JOIN users u ON TRIM(LOWER(e.first_name)) = TRIM(LOWER(u.first_name))
+                       AND TRIM(LOWER(e.last_name)) = TRIM(LOWER(u.last_name))
+      ORDER BY d.log_date DESC, d.id DESC
+    `);
+
+    const formatted = rows.map(r => ({
+      name: `${r.first_name} ${r.last_name}`,
+      position: (r.role || 'Staff').toUpperCase(),
+      date: r.log_date,
+      timeIn: r.time_in,
+      timeOut: r.time_out,
+      status: r.status
+    }));
+
+    return res.status(200).json({ success: true, logs: formatted });
+  } catch (error) {
+    console.error("getAllDtrLogs error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

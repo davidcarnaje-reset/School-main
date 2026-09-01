@@ -19,7 +19,9 @@ const HrEmployees = () => {
   // State for complete employee profile + statutory details + documents checklist
   const [formData, setFormData] = useState({
     first_name: '',
+    middle_name: '',
     last_name: '',
+    suffix: '',
     email: '',
     position: 'TEACHER',
     department: 'Administration',
@@ -27,6 +29,7 @@ const HrEmployees = () => {
     status: 'Active',
     phone_number: '',
     employment_history: 'Hired Active',
+    salary_type: 'Monthly',
 
     // Government Statutory IDs
     sss_number: '',
@@ -101,7 +104,9 @@ const HrEmployees = () => {
   const resetForm = () => {
     setFormData({
       first_name: '',
+      middle_name: '',
       last_name: '',
+      suffix: '',
       email: '',
       position: 'TEACHER',
       department: 'Faculty',
@@ -110,6 +115,7 @@ const HrEmployees = () => {
       phone_number: '',
       employment_history: 'Hired Active',
       employment_status: 'Probationary',
+      salary_type: 'Monthly',
 
       sss_number: '',
       philhealth_number: '',
@@ -141,7 +147,9 @@ const HrEmployees = () => {
     // Parse mock statutory data if none exists
     setFormData({
       first_name: emp.first_name || '',
+      middle_name: emp.middle_name || '',
       last_name: emp.last_name || '',
+      suffix: emp.suffix || '',
       email: emp.email || '',
       position: emp.position || 'TEACHER',
       department: emp.department || 'Faculty',
@@ -150,6 +158,7 @@ const HrEmployees = () => {
       phone_number: emp.phone_number || '',
       employment_history: emp.employment_history || 'Promoted',
       employment_status: emp.employment_status || 'Probationary',
+      salary_type: emp.salary_type || 'Monthly',
 
       sss_number: emp.sss_number || '03-9384729-1',
       philhealth_number: emp.philhealth_number || '12-094837264-9',
@@ -241,7 +250,9 @@ const HrEmployees = () => {
                       <span className="text-xs font-mono font-bold text-slate-400">{emp.employee_id}</span>
                     </td>
                     <td className="py-4 pr-4">
-                      <p className="text-sm font-bold text-slate-700">{emp.first_name} {emp.last_name}</p>
+                      <p className="text-sm font-bold text-slate-700">
+                        {emp.first_name} {emp.middle_name ? `${emp.middle_name.trim().charAt(0)}.` : ''} {emp.last_name} {emp.suffix || ''}
+                      </p>
                       <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-0.5"><Mail size={12}/> {emp.email}</span>
                     </td>
                     <td className="py-4 pr-4">
@@ -252,6 +263,7 @@ const HrEmployees = () => {
                     </td>
                     <td className="py-4 pr-4">
                       <p className="text-xs font-mono font-bold text-slate-700">₱{emp.basic_salary?.toLocaleString()}</p>
+                      <span className="text-[9px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded font-black mt-0.5 block w-fit">{emp.salary_type || 'Monthly'} Release</span>
                       {emp.phone_number && <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-0.5"><Phone size={12}/> {emp.phone_number}</span>}
                     </td>
                     <td className="py-4 pr-4">
@@ -303,8 +315,16 @@ const HrEmployees = () => {
                     <input type="text" name="first_name" value={formData.first_name} onChange={handleInputChange} required placeholder="e.g. Jobel" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
                   </div>
                   <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Middle Name</label>
+                    <input type="text" name="middle_name" value={formData.middle_name || ''} onChange={handleInputChange} placeholder="e.g. Fernando" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase text-slate-400">Last Name *</label>
                     <input type="text" name="last_name" value={formData.last_name} onChange={handleInputChange} required placeholder="e.g. Jobert" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Suffix (if any)</label>
+                    <input type="text" name="suffix" value={formData.suffix || ''} onChange={handleInputChange} placeholder="e.g. Jr., III" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase text-slate-400">Email Address *</label>
@@ -347,6 +367,15 @@ const HrEmployees = () => {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase text-slate-400">Basic Monthly Pay (₱) *</label>
                     <input type="number" name="basic_salary" value={formData.basic_salary} onChange={handleInputChange} required className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Payment Releasing Schedule</label>
+                    <select name="salary_type" value={formData.salary_type || 'Monthly'} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+                      <option value="Monthly">Monthly Release (Every 30th)</option>
+                      <option value="Semi-Monthly">Semi-Monthly Release (15th & 30th)</option>
+                      <option value="Weekly">Weekly Release (Every Friday)</option>
+                      <option value="Daily">Daily Release (Daily Wage)</option>
+                    </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase text-slate-400">Uptime Status</label>

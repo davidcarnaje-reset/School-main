@@ -179,7 +179,7 @@ const FilingTab = ({ requests, fetchPortalData, themeColor, API_BASE_URL, user }
 
           {/* DATA TABLE */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs font-semibold">
+            <table className="w-full text-left border-collapse text-xs font-semibold min-w-[700px]">
               <thead>
                 <tr className="border-b border-slate-100 text-slate-400">
                   <th className="py-4 text-[10px] font-black uppercase tracking-widest">Request Date</th>

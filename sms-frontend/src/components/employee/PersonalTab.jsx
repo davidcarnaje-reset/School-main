@@ -14,13 +14,15 @@ const PersonalTab = ({ employeeInfo, portalNotifs, unreadNotifsCount, handleMark
         </div>
         <div className="space-y-2 text-center md:text-left">
           <p className="text-xs font-black uppercase text-blue-600 tracking-widest leading-none">Employment Record Profile</p>
-          <h2 className="text-2xl font-black text-slate-800">{employeeInfo?.first_name} {employeeInfo?.last_name}</h2>
+          <h2 className="text-2xl font-black text-slate-800">
+            {employeeInfo?.first_name} {employeeInfo?.middle_name ? `${employeeInfo.middle_name.trim().charAt(0)}.` : ''} {employeeInfo?.last_name} {employeeInfo?.suffix || ''}
+          </h2>
           <p className="text-sm font-bold text-slate-400">{employeeInfo?.position} • {employeeInfo?.department} Department</p>
         </div>
         <div className="md:ml-auto text-center md:text-right shrink-0 bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100">
           <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Salary Configuration</p>
           <p className="text-2xl font-black text-slate-800 mt-1">₱{employeeInfo?.basic_salary?.toLocaleString()}</p>
-          <p className="text-[10px] text-slate-550 mt-0.5">Base Pay / Monthly Release</p>
+          <p className="text-[10px] text-slate-550 mt-0.5">Base Pay / {employeeInfo?.salary_type || 'Monthly'} Release</p>
         </div>
       </div>
 

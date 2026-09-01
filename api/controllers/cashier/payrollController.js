@@ -9,7 +9,9 @@ export const getEmployees = async (req, res) => {
         id, 
         username, 
         first_name, 
+        middle_name,
         last_name, 
+        suffix,
         role, 
         email,
         phone_number,
@@ -34,13 +36,15 @@ export const getEmployees = async (req, res) => {
           const employeeNumber = `${rolePrefix}${currentYear}-${String(nextId).padStart(4, '0')}`;
 
           await pool.query(
-            `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status, phone_number, email) 
-             VALUES (?, ?, ?, ?, ?, 'Administration', 25000, ?, ?, ?)`,
+            `INSERT INTO employees (id, employee_id, first_name, middle_name, last_name, suffix, position, department, basic_salary, status, phone_number, email) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'Administration', 25000, ?, ?, ?)`,
             [
               nextId,
               employeeNumber,
               u.first_name || '',
+              u.middle_name || null,
               u.last_name || '',
+              u.suffix || null,
               (u.role || 'STAFF').toUpperCase() + ' STAFF',
               u.status === 'Inactive' ? 'Inactive' : 'Active',
               u.phone_number || null,
@@ -53,8 +57,17 @@ export const getEmployees = async (req, res) => {
       }
     }
 
-    // 3. Select all from employees table
-    const [empRows] = await pool.query("SELECT * FROM employees ORDER BY id DESC");
+    // 3. Select all from employees table joining users to get email & phone
+    const [empRows] = await pool.query(`
+      SELECT 
+        e.*,
+        u.email,
+        COALESCE(e.phone_number, u.phone_number) AS phone_number
+      FROM employees e
+      LEFT JOIN users u ON TRIM(LOWER(e.first_name)) = TRIM(LOWER(u.first_name)) 
+                       AND TRIM(LOWER(e.last_name)) = TRIM(LOWER(u.last_name))
+      ORDER BY e.id DESC
+    `);
     
     // Format salaries
     const formatted = empRows.map(emp => ({

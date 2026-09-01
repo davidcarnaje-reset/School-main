@@ -109,11 +109,84 @@ pool.on('error', (err) => {
         shift_name VARCHAR(100) NOT NULL,
         time_in VARCHAR(50) NOT NULL,
         time_out VARCHAR(50) NOT NULL,
+        work_days VARCHAR(100) NOT NULL DEFAULT 'Monday - Friday',
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    
+    // Auto-alter if column doesn't exist
+    try {
+      await pool.query("ALTER TABLE employee_shifts ADD COLUMN work_days VARCHAR(100) NOT NULL DEFAULT 'Monday - Friday'");
+    } catch (e) {}
   } catch (err) {
     console.error("Failed to initialize employee_shifts table:", err.message);
+  }
+})();
+
+// Auto-patch schema for shift templates
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS shift_templates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shift_name VARCHAR(100) NOT NULL,
+        time_in VARCHAR(50) NOT NULL,
+        time_out VARCHAR(50) NOT NULL,
+        work_days VARCHAR(100) NOT NULL DEFAULT 'Monday - Friday',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    
+    // Auto-alter if column doesn't exist
+    try {
+      await pool.query("ALTER TABLE shift_templates ADD COLUMN work_days VARCHAR(100) NOT NULL DEFAULT 'Monday - Friday'");
+    } catch (e) {}
+    
+    // Seed default shift templates if table is empty
+    const [rows] = await pool.query("SELECT COUNT(*) AS count FROM shift_templates");
+    if (rows[0].count === 0) {
+      await pool.query(`
+        INSERT INTO shift_templates (shift_name, time_in, time_out, work_days) VALUES
+        ('Regular Day Shift', '08:00 AM', '05:00 PM', 'Monday - Friday'),
+        ('Night Shift', '10:00 PM', '07:00 AM', 'Monday - Friday'),
+        ('Morning Half Day', '08:00 AM', '12:00 PM', 'Monday - Friday'),
+        ('Afternoon Half Day', '01:00 PM', '05:00 PM', 'Monday - Friday')
+      `);
+      console.log("Seeded default shift templates.");
+    }
+  } catch (err) {
+    console.error("Failed to initialize shift_templates table:", err.message);
+  }
+})();
+
+// Auto-patch schema for middle_name and suffix columns in users and employees tables
+(async () => {
+  try {
+    // 1. Add suffix to users table if missing
+    try {
+      await pool.query("ALTER TABLE users ADD COLUMN suffix VARCHAR(50) NULL AFTER last_name");
+      console.log("Added column 'suffix' to 'users' table.");
+    } catch (e) {
+      // Ignore if already exists
+    }
+
+    // 2. Add middle_name to employees table if missing
+    try {
+      await pool.query("ALTER TABLE employees ADD COLUMN middle_name VARCHAR(100) NULL AFTER first_name");
+      console.log("Added column 'middle_name' to 'employees' table.");
+    } catch (e) {
+      // Ignore
+    }
+
+    // 3. Add suffix to employees table if missing
+    try {
+      await pool.query("ALTER TABLE employees ADD COLUMN suffix VARCHAR(50) NULL AFTER last_name");
+      console.log("Added column 'suffix' to 'employees' table.");
+    } catch (e) {
+      // Ignore
+    }
+  } catch (err) {
+    console.error("Failed to patch middle_name and suffix columns:", err.message);
   }
 })();
 

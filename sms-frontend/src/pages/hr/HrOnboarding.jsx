@@ -1,38 +1,48 @@
-import React, { useState } from 'react';
-import { UserCheck, CheckCircle2, Clipboard, Search, X, CheckSquare, Square } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserCheck, CheckCircle2, Clipboard, Search, X, CheckSquare, Square, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import axios from 'axios';
 
 const HrOnboarding = () => {
-  const { branding } = useAuth();
+  const { branding, API_BASE_URL } = useAuth();
   const themeColor = branding?.theme_color || '#2563eb';
 
-  const [candidates, setCandidates] = useState([
-    { id: "OB-101", name: "Jobel Jobert", role: "IT Portal Staff", steps: [
-      { name: "Sign employment agreement", done: true },
-      { name: "IT Portal credentials generated", done: true },
-      { name: "Payroll file linked (Finance)", done: true },
-      { name: "Company workstation setup", done: false },
-      { name: "Department orientation", done: false }
-    ]},
-    { id: "OB-102", name: "Prof. Del Rosario", role: "Teacher Portal Staff", steps: [
-      { name: "Sign employment agreement", done: true },
-      { name: "IT Portal credentials generated", done: true },
-      { name: "Payroll file linked (Finance)", done: true },
-      { name: "LMS Classroom course load map (Registrar)", done: true },
-      { name: "Faculty room key assignment", done: false }
-    ]},
-    { id: "OB-103", name: "Clara Santos", role: "Registrar Portal Staff", steps: [
-      { name: "Sign employment agreement", done: true },
-      { name: "IT Portal credentials generated", done: false },
-      { name: "Payroll file linked (Finance)", done: false },
-      { name: "Registrar Workspace keys hand-off", done: false }
-    ]},
-    { id: "OB-104", name: "Sarah Jenkins", role: "School Nurse", steps: [
-      { name: "Sign employment agreement", done: true },
-      { name: "Medical supplies inventory check", done: true },
-      { name: "HMO benefits onboarding checklist", done: false }
-    ]}
-  ]);
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCandidates = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/cashier/payroll/employees`);
+      if (res.data) {
+        // Map to onboarding candidates dynamically based on database properties
+        const list = res.data.map(emp => {
+          const steps = [
+            { name: "Sign employment contract agreement", done: emp.status === 'Active' },
+            { name: "IT Portal credentials generated", done: emp.status === 'Active' },
+            { name: "PSA birth certificate uploaded", done: emp.psa_status === 'Submitted' },
+            { name: "NBI Clearance document submitted", done: emp.nbi_status === 'Submitted' },
+            { name: "Statutory accounts setup (SSS / TIN)", done: (emp.sss_number && emp.tin_number) ? true : false }
+          ];
+          return {
+            id: emp.employee_id,
+            name: `${emp.first_name} ${emp.last_name}`,
+            role: emp.position,
+            steps
+          };
+        });
+        setCandidates(list);
+      }
+    } catch (err) {
+      console.error("Error loading onboarding candidates:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCandidates();
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCandidate, setSelectedCandidate] = useState(null);
@@ -111,7 +121,13 @@ const HrOnboarding = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredCandidates.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-slate-400 font-bold uppercase tracking-wider">
+                    <Loader2 className="animate-spin text-blue-600 inline mr-2" size={16} style={{ color: themeColor }} /> Loading Candidates...
+                  </td>
+                </tr>
+              ) : filteredCandidates.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-10 text-slate-400 font-bold">No onboarding records found.</td>
                 </tr>

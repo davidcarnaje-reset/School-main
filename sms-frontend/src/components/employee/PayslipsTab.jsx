@@ -11,7 +11,7 @@ const PayslipsTab = ({ payslips, selectedPayslip, setSelectedPayslip, employeeIn
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs font-semibold">
+          <table className="w-full text-left border-collapse text-xs font-semibold min-w-[600px]">
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Released Period</th>

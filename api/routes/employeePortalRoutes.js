@@ -18,7 +18,12 @@ import {
   hireEmployee,
   getEmployeeShifts,
   assignEmployeeShift,
-  getMyShift
+  getMyShift,
+  getShiftTemplates,
+  createShiftTemplate,
+  deleteShiftTemplate,
+  removeEmployeeShift,
+  getAllDtrLogs
 } from '../controllers/employee/employeePortalController.js';
 
 const router = express.Router();
@@ -50,6 +55,9 @@ router.post('/purchases', createPurchase);
 router.get('/accomplishments', getMyAccomplishments);
 router.post('/accomplishments', createAccomplishment);
 
+// Attendance logs list (HR view)
+router.get('/dtr-logs', getAllDtrLogs);
+
 // Portal-specific Notifications
 router.get('/notifications', getEmployeeNotifications);
 router.post('/notifications/read', markEmployeeNotificationRead);
@@ -60,6 +68,12 @@ router.post('/hire', hireEmployee);
 // Employee Shifts Scheduling
 router.get('/shifts', getEmployeeShifts);
 router.post('/shifts', assignEmployeeShift);
+router.post('/shifts/remove', removeEmployeeShift);
 router.get('/my-shift', getMyShift);
+
+// Shift Templates catalog CRUD
+router.get('/shifts/templates', getShiftTemplates);
+router.post('/shifts/templates', createShiftTemplate);
+router.delete('/shifts/templates/:id', deleteShiftTemplate);
 
 export default router;

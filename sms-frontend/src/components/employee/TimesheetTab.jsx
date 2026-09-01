@@ -148,23 +148,30 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
                   </span>
                   
                   {log ? (
-                    <div className="flex-1 flex flex-col justify-center space-y-0.5 mt-1">
-                      <div className="text-[9px] font-bold text-emerald-600 leading-none">
+                    <div className="flex-1 flex flex-col justify-end mt-1">
+                      <div className="text-[9px] font-bold text-emerald-600 leading-none hidden md:block">
                         IN: {formatTimeAMPM(log.time_in)}
                       </div>
-                      <div className="text-[9px] font-bold text-slate-500 leading-none">
+                      <div className="text-[9px] font-bold text-slate-500 leading-none hidden md:block mt-0.5">
                         OUT: {formatTimeAMPM(log.time_out)}
                       </div>
                       
+                      {/* Mobile dots indicators */}
+                      <div className="flex justify-center gap-1 md:hidden mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        {log.time_out && <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>}
+                      </div>
+
                       {parseFloat(log.ot_hours) > 0 && (
-                        <div className="text-[8px] bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded font-black w-fit mt-1 uppercase tracking-tighter">
+                        <div className="text-[8px] bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded font-black w-fit mt-1 uppercase tracking-tighter hidden md:block">
                           OT: {parseFloat(log.ot_hours)} hrs
                         </div>
                       )}
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center text-[9px] text-slate-350 font-bold uppercase tracking-wider">
-                      Off
+                      <span className="hidden md:inline">Off</span>
+                      <span className="md:hidden text-[6px] opacity-40">•</span>
                     </div>
                   )}
                 </div>

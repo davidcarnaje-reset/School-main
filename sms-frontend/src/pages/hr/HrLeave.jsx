@@ -11,11 +11,7 @@ const HrLeave = () => {
   const [requestTypeFilter, setRequestTypeFilter] = useState('All');
 
   // Leave balance tracking for active staff (standard configuration)
-  const [balances, setBalances] = useState([
-    { name: "Prof. Del Rosario", role: "Faculty", vacationUsed: 3, vacationLeft: 12, sickUsed: 2, sickLeft: 13 },
-    { name: "Clara Santos", role: "Registrar", vacationUsed: 5, vacationLeft: 10, sickUsed: 1, sickLeft: 14 },
-    { name: "Jobel Jobert", role: "IT Staff", vacationUsed: 1, vacationLeft: 14, sickUsed: 4, sickLeft: 11 }
-  ]);
+  const [balances, setBalances] = useState([]);
 
   const themeColor = branding?.theme_color || '#2563eb';
 
@@ -25,6 +21,20 @@ const HrLeave = () => {
       const res = await axios.get(`${API_BASE_URL}/employee-portal/approvals`);
       if (res.data?.success) {
         setRequests(res.data.requests || []);
+      }
+
+      // Also fetch employee list to build balances list dynamically
+      const empRes = await axios.get(`${API_BASE_URL}/cashier/payroll/employees`);
+      if (empRes.data) {
+        const list = empRes.data.map(emp => ({
+          name: `${emp.first_name} ${emp.last_name}`,
+          role: emp.position,
+          vacationUsed: 0,
+          vacationLeft: 15,
+          sickUsed: 0,
+          sickLeft: 15
+        }));
+        setBalances(list);
       }
     } catch (error) {
       console.error("Error loading requests:", error);

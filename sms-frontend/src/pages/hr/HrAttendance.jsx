@@ -10,11 +10,7 @@ const HrAttendance = () => {
   const [loading, setLoading] = useState(true);
 
   // Shift schedule configurations state
-  const [shifts, setShifts] = useState([
-    { id: 'SH-01', name: "Standard Academic Shift", timeIn: "08:00 AM", timeOut: "05:00 PM", gracePeriod: "15 mins", status: "Active" },
-    { id: 'SH-02', name: "Support Services Flexi", timeIn: "09:00 AM", timeOut: "06:00 PM", gracePeriod: "30 mins", status: "Active" },
-    { id: 'SH-03', name: "Night Custodian Shift", timeIn: "10:00 PM", timeOut: "07:00 AM", gracePeriod: "15 mins", status: "Inactive" }
-  ]);
+  const [shifts, setShifts] = useState([]);
 
   const [shiftForm, setShiftForm] = useState({ name: '', timeIn: '08:00', timeOut: '17:00', gracePeriod: '15 mins' });
   const themeColor = branding?.theme_color || '#2563eb';
@@ -23,47 +19,36 @@ const HrAttendance = () => {
   const fetchDtrLogs = async () => {
     setLoading(true);
     try {
-      // Fetch DTR logs by querying the employee-portal timesheet for all users (or mock list joined)
-      // For presentation purposes, we pull the approvals list or fallback logs
-      const res = await axios.get(`${API_BASE_URL}/employee-portal/approvals`);
+      const res = await axios.get(`${API_BASE_URL}/employee-portal/dtr-logs`);
       if (res.data?.success) {
-        // Map approvals to attendance log items
-        const rawList = res.data.requests || [];
-        const formattedLogs = rawList
-          .filter(r => r.request_type === 'Time Adjustment')
-          .map(r => {
-            let detailsObj = {};
-            try { detailsObj = JSON.parse(r.details); } catch(e) {}
-            const entry = detailsObj.entries?.[0] || {};
-            return {
-              name: `${r.first_name} ${r.last_name}`,
-              position: r.position,
-              date: entry.dateFrom || new Date().toISOString().split('T')[0],
-              timeIn: entry.timeFrom || '08:00',
-              timeOut: entry.timeTo || '17:00',
-              status: r.status === 'Approved' ? 'On Time' : 'Pending Verification'
-            };
-          });
-
-        // Add some default fallback logs so list isn't empty
-        const fallbackLogs = [
-          { name: "Clara Santos", position: "REGISTRAR OFFICER", date: "2026-08-22", timeIn: "07:56 AM", timeOut: "05:00 PM", status: "On Time" },
-          { name: "Mark Torres", position: "FACULTY", date: "2026-08-22", timeIn: "08:12 AM", timeOut: "05:00 PM", status: "Late" },
-          { name: "Jobel Jobert", position: "IT SUPPORT", date: "2026-08-22", timeIn: "07:48 AM", timeOut: "05:00 PM", status: "On Time" }
-        ];
-
-        setLogs([...formattedLogs, ...fallbackLogs]);
+        setLogs(res.data.logs || []);
       } else {
-        setLogs([
-          { name: "Clara Santos", position: "REGISTRAR OFFICER", date: "2026-08-22", timeIn: "07:56 AM", timeOut: "05:00 PM", status: "On Time" },
-          { name: "Mark Torres", position: "FACULTY", date: "2026-08-22", timeIn: "08:12 AM", timeOut: "05:00 PM", status: "Late" },
-          { name: "Jobel Jobert", position: "IT SUPPORT", date: "2026-08-22", timeIn: "07:48 AM", timeOut: "05:00 PM", status: "On Time" }
-        ]);
+        setLogs([]);
       }
     } catch (error) {
       console.error("Error loading DTR logs:", error);
+      setLogs([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchShifts = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/employee-portal/shifts/templates`);
+      if (res.data?.success) {
+        const mapped = res.data.templates.map(t => ({
+          id: `SH-${t.id}`,
+          name: t.shift_name,
+          timeIn: t.time_in,
+          timeOut: t.time_out,
+          gracePeriod: "15 mins",
+          status: "Active"
+        }));
+        setShifts(mapped);
+      }
+    } catch (err) {
+      console.error("Error fetching shift templates:", err);
     }
   };
 
@@ -102,6 +87,7 @@ const HrAttendance = () => {
   useEffect(() => {
     fetchDtrLogs();
     fetchEmployeeShifts();
+    fetchShifts();
   }, []);
 
   const handleAddShift = (e) => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   User, Calendar, CreditCard, Clipboard, CheckSquare, 
-  Wallet, Award, Bell, ArrowLeft, Loader2, X
+  Wallet, Award, Bell, ArrowLeft, Loader2, X, Menu
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +22,7 @@ const EmployeePortal = () => {
   const [activeTab, setActiveTab] = useState('Personal');
   const [loading, setLoading] = useState(true);
   const [employeeShift, setEmployeeShift] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Core employee state
   const [employeeInfo, setEmployeeInfo] = useState(null);
@@ -51,7 +52,7 @@ const EmployeePortal = () => {
   const fetchPortalData = async () => {
     setLoading(true);
     try {
-      const email = user?.email;
+      const email = user?.email || user?.username;
       if (!email) return;
 
       // 1. Fetch Personal Details
@@ -136,7 +137,7 @@ const EmployeePortal = () => {
   const handleTimeAdjustment = async (e) => {
     e.preventDefault();
     try {
-      const email = user?.email;
+      const email = user?.email || user?.username;
       const details = {
         date: timeAdjForm.log_date,
         time_in: timeAdjForm.time_in,
@@ -175,7 +176,7 @@ const EmployeePortal = () => {
   const handleWfhAccomplishment = async (e) => {
     e.preventDefault();
     try {
-      const email = user?.email;
+      const email = user?.email || user?.username;
       const res = await axios.post(`${API_BASE_URL}/employee-portal/accomplishments`, {
         email,
         log_date: wfhForm.log_date,
@@ -194,7 +195,7 @@ const EmployeePortal = () => {
   const handleExpenseSubmit = async (e) => {
     e.preventDefault();
     try {
-      const email = user?.email;
+      const email = user?.email || user?.username;
       const res = await axios.post(`${API_BASE_URL}/employee-portal/expenses`, {
         email,
         expense_type: expenseForm.type,
@@ -214,7 +215,7 @@ const EmployeePortal = () => {
   const handlePurchaseSubmit = async (e) => {
     e.preventDefault();
     try {
-      const email = user?.email;
+      const email = user?.email || user?.username;
       const res = await axios.post(`${API_BASE_URL}/employee-portal/purchases`, {
         email,
         item_name: purchaseForm.item_name,
@@ -239,7 +240,7 @@ const EmployeePortal = () => {
         id: requestId,
         status,
         remarks,
-        approved_by_email: user?.email
+        approved_by_email: user?.email || user?.username
       });
       if (res.data?.success) {
         alert(`Request ${status.toLowerCase()} successfully.`);
@@ -255,7 +256,7 @@ const EmployeePortal = () => {
             const firstEntry = parsedDetails.entries?.[0];
             if (firstEntry && (req.request_type === 'Time Adjustment' || req.request_type === 'Overtime')) {
               await axios.post(`${API_BASE_URL}/employee-portal/timelog`, {
-                email: req.email || user?.email,
+                email: req.email || user?.email || user?.username,
                 log_date: firstEntry.dateFrom || new Date().toISOString().split('T')[0],
                 time_in: firstEntry.timeFrom || '08:00',
                 time_out: firstEntry.timeTo || '17:00',
@@ -296,8 +297,16 @@ const EmployeePortal = () => {
   return (
     <div className="flex h-screen bg-slate-50 relative font-sans overflow-hidden">
       
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 lg:hidden transition-all duration-300"
+        />
+      )}
+
       {/* 1. PORTAL SIDEBAR */}
-      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col h-full overflow-hidden shadow-2xl shrink-0">
+      <aside className={`fixed inset-y-0 left-0 lg:relative w-64 bg-slate-900 text-slate-300 flex flex-col h-full overflow-hidden shadow-2xl shrink-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
         <div className="h-20 px-6 border-b border-slate-800 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black shrink-0 shadow-lg" style={{ backgroundColor: themeColor }}>
             EP
@@ -320,7 +329,10 @@ const EmployeePortal = () => {
           ].map(item => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                setIsSidebarOpen(false);
+              }}
               className={`w-full flex items-center p-3 rounded-2xl transition-all font-bold text-sm ${
                 activeTab === item.id 
                   ? 'text-white shadow-lg shadow-blue-500/10' 
@@ -349,14 +361,20 @@ const EmployeePortal = () => {
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto z-10 bg-slate-50">
         
         {/* HEADER BAR */}
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 sticky top-0 z-30 shrink-0 shadow-sm">
-          <div className="flex items-center gap-4">
-            <h2 className="text-slate-850 font-black text-xl capitalize">{activeTab} Workspaces</h2>
-            <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-10 sticky top-0 z-30 shrink-0 shadow-sm">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 -ml-2 text-slate-550 hover:text-slate-850 lg:hidden rounded-xl hover:bg-slate-100 transition-colors"
+            >
+              <Menu size={22} />
+            </button>
+            <h2 className="text-slate-850 font-black text-lg sm:text-xl capitalize shrink-0">{activeTab} Workspaces</h2>
+            <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0 hidden xs:inline-block">
               Employee Portal Active
             </span>
             {employeeShift && (
-              <span className="px-3 py-1 bg-indigo-50 border border-indigo-150 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
+              <span className="px-3 py-1 bg-indigo-50 border border-indigo-150 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0 hidden md:inline-block">
                 Shift: {employeeShift.time_in} - {employeeShift.time_out}
               </span>
             )}
@@ -393,7 +411,7 @@ const EmployeePortal = () => {
         </header>
 
         {/* COMPONENT BODY RENDER */}
-        <div className="p-10 max-w-7xl mx-auto w-full">
+        <div className="p-4 sm:p-10 max-w-7xl mx-auto w-full">
           {activeTab === 'Personal' && (
             <PersonalTab 
               employeeInfo={employeeInfo}

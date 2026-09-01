@@ -131,16 +131,25 @@ const AdminLayout = () => {
       { icon: <Printer size={20} />, label: 'DepEd / CHED Reports', path: '/registrar/deped-reports', module: 'deped_reports' },
     ],
     hr: [
-      { type: 'header', label: 'HR Home & Work' },
+      { type: 'header', label: 'HR Home & Overview' },
       { icon: <Compass size={20} />, label: 'HR Home', path: '/hr/home' },
       { icon: <LayoutDashboard size={20} />, label: 'HR Dashboard', path: '/hr/dashboard' },
+      
+      { type: 'header', label: 'Employee Registry' },
       { icon: <Users size={20} />, label: 'Employee Directory', path: '/hr/employees', module: 'employees' },
       { icon: <UserCheck size={20} />, label: 'Onboarding Hires', path: '/hr/onboarding', module: 'onboarding' },
+      
+      { type: 'header', label: 'Time & Attendance' },
       { icon: <ClipboardList size={20} />, label: 'Attendance (DTR)', path: '/hr/attendance', module: 'attendance' },
+      { icon: <Clock size={20} />, label: 'Time Schedules', path: '/hr/schedules' },
+      
+      { type: 'header', label: 'Services & Payroll' },
       { icon: <FileText size={20} />, label: 'Service Requests', path: '/hr/leave', module: 'leave' },
       { icon: <Banknote size={20} />, label: 'Payroll Support', path: '/hr/payroll-support', module: 'payroll_support' },
       { icon: <Award size={20} />, label: 'Evaluations (KPI)', path: '/hr/performance', module: 'performance' },
       { icon: <BookOpen size={20} />, label: 'Staff Training', path: '/hr/training', module: 'training' },
+      
+      { type: 'header', label: 'Files & Compliance' },
       { icon: <FolderOpen size={20} />, label: 'Employee 201 Files', path: '/hr/documents', module: 'documents' },
       { icon: <AlertCircle size={20} />, label: 'Disciplinary Cases', path: '/hr/disciplinary', module: 'disciplinary' },
       { icon: <CheckCircle2 size={20} />, label: 'Clearance Status', path: '/hr/clearance', module: 'clearance' },
