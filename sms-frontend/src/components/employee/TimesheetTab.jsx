@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, Clock, Calendar, CheckCircle2, ShieldAlert, LogIn, LogOut, MapPin } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import Tooltip from '../shared/Tooltip';
 
 const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjustment, themeColor, employeeShift, onRefresh }) => {
   const { user, API_BASE_URL } = useAuth();
@@ -100,9 +101,9 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
 
   // Helper to format time to 12-hour AM/PM format (e.g., 6:56 AM)
   const formatTimeAMPM = (timeStr) => {
-    if (!timeStr) return '';
+    if (!timeStr) return '--:--';
     const parts = timeStr.split(':');
-    if (parts.length < 2) return '';
+    if (parts.length < 2) return timeStr;
     let hour = parseInt(parts[0], 10);
     const minute = parts[1];
     const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -133,10 +134,8 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
   // Calendar Math
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year, month) => {
-    // JavaScript getDay() returns 0 for Sunday, 1 for Monday, etc.
-    const startDay = new Date(year, month, 1).getDay();
-    // Adjust so Monday is 0, Tuesday is 1, ..., Sunday is 6
-    return startDay === 0 ? 6 : startDay - 1;
+    // Standard Calendar: Sunday = 0, Monday = 1, ..., Saturday = 6
+    return new Date(year, month, 1).getDay();
   };
 
   const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
@@ -223,29 +222,33 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
           </div>
 
           <div className="flex gap-4 w-full md:w-auto">
-            <button
-              onClick={() => handleClockLog('time_in')}
-              disabled={clockLoading || Boolean(todayLog?.time_in)}
-              className="flex-1 md:flex-none flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed group min-w-[130px]"
-            >
-              <LogIn size={28} className="mb-1 text-emerald-500 group-hover:scale-110 transition-transform" />
-              <span className="font-extrabold text-xs tracking-wider">TIME IN</span>
-              <span className="text-[10px] font-bold text-slate-400 mt-1 font-mono">
-                {todayLog?.time_in ? formatTimeAMPM(todayLog.time_in) : '--:--'}
-              </span>
-            </button>
+            <Tooltip text={todayLog?.time_in ? `Already Timed In at ${formatTimeAMPM(todayLog.time_in)}` : "Record Morning / Shift Clock In with Geofence GPS"} position="top">
+              <button
+                onClick={() => handleClockLog('time_in')}
+                disabled={clockLoading || Boolean(todayLog?.time_in)}
+                className="flex-1 md:flex-none flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed group min-w-[130px]"
+              >
+                <LogIn size={28} className="mb-1 text-emerald-500 group-hover:scale-110 transition-transform" />
+                <span className="font-extrabold text-xs tracking-wider">TIME IN</span>
+                <span className="text-[10px] font-bold text-slate-400 mt-1 font-mono">
+                  {todayLog?.time_in ? formatTimeAMPM(todayLog.time_in) : '--:--'}
+                </span>
+              </button>
+            </Tooltip>
 
-            <button
-              onClick={() => handleClockLog('time_out')}
-              disabled={clockLoading || !todayLog?.time_in || Boolean(todayLog?.time_out)}
-              className="flex-1 md:flex-none flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50 text-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed group min-w-[130px]"
-            >
-              <LogOut size={28} className="mb-1 text-rose-500 group-hover:scale-110 transition-transform" />
-              <span className="font-extrabold text-xs tracking-wider">TIME OUT</span>
-              <span className="text-[10px] font-bold text-slate-400 mt-1 font-mono">
-                {todayLog?.time_out ? formatTimeAMPM(todayLog.time_out) : '--:--'}
-              </span>
-            </button>
+            <Tooltip text={todayLog?.time_out ? `Already Timed Out at ${formatTimeAMPM(todayLog.time_out)}` : todayLog?.time_in ? "Record Afternoon / Shift Clock Out" : "Please Time In first"} position="top">
+              <button
+                onClick={() => handleClockLog('time_out')}
+                disabled={clockLoading || !todayLog?.time_in || Boolean(todayLog?.time_out)}
+                className="flex-1 md:flex-none flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50 text-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed group min-w-[130px]"
+              >
+                <LogOut size={28} className="mb-1 text-rose-500 group-hover:scale-110 transition-transform" />
+                <span className="font-extrabold text-xs tracking-wider">TIME OUT</span>
+                <span className="text-[10px] font-bold text-slate-400 mt-1 font-mono">
+                  {todayLog?.time_out ? formatTimeAMPM(todayLog.time_out) : '--:--'}
+                </span>
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -292,9 +295,9 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
             </div>
           </div>
 
-          {/* WEEK DAYS HEADINGS */}
+          {/* WEEK DAYS HEADINGS (STANDARD SUNDAY-FIRST) */}
           <div className="grid grid-cols-7 gap-2 text-center text-xs font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-3">
-            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            <span className="text-rose-500">Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span className="text-blue-500">Sat</span>
           </div>
 
           {/* CALENDAR CELLS GRID */}

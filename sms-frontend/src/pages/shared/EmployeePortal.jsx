@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import Tooltip from '../../components/shared/Tooltip';
+import AiSupportChatbot from '../../components/shared/AiSupportChatbot';
 
 // Import subcomponents
 import PersonalTab from '../../components/employee/PersonalTab';
@@ -379,13 +381,15 @@ const EmployeePortal = () => {
       {/* 1. PORTAL SIDEBAR */}
       <aside className={`fixed inset-y-0 left-0 lg:relative ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64 bg-slate-900 text-slate-300 flex flex-col h-full shadow-2xl shrink-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-all duration-300 ease-in-out`}>
         {/* FLOATING SIDEBAR TOGGLE BUTTON */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden lg:flex absolute -right-3.5 top-6 w-7 h-7 rounded-full bg-white border border-slate-200 shadow-md items-center justify-center text-slate-600 hover:text-blue-600 hover:bg-slate-50 hover:scale-110 hover:border-blue-300 transition-all z-50 cursor-pointer"
-          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-        >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
+        <Tooltip text={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"} position="right">
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="hidden lg:flex absolute -right-3.5 top-6 w-7 h-7 rounded-full bg-white border border-slate-200 shadow-md items-center justify-center text-slate-600 hover:text-blue-600 hover:bg-slate-50 hover:scale-110 hover:border-blue-300 transition-all z-50 cursor-pointer"
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
+        </Tooltip>
 
         {/* HEADER */}
         <div className={`h-20 border-b border-slate-800 flex items-center shrink-0 ${isCollapsed ? 'justify-center px-2' : 'px-5'}`}>
@@ -421,7 +425,6 @@ const EmployeePortal = () => {
                   setActiveTab(item.id);
                   setIsSidebarOpen(false);
                 }}
-                title={item.label}
                 className={`transition-all duration-200 font-bold text-sm flex items-center ${
                   isCollapsed 
                     ? 'w-12 h-12 rounded-2xl mx-auto justify-center' 
@@ -444,7 +447,6 @@ const EmployeePortal = () => {
         <div className="p-3 border-t border-slate-800 shrink-0">
           <button
             onClick={() => navigate(getExitPath())}
-            title="Return to Campus"
             className={`transition-all duration-200 font-bold text-sm flex items-center ${
               isCollapsed 
                 ? 'w-12 h-12 rounded-2xl mx-auto justify-center text-slate-450 hover:bg-slate-800 hover:text-white' 
@@ -458,7 +460,7 @@ const EmployeePortal = () => {
       </aside>
 
       {/* 2. PORTAL CONTENT WRAPPER */}
-      <main className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto z-10 bg-slate-50">
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto z-10 bg-slate-50 relative">
         
         {/* HEADER BAR */}
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-10 sticky top-0 z-30 shrink-0 shadow-sm">
@@ -494,24 +496,24 @@ const EmployeePortal = () => {
             </div>
 
             {/* PROFILE BRIEF */}
-            <div className="flex items-center space-x-3 cursor-pointer shrink-0">
-              <div className="text-right">
-                <p className="text-sm font-black text-slate-800 leading-tight">{user?.full_name}</p>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-450">{user?.role}</p>
+            <div className="flex items-center gap-3 border-l border-slate-150 pl-6 shrink-0">
+              <div className="text-right hidden sm:block">
+                <p className="text-xs font-bold text-slate-800 leading-tight">{user?.full_name || 'Staff'}</p>
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{user?.role}</span>
               </div>
-              <div className="w-10 h-10 bg-slate-200 rounded-2xl overflow-hidden shadow-sm border-2 border-white ring-1 ring-slate-100 shrink-0 flex items-center justify-center font-black text-slate-450">
-                {user?.profile_image ? (
-                  <img src={`${API_BASE_URL}/uploads/profiles/${user.profile_image}`} className="w-full h-full object-cover" alt="Profile" />
+              <div className="w-10 h-10 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-black text-sm uppercase shadow-inner overflow-hidden">
+                {employeeInfo?.profile_image ? (
+                  <img src={`${API_BASE_URL}/uploads/profiles/${employeeInfo.profile_image}`} className="w-full h-full object-cover" alt="Profile" />
                 ) : (
-                  user?.full_name?.charAt(0)
+                  user?.first_name?.charAt(0) || 'E'
                 )}
               </div>
             </div>
           </div>
         </header>
 
-        {/* COMPONENT BODY RENDER */}
-        <div className="p-4 sm:p-10 max-w-7xl mx-auto w-full">
+        {/* WORKSPACE TAB CONTENTS */}
+        <div className="p-4 sm:p-10 flex-1 max-w-7xl w-full mx-auto pb-24">
           {activeTab === 'Personal' && (
             <PersonalTab 
               employeeInfo={employeeInfo}
@@ -593,6 +595,9 @@ const EmployeePortal = () => {
         </div>
 
       </main>
+
+      {/* FLOATING AI SUPPORT CHATBOT */}
+      <AiSupportChatbot themeColor={themeColor} />
 
     </div>
   );
