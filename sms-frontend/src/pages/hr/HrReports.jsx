@@ -12,7 +12,8 @@ const HrReports = () => {
   const fetchEmployees = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/cashier/payroll/employees`);
-      setEmployees(res.data || []);
+      const activeOnly = (res.data || []).filter(e => (e.status || 'Active') === 'Active');
+      setEmployees(activeOnly);
     } catch (e) {
       console.error(e);
     } finally {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { User, Bell } from 'lucide-react';
+import { User, Bell, Download } from 'lucide-react';
+import { download201FormPDF } from '../../utils/employee201FormGenerator';
 
 const PersonalTab = ({ employeeInfo, portalNotifs, unreadNotifsCount, handleMarkNotifRead, themeColor, API_BASE_URL }) => {
   return (
@@ -19,10 +20,19 @@ const PersonalTab = ({ employeeInfo, portalNotifs, unreadNotifsCount, handleMark
           </h2>
           <p className="text-sm font-bold text-slate-400">{employeeInfo?.position} • {employeeInfo?.department} Department</p>
         </div>
-        <div className="md:ml-auto text-center md:text-right shrink-0 bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100">
-          <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Salary Configuration</p>
-          <p className="text-2xl font-black text-slate-800 mt-1">₱{employeeInfo?.basic_salary?.toLocaleString()}</p>
-          <p className="text-[10px] text-slate-550 mt-0.5">Base Pay / {employeeInfo?.salary_type || 'Monthly'} Release</p>
+        <div className="md:ml-auto text-center md:text-right shrink-0 bg-slate-50 px-6 py-4 rounded-3xl border border-slate-100 flex flex-col items-center md:items-end gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Salary Configuration</p>
+            <p className="text-2xl font-black text-slate-800 mt-1">₱{employeeInfo?.basic_salary?.toLocaleString()}</p>
+            <p className="text-[10px] text-slate-550 mt-0.5">Base Pay / {employeeInfo?.salary_type || 'Monthly'} Release</p>
+          </div>
+          <button 
+            onClick={() => download201FormPDF(employeeInfo)} 
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-200 flex items-center gap-1.5 cursor-pointer mt-1"
+            style={{ backgroundColor: themeColor }}
+          >
+            <Download size={14} /> Download 201 File
+          </button>
         </div>
       </div>
 

@@ -199,7 +199,7 @@ const HrAttendance = () => {
                   <div className="flex items-center gap-6">
                     <div className="text-right">
                       <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Clock Hours</p>
-                      <p className="text-xs font-mono font-bold text-slate-750 mt-0.5">{log.timeIn} - {log.timeOut}</p>
+                      <p className="text-xs font-mono font-bold text-slate-750 mt-0.5">{log.timeIn} - {log.timeOut || '--:--'}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Date Logged</p>

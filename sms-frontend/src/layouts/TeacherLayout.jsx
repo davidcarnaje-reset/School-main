@@ -185,7 +185,6 @@ const TeacherLayout = () => {
   const currentMenu = [
     { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/teacher/dashboard' },
     { icon: <School size={20} />, label: 'My Classes', path: '/teacher/classes' },
-    { icon: <Calendar size={20} />, label: 'Daily Time Record', path: '/teacher/dtr' },
     { icon: <BookOpen size={20} />, label: 'LMS', path: '/teacher/activities', state: { tab: 'Stream' } }
   ];
 

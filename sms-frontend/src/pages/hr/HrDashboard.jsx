@@ -20,17 +20,28 @@ const HrDashboard = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [empRes, reqRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/cashier/payroll/employees`),
-        axios.get(`${API_BASE_URL}/employee-portal/approvals`)
-      ]);
+      let employeesList = [];
+      try {
+        const empRes = await axios.get(`${API_BASE_URL}/cashier/payroll/employees`);
+        employeesList = empRes.data || [];
+      } catch (e) {
+        console.error("Error loading employees for HR dashboard:", e);
+      }
 
-      const employeesList = empRes.data || [];
-      const requestsList = reqRes.data.requests || [];
+      let requestsList = [];
+      try {
+        const reqRes = await axios.get(`${API_BASE_URL}/employee-portal/approvals`);
+        requestsList = reqRes.data?.requests || [];
+      } catch (e) {
+        console.error("Error loading approvals for HR dashboard:", e);
+      }
 
-      // Compute staff distribution
-      const total = employeesList.length;
-      const faculty = employeesList.filter(e => 
+      // Filter ACTIVE employees only for HR Dashboard & Analytics
+      const activeEmployees = employeesList.filter(e => (e.status || 'Active') === 'Active');
+
+      // Compute active staff distribution
+      const total = activeEmployees.length;
+      const faculty = activeEmployees.filter(e => 
         (e.position || '').toLowerCase().includes('teacher') || 
         (e.department || '').toLowerCase().includes('faculty')
       ).length;
@@ -53,14 +64,14 @@ const HrDashboard = () => {
         date: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : "Today"
       }));
 
-      // Fallback dynamic onboarding logs based on actual registered employees
+      // Fallback dynamic onboarding logs based on actual registered ACTIVE employees
       if (logs.length === 0) {
-        employeesList.slice(0, 3).forEach((emp) => {
+        activeEmployees.slice(0, 5).forEach((emp) => {
           logs.push({
-            type: "IT Account Setup",
+            type: "IT Account & Payroll Setup",
             employee: `${emp.first_name} ${emp.last_name} (${emp.position})`,
             target: emp.department || "Operations",
-            status: emp.status === 'Active' ? 'Approved & Linked' : 'Sent to IT',
+            status: 'Approved & Linked',
             date: "Today"
           });
         });

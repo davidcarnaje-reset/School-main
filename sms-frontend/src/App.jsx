@@ -318,7 +318,7 @@ function App() {
             <Route path="dashboard" element={<TeacherDashboard />} />
             <Route path="announcements" element={<TeacherNotify />} />
             <Route path="classes" element={<TeacherClasses />} />
-            <Route path="dtr" element={<TeacherDTR />} />
+            <Route path="dtr" element={<Navigate to="/employee-portal" replace />} />
             <Route path="profile" element={<TeacherProfile />} />
             <Route path="/teacher/sections/:classId" element={<GradeManagement />} />
             <Route path="/teacher/grades/:classId" element={<GradeManagement />} />

@@ -3,7 +3,7 @@ import axios from 'axios';
 import { 
   User, Calendar, CreditCard, Clipboard, CheckSquare, 
   Wallet, Award, Bell, ArrowLeft, Loader2, X, Menu,
-  CheckCircle, AlertCircle
+  CheckCircle, AlertCircle, ChevronLeft, ChevronRight, Banknote, BadgeDollarSign
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +24,17 @@ const EmployeePortal = () => {
   const [loading, setLoading] = useState(true);
   const [employeeShift, setEmployeeShift] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('portalSidebarCollapsed')) ?? false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('portalSidebarCollapsed', JSON.stringify(isCollapsed));
+  }, [isCollapsed]);
 
   // Core employee state
   const [employeeInfo, setEmployeeInfo] = useState(null);
@@ -61,28 +72,40 @@ const EmployeePortal = () => {
   const fetchPortalData = async () => {
     setLoading(true);
     try {
-      const email = user?.email || user?.username;
+      const email = user?.email || user?.username || user?.id || user?.employee_id;
       if (!email) return;
 
       // 1. Fetch Personal Details
-      const personalRes = await axios.get(`${API_BASE_URL}/employee-portal/personal?email=${email}`);
-      if (personalRes.data?.success) {
-        setEmployeeInfo(personalRes.data.employee);
-        
-        // 2. Fetch completed payslips for this employee
+      try {
+        const personalRes = await axios.get(`${API_BASE_URL}/employee-portal/personal?email=${email}`);
+        if (personalRes.data?.success) {
+          setEmployeeInfo(personalRes.data.employee);
+        }
+      } catch (err) {
+        console.error("Error loading personal info:", err);
+      }
+
+      // 2. Fetch completed payslips
+      try {
         const myPayslipsRes = await axios.get(`${API_BASE_URL}/cashier/payroll/my-payslips?email=${email}`);
         if (myPayslipsRes.data?.success) {
           setPayslips(myPayslipsRes.data.payslips || []);
         }
+      } catch (err) {
+        console.error("Error loading payslips:", err);
       }
 
       // 3. Fetch Timesheet DTR Logs
-      const timesheetRes = await axios.get(`${API_BASE_URL}/employee-portal/timesheet?email=${email}`);
-      if (timesheetRes.data?.success) {
-        setTimesheet(timesheetRes.data.logs || []);
+      try {
+        const timesheetRes = await axios.get(`${API_BASE_URL}/employee-portal/timesheet?email=${email}&_t=${Date.now()}`);
+        if (timesheetRes.data?.success) {
+          setTimesheet(timesheetRes.data.logs || []);
+        }
+      } catch (err) {
+        console.error("Error loading timesheet:", err);
       }
 
-      // Fetch shift assignment
+      // 4. Fetch Shift Assignment
       try {
         const shiftRes = await axios.get(`${API_BASE_URL}/employee-portal/my-shift?email=${email}`);
         if (shiftRes.data?.success) {
@@ -92,43 +115,67 @@ const EmployeePortal = () => {
         console.error("Error loading my shift:", err);
       }
 
-      // 4. Fetch requests
-      const requestsRes = await axios.get(`${API_BASE_URL}/employee-portal/requests?email=${email}`);
-      if (requestsRes.data?.success) {
-        setRequests(requestsRes.data.requests || []);
+      // 5. Fetch Requests
+      try {
+        const requestsRes = await axios.get(`${API_BASE_URL}/employee-portal/requests?email=${email}`);
+        if (requestsRes.data?.success) {
+          setRequests(requestsRes.data.requests || []);
+        }
+      } catch (err) {
+        console.error("Error loading requests:", err);
       }
 
-      // 5. Fetch approvals (if admin/manager)
+      // 6. Fetch Approvals (if manager)
       if (isManager) {
-        const approvalsRes = await axios.get(`${API_BASE_URL}/employee-portal/approvals`);
-        if (approvalsRes.data?.success) {
-          setApprovalsQueue(approvalsRes.data.requests || []);
+        try {
+          const approvalsRes = await axios.get(`${API_BASE_URL}/employee-portal/approvals`);
+          if (approvalsRes.data?.success) {
+            setApprovalsQueue(approvalsRes.data.requests || []);
+          }
+        } catch (err) {
+          console.error("Error loading approvals:", err);
         }
       }
 
-      // 6. Fetch Expenses
-      const expensesRes = await axios.get(`${API_BASE_URL}/employee-portal/expenses?email=${email}`);
-      if (expensesRes.data?.success) {
-        setExpenses(expensesRes.data.expenses || []);
+      // 7. Fetch Expenses
+      try {
+        const expensesRes = await axios.get(`${API_BASE_URL}/employee-portal/expenses?email=${email}`);
+        if (expensesRes.data?.success) {
+          setExpenses(expensesRes.data.expenses || []);
+        }
+      } catch (err) {
+        console.error("Error loading expenses:", err);
       }
 
-      // 7. Fetch Purchases
-      const purchasesRes = await axios.get(`${API_BASE_URL}/employee-portal/purchases?email=${email}`);
-      if (purchasesRes.data?.success) {
-        setPurchases(purchasesRes.data.purchases || []);
+      // 8. Fetch Purchases
+      try {
+        const purchasesRes = await axios.get(`${API_BASE_URL}/employee-portal/purchases?email=${email}`);
+        if (purchasesRes.data?.success) {
+          setPurchases(purchasesRes.data.purchases || []);
+        }
+      } catch (err) {
+        console.error("Error loading purchases:", err);
       }
 
-      // 8. Fetch WFH accomplishments
-      const accomplishmentsRes = await axios.get(`${API_BASE_URL}/employee-portal/accomplishments?email=${email}`);
-      if (accomplishmentsRes.data?.success) {
-        setAccomplishments(accomplishmentsRes.data.accomplishments || []);
+      // 9. Fetch WFH Accomplishments
+      try {
+        const accomplishmentsRes = await axios.get(`${API_BASE_URL}/employee-portal/accomplishments?email=${email}`);
+        if (accomplishmentsRes.data?.success) {
+          setAccomplishments(accomplishmentsRes.data.accomplishments || []);
+        }
+      } catch (err) {
+        console.error("Error loading accomplishments:", err);
       }
 
-      // 9. Fetch Notifications
-      const notifsRes = await axios.get(`${API_BASE_URL}/employee-portal/notifications?email=${email}`);
-      if (notifsRes.data?.success) {
-        setPortalNotifs(notifsRes.data.notifications || []);
-        setUnreadNotifsCount(notifsRes.data.unread || 0);
+      // 10. Fetch Notifications
+      try {
+        const notifsRes = await axios.get(`${API_BASE_URL}/employee-portal/notifications?email=${email}`);
+        if (notifsRes.data?.success) {
+          setPortalNotifs(notifsRes.data.notifications || []);
+          setUnreadNotifsCount(notifsRes.data.unread || 0);
+        }
+      } catch (err) {
+        console.error("Error loading notifications:", err);
       }
 
     } catch (error) {
@@ -330,53 +377,82 @@ const EmployeePortal = () => {
       )}
 
       {/* 1. PORTAL SIDEBAR */}
-      <aside className={`fixed inset-y-0 left-0 lg:relative w-64 bg-slate-900 text-slate-300 flex flex-col h-full overflow-hidden shadow-2xl shrink-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
-        <div className="h-20 px-6 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black shrink-0 shadow-lg" style={{ backgroundColor: themeColor }}>
-            EP
-          </div>
-          <div>
-            <h3 className="text-sm font-black text-white leading-tight">Employee Portal</h3>
-            <p className="text-[10px] text-slate-550 font-bold uppercase tracking-wider">Payroll & Service</p>
+      <aside className={`fixed inset-y-0 left-0 lg:relative ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64 bg-slate-900 text-slate-300 flex flex-col h-full shadow-2xl shrink-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-all duration-300 ease-in-out`}>
+        {/* FLOATING SIDEBAR TOGGLE BUTTON */}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="hidden lg:flex absolute -right-3.5 top-6 w-7 h-7 rounded-full bg-white border border-slate-200 shadow-md items-center justify-center text-slate-600 hover:text-blue-600 hover:bg-slate-50 hover:scale-110 hover:border-blue-300 transition-all z-50 cursor-pointer"
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        >
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
+
+        {/* HEADER */}
+        <div className={`h-20 border-b border-slate-800 flex items-center shrink-0 ${isCollapsed ? 'justify-center px-2' : 'px-5'}`}>
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-900/40 border border-blue-400/20" style={{ backgroundColor: themeColor }}>
+              <Banknote size={22} className="text-white" />
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden whitespace-nowrap">
+                <h3 className="text-sm font-black text-white leading-tight tracking-wide">Employee Portal</h3>
+                <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Payroll & Service</p>
+              </div>
+            )}
           </div>
         </div>
 
-        <nav className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto">
+        {/* NAVIGATION ITEMS */}
+        <nav className="flex-1 py-6 px-2.5 space-y-2 overflow-y-auto">
           {[
-            { id: 'Personal', label: 'My Personal Tab', icon: <User size={18} /> },
-            { id: 'Timesheet', label: 'DTR & Timesheet', icon: <Calendar size={18} /> },
-            { id: 'Payslips', label: 'Payslip History', icon: <CreditCard size={18} /> },
-            { id: 'Filing', label: 'File A Request', icon: <Clipboard size={18} /> },
-            { id: 'Approvals', label: isManager ? 'Approvals Queue' : 'My Approvals', icon: <CheckSquare size={18} /> },
-            { id: 'Finance', label: 'Expenses & Purchases', icon: <Wallet size={18} /> },
-            { id: 'WFH', label: 'Accomplishments', icon: <Award size={18} /> }
-          ].map(item => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                setIsSidebarOpen(false);
-              }}
-              className={`w-full flex items-center p-3 rounded-2xl transition-all font-bold text-sm ${
-                activeTab === item.id 
-                  ? 'text-white shadow-lg shadow-blue-500/10' 
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-              style={activeTab === item.id ? { backgroundColor: themeColor } : {}}
-            >
-              <span className="mr-3">{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
+            { id: 'Personal', label: 'My Personal Tab', icon: <User size={20} /> },
+            { id: 'Timesheet', label: 'DTR & Timesheet', icon: <Calendar size={20} /> },
+            { id: 'Payslips', label: 'Payslip History', icon: <CreditCard size={20} /> },
+            { id: 'Filing', label: 'File A Request', icon: <Clipboard size={20} /> },
+            { id: 'Approvals', label: isManager ? 'Approvals Queue' : 'My Approvals', icon: <CheckSquare size={20} /> },
+            { id: 'Finance', label: 'Expenses & Purchases', icon: <Wallet size={20} /> },
+            { id: 'WFH', label: 'Accomplishments', icon: <Award size={20} /> }
+          ].map(item => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setIsSidebarOpen(false);
+                }}
+                title={item.label}
+                className={`transition-all duration-200 font-bold text-sm flex items-center ${
+                  isCollapsed 
+                    ? 'w-12 h-12 rounded-2xl mx-auto justify-center' 
+                    : 'w-full p-3 gap-3 rounded-2xl justify-start'
+                } ${
+                  isActive 
+                    ? 'text-white shadow-lg shadow-blue-500/20 scale-[1.02]' 
+                    : 'text-slate-400 hover:bg-slate-800/80 hover:text-white hover:scale-[1.02]'
+                }`}
+                style={isActive ? { backgroundColor: themeColor } : {}}
+              >
+                <span className="shrink-0">{item.icon}</span>
+                {!isCollapsed && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
+              </button>
+            );
+          })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 shrink-0">
+        {/* FOOTER */}
+        <div className="p-3 border-t border-slate-800 shrink-0">
           <button
             onClick={() => navigate(getExitPath())}
-            className="flex items-center p-3 rounded-2xl hover:bg-slate-800 text-slate-450 hover:text-white w-full transition-all gap-3"
+            title="Return to Campus"
+            className={`transition-all duration-200 font-bold text-sm flex items-center ${
+              isCollapsed 
+                ? 'w-12 h-12 rounded-2xl mx-auto justify-center text-slate-450 hover:bg-slate-800 hover:text-white' 
+                : 'w-full p-3 gap-3 rounded-2xl justify-start text-slate-450 hover:bg-slate-800 hover:text-white'
+            }`}
           >
-            <ArrowLeft size={18} />
-            <span className="text-sm font-bold">Return to Campus</span>
+            <ArrowLeft size={20} className="shrink-0" />
+            {!isCollapsed && <span className="whitespace-nowrap overflow-hidden text-ellipsis">Return to Campus</span>}
           </button>
         </div>
       </aside>
@@ -455,6 +531,7 @@ const EmployeePortal = () => {
               handleTimeAdjustment={handleTimeAdjustment}
               themeColor={themeColor}
               employeeShift={employeeShift}
+              onRefresh={fetchPortalData}
             />
           )}
 

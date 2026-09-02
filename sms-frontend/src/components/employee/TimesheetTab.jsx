@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, X, Clock, Calendar, CheckCircle2, ShieldAler
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
-const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjustment, themeColor, employeeShift }) => {
+const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjustment, themeColor, employeeShift, onRefresh }) => {
   const { user, API_BASE_URL } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -18,8 +18,27 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
     return () => clearInterval(timer);
   }, []);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayLog = Array.isArray(timesheet) ? timesheet.find(l => (l.log_date?.split('T')[0] === todayStr || l.log_date === todayStr)) : null;
+  const parseLogDateStr = (dateVal) => {
+    if (!dateVal) return '';
+    if (typeof dateVal === 'string' && dateVal.includes('T')) {
+      const d = new Date(dateVal);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    return String(dateVal).split('T')[0];
+  };
+
+  const getTodayLocalStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const todayStr = getTodayLocalStr();
+  const todayLog = Array.isArray(timesheet) ? timesheet.find(l => parseLogDateStr(l.log_date) === todayStr) : null;
 
   const handleClockLog = (logType) => {
     setClockLoading(true);
@@ -45,13 +64,18 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
 
           if (res.data?.success) {
             alert(res.data.message || `Successfully logged ${logType.replace('_', ' ')}!`);
-            window.location.reload();
+            if (onRefresh) onRefresh();
+            else window.location.reload();
           } else {
             alert(res.data?.message || "Failed to log DTR time.");
+            if (onRefresh) onRefresh();
           }
         } catch (err) {
           console.error("Clock log error:", err);
-          alert(err.response?.data?.message || "Failed to log DTR time. Please check your location permissions.");
+          const errMsg = err.response?.data?.message || "Failed to log DTR time. Please check your location permissions.";
+          alert(errMsg);
+          if (onRefresh) onRefresh();
+          else window.location.reload();
         } finally {
           setClockLoading(false);
           setClockStatus('');
@@ -133,7 +157,47 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
   const findLogForDay = (day) => {
     if (!day) return null;
     const formattedDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return timesheet.find(log => log.log_date.split('T')[0] === formattedDate || log.log_date === formattedDate);
+    return timesheet.find(log => parseLogDateStr(log.log_date) === formattedDate);
+  };
+
+  // Determine if a day is a Work Day or Rest Day based on employee's shift schedule
+  const getDayInfo = (day) => {
+    if (!day) return { isWorkDay: false, statusText: '', type: 'empty' };
+
+    const cellDate = new Date(selectedYear, selectedMonth, day);
+    const jsDay = cellDate.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const workDaysStr = employeeShift?.work_days || 'Monday - Friday';
+    const lower = workDaysStr.toLowerCase();
+
+    let isWork = false;
+    if (lower.includes('monday - friday') || lower.includes('mon - fri') || lower.includes('mon-fri')) {
+      isWork = jsDay >= 1 && jsDay <= 5;
+    } else if (lower.includes('monday - saturday') || lower.includes('mon - sat') || lower.includes('mon-sat')) {
+      isWork = jsDay >= 1 && jsDay <= 6;
+    } else if (lower.includes('everyday') || lower.includes('all days')) {
+      isWork = true;
+    } else {
+      const dayAbbrs = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const dayFulls = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      isWork = lower.includes(dayAbbrs[jsDay]) || lower.includes(dayFulls[jsDay]);
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(selectedYear, selectedMonth, day);
+    targetDate.setHours(0, 0, 0, 0);
+
+    if (!isWork) {
+      return { isWorkDay: false, statusText: 'Off', type: 'off' };
+    }
+
+    if (targetDate.getTime() > today.getTime()) {
+      return { isWorkDay: true, statusText: 'Scheduled', type: 'future' };
+    } else if (targetDate.getTime() === today.getTime()) {
+      return { isWorkDay: true, statusText: 'No Log', type: 'today' };
+    } else {
+      return { isWorkDay: true, statusText: 'Absent', type: 'absent' };
+    }
   };
 
   return (
@@ -241,6 +305,7 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
               }
 
               const log = findLogForDay(day);
+              const dayInfo = getDayInfo(day);
 
               return (
                 <div 
@@ -249,10 +314,14 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
                   className={`aspect-square p-2.5 rounded-2xl border flex flex-col justify-between transition-all cursor-pointer hover:border-blue-300 hover:scale-105 active:scale-95 ${
                     log 
                       ? 'bg-white border-slate-150 shadow-sm hover:shadow-md' 
-                      : 'bg-slate-50/30 border-slate-100'
+                      : dayInfo.type === 'absent'
+                        ? 'bg-rose-50/40 border-rose-150/70 hover:border-rose-300'
+                        : dayInfo.type === 'off'
+                          ? 'bg-slate-50/20 border-slate-100/60 opacity-60'
+                          : 'bg-slate-50/40 border-slate-100'
                   }`}
                 >
-                  <span className={`text-[10px] font-black ${log ? 'text-blue-650' : 'text-slate-400'}`} style={log ? { color: themeColor } : {}}>
+                  <span className={`text-[10px] font-black ${log ? 'text-blue-650' : dayInfo.type === 'absent' ? 'text-rose-500' : 'text-slate-400'}`} style={log ? { color: themeColor } : {}}>
                     {day}
                   </span>
                   
@@ -278,9 +347,19 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
                       )}
                     </div>
                   ) : (
-                    <div className="flex-1 flex items-center justify-center text-[9px] text-slate-350 font-bold uppercase tracking-wider">
-                      <span className="hidden md:inline">Off</span>
-                      <span className="md:hidden text-[6px] opacity-40">•</span>
+                    <div className="flex-1 flex items-center justify-center text-[9px] font-bold uppercase tracking-wider">
+                      <span className={`hidden md:inline ${
+                        dayInfo.type === 'absent'
+                          ? 'text-rose-500 font-black tracking-widest'
+                          : dayInfo.type === 'off' 
+                            ? 'text-slate-350 font-medium' 
+                            : dayInfo.type === 'future'
+                              ? 'text-slate-400 font-semibold'
+                              : 'text-amber-600 font-semibold'
+                      }`}>
+                        {dayInfo.statusText}
+                      </span>
+                      <span className={`md:hidden text-[6px] ${dayInfo.type === 'absent' ? 'text-rose-400' : 'opacity-40'}`}>•</span>
                     </div>
                   )}
                 </div>
@@ -366,7 +445,9 @@ const TimesheetTab = ({ timesheet, timeAdjForm, setTimeAdjForm, handleTimeAdjust
                 </div>
               ) : (
                 <div className="p-4 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400 font-semibold text-xs py-6">
-                  No clock-in/out record found for this day. (Off-duty / Weekend / Absent)
+                  {getDayInfo(selectedDayDetail.day).isWorkDay 
+                    ? "Scheduled Work Day — No clock-in/out log recorded for this day." 
+                    : "Scheduled Rest Day / Off-duty."}
                 </div>
               )}
             </div>

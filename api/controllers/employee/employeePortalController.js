@@ -3,39 +3,56 @@ import { logAuditTrail } from '../../utils/auditLogger.js';
 import bcrypt from 'bcryptjs';
 import { sendStaffInvitationEmail } from '../../utils/emailEngine.js';
 
-// Helper to get or create employee ID corresponding to user email
-const getOrCreateEmployeeId = async (userEmail) => {
-  const [users] = await pool.query("SELECT id, first_name, last_name, role, status FROM users WHERE email = ? OR username = ?", [userEmail, userEmail]);
-  if (users.length === 0) return null;
-  const u = users[0];
-  
-  const [empCheck] = await pool.query(
-    "SELECT id FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))",
-    [u.first_name, u.last_name]
+// Helper to get or create employee ID corresponding to user identifier
+const getOrCreateEmployeeId = async (identifier) => {
+  if (!identifier) return null;
+
+  // 1. Try matching directly by employee integer ID or employee_id string in `employees` table
+  const [empDirect] = await pool.query(
+    "SELECT id FROM employees WHERE id = ? OR employee_id = ?",
+    [identifier, identifier]
   );
-  
-  if (empCheck.length > 0) {
-    return empCheck[0].id;
+  if (empDirect.length > 0) {
+    return empDirect[0].id;
   }
-  
-  const [maxIdRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
-  const nextId = maxIdRows[0].maxId + 1;
-  const currentYear = new Date().getFullYear();
-  const empId = `EMP-${currentYear}-${String(u.id).padStart(4, '0')}`;
-  
-  await pool.query(
-    `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status) 
-     VALUES (?, ?, ?, ?, ?, 'Administration', 25000, ?)`,
-    [
-      nextId,
-      empId,
-      u.first_name,
-      u.last_name,
-      u.role.toUpperCase() + ' STAFF',
-      u.status === 'Inactive' ? 'Inactive' : 'Active'
-    ]
+
+  // 2. Try matching user in `users` table by email, username, or id
+  const [users] = await pool.query(
+    "SELECT id, first_name, last_name, role, status FROM users WHERE email = ? OR username = ? OR id = ?",
+    [identifier, identifier, identifier]
   );
-  return nextId;
+
+  if (users.length > 0) {
+    const u = users[0];
+    const [empCheck] = await pool.query(
+      "SELECT id FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))",
+      [u.first_name, u.last_name]
+    );
+    if (empCheck.length > 0) {
+      return empCheck[0].id;
+    }
+
+    const [maxIdRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
+    const nextId = maxIdRows[0].maxId + 1;
+    const currentYear = new Date().getFullYear();
+    const empId = `EMP-${currentYear}-${String(u.id).padStart(4, '0')}`;
+
+    await pool.query(
+      `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status) 
+       VALUES (?, ?, ?, ?, ?, 'Administration', 25000, ?)`,
+      [
+        nextId,
+        empId,
+        u.first_name,
+        u.last_name,
+        u.role.toUpperCase() + ' STAFF',
+        u.status === 'Inactive' ? 'Inactive' : 'Active'
+      ]
+    );
+    return nextId;
+  }
+
+  return null;
 };
 
 // 1. GET PERSONAL INFORMATION
@@ -77,7 +94,7 @@ export const getTimesheet = async (req, res) => {
     const empId = await getOrCreateEmployeeId(email);
     if (!empId) return res.status(404).json({ success: false, message: "Employee not found." });
 
-    const [dtrLogs] = await pool.query("SELECT * FROM employee_dtr WHERE employee_id = ? ORDER BY log_date DESC", [empId]);
+    const [dtrLogs] = await pool.query("SELECT id, employee_id, DATE_FORMAT(log_date, '%Y-%m-%d') AS log_date, time_in, time_out, ot_hours, status FROM employee_dtr WHERE employee_id = ? ORDER BY log_date DESC", [empId]);
 
     // If no logs, return some mock seed data so calendar isn't completely empty
     if (dtrLogs.length === 0) {
@@ -195,9 +212,70 @@ export const logEmployeeClock = async (req, res) => {
       [empId, logDate]
     );
 
+    // Fetch assigned shift for employee to compare schedule
+    const [shiftRows] = await pool.query(
+      "SELECT time_in, time_out, shift_name FROM employee_shifts WHERE user_id = (SELECT id FROM users WHERE email = ? OR username = ? OR id = ? LIMIT 1)",
+      [email, email, email]
+    );
+
+    const assignedShift = shiftRows[0] || {
+      time_in: '08:00 AM',
+      time_out: '05:00 PM',
+      shift_name: 'Standard Shift'
+    };
+
+    const parseTimeToMinutes = (tStr) => {
+      if (!tStr) return null;
+      const str = tStr.trim().toUpperCase();
+      const isPM = str.includes('PM');
+      const isAM = str.includes('AM');
+      const cleanStr = str.replace('AM', '').replace('PM', '').trim();
+      const parts = cleanStr.split(':');
+      if (parts.length < 2) return null;
+      let hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+
+      if (isPM && hours < 12) hours += 12;
+      if (isAM && hours === 12) hours = 0;
+
+      return hours * 60 + minutes;
+    };
+
+    const format12hTime = (t24Str) => {
+      if (!t24Str) return '';
+      const parts = t24Str.split(':');
+      if (parts.length < 2) return t24Str;
+      let hour = parseInt(parts[0], 10);
+      const minute = parts[1];
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      hour = hour ? hour : 12;
+      return `${hour}:${minute} ${ampm}`;
+    };
+
     if (log_type === 'time_in') {
       if (existing.length > 0 && existing[0].time_in) {
-        return res.status(400).json({ success: false, message: "You have already timed in today." });
+        const formattedIn = format12hTime(existing[0].time_in);
+        return res.status(200).json({ success: true, message: `You have already timed in today at ${formattedIn}.` });
+      }
+
+      const actualInMins = parseTimeToMinutes(timeStr);
+      const shiftInMins = parseTimeToMinutes(assignedShift.time_in);
+
+      let status = 'On Time';
+      let lateMinutes = 0;
+
+      if (actualInMins !== null && shiftInMins !== null && actualInMins > shiftInMins) {
+        lateMinutes = actualInMins - shiftInMins;
+        status = 'Late';
+      }
+
+      const formattedInStr = format12hTime(timeStr);
+      let successMsg = `Timed in successfully at ${formattedInStr}.`;
+      if (lateMinutes > 0) {
+        successMsg += ` You are ${lateMinutes} minute${lateMinutes > 1 ? 's' : ''} late for your shift schedule (${assignedShift.time_in}).`;
+      } else {
+        successMsg += ` On time for your shift!`;
       }
 
       const [maxRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employee_dtr");
@@ -205,18 +283,35 @@ export const logEmployeeClock = async (req, res) => {
 
       await pool.query(`
         INSERT INTO employee_dtr (id, employee_id, log_date, time_in, time_out, ot_hours, status)
-        VALUES (?, ?, ?, ?, NULL, 0.00, 'On Time')
-        ON DUPLICATE KEY UPDATE time_in = VALUES(time_in), status = 'On Time'
-      `, [nextId, empId, logDate, timeStr]);
+        VALUES (?, ?, ?, ?, NULL, 0.00, ?)
+        ON DUPLICATE KEY UPDATE time_in = VALUES(time_in), status = VALUES(status)
+      `, [nextId, empId, logDate, timeStr, status]);
 
-      return res.status(200).json({ success: true, message: `Timed in successfully at ${timeStr}` });
+      return res.status(200).json({ success: true, message: successMsg, status, lateMinutes });
 
     } else if (log_type === 'time_out') {
       if (existing.length === 0 || !existing[0].time_in) {
         return res.status(400).json({ success: false, message: "Cannot Time Out without a Time In record today." });
       }
       if (existing[0].time_out) {
-        return res.status(400).json({ success: false, message: "You have already timed out today." });
+        const formattedOut = format12hTime(existing[0].time_out);
+        return res.status(200).json({ success: true, message: `You have already timed out today at ${formattedOut}.` });
+      }
+
+      const actualOutMins = parseTimeToMinutes(timeStr);
+      const shiftOutMins = parseTimeToMinutes(assignedShift.time_out);
+
+      let earlyMinutes = 0;
+      if (actualOutMins !== null && shiftOutMins !== null && actualOutMins < shiftOutMins) {
+        earlyMinutes = shiftOutMins - actualOutMins;
+      }
+
+      const formattedOutStr = format12hTime(timeStr);
+      let successMsg = `Timed out successfully at ${formattedOutStr}.`;
+      if (earlyMinutes > 0) {
+        successMsg += ` Early time-out (${earlyMinutes} minute${earlyMinutes > 1 ? 's' : ''} before your shift end of ${assignedShift.time_out}).`;
+      } else {
+        successMsg += ` Shift complete!`;
       }
 
       await pool.query(
@@ -224,7 +319,7 @@ export const logEmployeeClock = async (req, res) => {
         [timeStr, existing[0].id]
       );
 
-      return res.status(200).json({ success: true, message: `Timed out successfully at ${timeStr}` });
+      return res.status(200).json({ success: true, message: successMsg, earlyMinutes });
 
     } else {
       return res.status(400).json({ success: false, message: "Invalid log type." });
@@ -814,28 +909,30 @@ export const getAllDtrLogs = async (req, res) => {
     const [rows] = await pool.query(`
       SELECT 
         d.id,
-        d.log_date,
+        DATE_FORMAT(d.log_date, '%Y-%m-%d') AS log_date,
         d.time_in,
         d.time_out,
         d.ot_hours,
         d.status,
-        u.first_name,
-        u.last_name,
-        u.role
+        e.first_name,
+        e.last_name,
+        e.position,
+        e.department
       FROM employee_dtr d
-      JOIN employees e ON d.employee_id = e.employee_id
-      LEFT JOIN users u ON TRIM(LOWER(e.first_name)) = TRIM(LOWER(u.first_name))
-                       AND TRIM(LOWER(e.last_name)) = TRIM(LOWER(u.last_name))
+      JOIN employees e ON (d.employee_id = e.id OR d.employee_id = e.employee_id)
       ORDER BY d.log_date DESC, d.id DESC
     `);
 
     const formatted = rows.map(r => ({
+      id: r.id,
       name: `${r.first_name} ${r.last_name}`,
-      position: (r.role || 'Staff').toUpperCase(),
+      position: (r.position || 'Staff').toUpperCase(),
+      department: r.department || 'Administration',
       date: r.log_date,
       timeIn: r.time_in,
       timeOut: r.time_out,
-      status: r.status
+      otHours: r.ot_hours,
+      status: r.status || 'On Time'
     }));
 
     return res.status(200).json({ success: true, logs: formatted });

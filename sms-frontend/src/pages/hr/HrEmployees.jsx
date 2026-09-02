@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  Users, Search, UserPlus, Shield, Mail, Edit, Phone, 
+  Users, Search, UserPlus, Shield, Mail, Edit, Phone, Download,
   Award, X, FileText, CheckCircle, AlertCircle, Upload 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { download201FormPDF } from '../../utils/employee201FormGenerator';
 
 const HrEmployees = () => {
   const { API_BASE_URL, branding } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Active', 'Inactive'
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -300,11 +302,15 @@ const HrEmployees = () => {
     setShowModal(true);
   };
 
-  const filtered = employees.filter(e => 
-    `${e.first_name} ${e.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
-    (e.position || '').toLowerCase().includes(search.toLowerCase()) ||
-    (e.department || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = employees.filter(e => {
+    const matchesSearch = `${e.first_name} ${e.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
+      (e.position || '').toLowerCase().includes(search.toLowerCase()) ||
+      (e.department || '').toLowerCase().includes(search.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'All' ? true : (e.status || 'Active') === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
@@ -328,16 +334,46 @@ const HrEmployees = () => {
         </button>
       </div>
 
-      {/* FILTER SEARCH BAR */}
-      <div className="bg-white rounded-[2rem] border border-slate-100 p-4 shadow-sm flex items-center gap-3">
-        <Search className="text-slate-400" size={20} />
-        <input 
-          type="text" 
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search employees by name, job position role, or department..."
-          className="w-full text-sm bg-transparent focus:outline-none placeholder-slate-400 font-medium text-slate-700"
-        />
+      {/* FILTER SEARCH BAR & STATUS TABS */}
+      <div className="bg-white rounded-[2rem] border border-slate-100 p-3 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full md:w-auto flex-1 px-3">
+          <Search className="text-slate-400 shrink-0" size={20} />
+          <input 
+            type="text" 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search employees by name, job position role, or department..."
+            className="w-full text-sm bg-transparent focus:outline-none placeholder-slate-400 font-medium text-slate-700"
+          />
+        </div>
+
+        {/* STATUS FILTER BUTTONS (ACTIVE & INACTIVE) */}
+        <div className="flex items-center gap-1.5 shrink-0 bg-slate-100/80 p-1.5 rounded-2xl w-full md:w-auto justify-center">
+          {[
+            { id: 'All', label: 'All Employees', count: employees.length },
+            { id: 'Active', label: 'Active', count: employees.filter(e => (e.status || 'Active') === 'Active').length },
+            { id: 'Inactive', label: 'Inactive', count: employees.filter(e => e.status === 'Inactive').length }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                statusFilter === tab.id
+                  ? 'bg-white text-slate-800 shadow-sm scale-105'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {tab.label}
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+                tab.id === 'Active' ? 'bg-emerald-100 text-emerald-700' :
+                tab.id === 'Inactive' ? 'bg-rose-100 text-rose-700' :
+                'bg-slate-200 text-slate-700'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* DIRECTORY TABLE */}
@@ -391,8 +427,9 @@ const HrEmployees = () => {
                         {emp.status}
                       </span>
                     </td>
-                    <td className="py-4 text-center">
-                      <button onClick={() => handleEditClick(emp)} className="p-2 hover:bg-slate-55 rounded-xl text-slate-500 hover:text-blue-600 transition-all inline-block"><Edit size={16} /></button>
+                    <td className="py-4 text-center flex items-center justify-center gap-1">
+                      <button onClick={() => download201FormPDF(emp, branding)} title="Download 201 Form A PDF" className="p-2 hover:bg-blue-50 rounded-xl text-slate-500 hover:text-blue-600 transition-all inline-block"><Download size={16} /></button>
+                      <button onClick={() => handleEditClick(emp)} title="Edit Employee Profile" className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-blue-600 transition-all inline-block"><Edit size={16} /></button>
                     </td>
                   </tr>
                 ))}

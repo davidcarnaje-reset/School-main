@@ -346,6 +346,36 @@ export const getEmployeePayrollTimesheet = async (req, res) => {
   }
 };
 
+export const getMyPayslips = async (req, res) => {
+  const { email } = req.query;
+  try {
+    const [userRows] = await pool.query("SELECT id, first_name, last_name FROM users WHERE email = ? OR username = ? OR id = ?", [email, email, email]);
+    if (userRows.length === 0) return res.json({ success: true, payslips: [] });
+    const u = userRows[0];
+
+    const [empRows] = await pool.query(
+      "SELECT id FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))",
+      [u.first_name, u.last_name]
+    );
+    if (empRows.length === 0) return res.json({ success: true, payslips: [] });
+
+    const empId = empRows[0].id;
+    const [payslips] = await pool.query(
+      `SELECT pe.*, pp.start_date, pp.end_date, pp.payout_date 
+       FROM payroll_entries pe
+       JOIN payroll_periods pp ON pe.period_id = pp.id
+       WHERE pe.employee_id = ? AND pp.status = 'Completed'
+       ORDER BY pp.end_date DESC`,
+      [empId]
+    );
+
+    return res.json({ success: true, payslips });
+  } catch (error) {
+    console.error("getMyPayslips error:", error);
+    return res.json({ success: true, payslips: [] });
+  }
+};
+
 export const savePayroll = async (req, res) => {
   const { period_id, entries, final_status } = req.body;
 

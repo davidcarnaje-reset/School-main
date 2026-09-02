@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FolderOpen, FileText, Download, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { download201FormPDF } from '../../utils/employee201FormGenerator';
 
 const HrDocuments = () => {
   const { API_BASE_URL, branding } = useAuth();
@@ -32,7 +33,8 @@ const HrDocuments = () => {
             name: `${emp.first_name} ${emp.last_name} (${emp.position})`,
             files: filesStr,
             size: docList.length > 0 ? `${(docList.length * 1.2).toFixed(1)} MB` : "0 KB",
-            rawList: docList
+            rawList: docList,
+            rawEmp: emp
           };
         });
         setFolders(list);
@@ -89,11 +91,11 @@ const HrDocuments = () => {
                     <p className="text-xs font-bold text-slate-600 mt-0.5">{f.size}</p>
                   </div>
                   <button 
-                    onClick={() => alert(`Downloading 201 folder files for ${f.name}...`)}
-                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-55 hover:border-slate-300 text-slate-700 font-bold rounded-xl text-xs uppercase tracking-wider transition-colors shadow-sm"
-                    disabled={f.rawList.length === 0}
+                    onClick={() => download201FormPDF(f.rawEmp, branding)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-200 flex items-center gap-1.5 cursor-pointer"
+                    style={{ backgroundColor: themeColor }}
                   >
-                    <Download size={14} className="inline mr-1" /> Download
+                    <Download size={14} /> Download 201 File
                   </button>
                 </div>
               </div>

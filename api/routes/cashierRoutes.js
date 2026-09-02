@@ -34,7 +34,8 @@ import {
   savePayroll, 
   getCompletedPeriods, 
   getCompletedPayroll,
-  getEmployeePayrollTimesheet 
+  getEmployeePayrollTimesheet,
+  getMyPayslips 
 } from '../controllers/cashier/payrollController.js';
 
 const router = express.Router();
@@ -67,6 +68,7 @@ router.get('/payroll/init', processPayrollInit);
 router.post('/payroll/save', savePayroll);
 router.get('/payroll/periods-completed', getCompletedPeriods);
 router.get('/payroll/completed', getCompletedPayroll);
+router.get('/payroll/my-payslips', getMyPayslips);
 
 
 // Legacy compatibility endpoints
