@@ -222,6 +222,134 @@ export const addPeriod = async (req, res) => {
   }
 };
 
+// Helper to ensure payroll_settings table and extra columns exist
+export const ensurePayrollSettingsTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payroll_settings (
+        id INT PRIMARY KEY DEFAULT 1,
+        late_deduction_mode VARCHAR(50) NOT NULL DEFAULT 'per_minute_fixed',
+        late_rate_per_min DECIMAL(10,2) NOT NULL DEFAULT 1.00,
+        absent_deduction_mode VARCHAR(50) NOT NULL DEFAULT 'automatic_daily_rate',
+        work_days_per_month INT NOT NULL DEFAULT 22,
+        work_hours_per_day INT NOT NULL DEFAULT 8,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [rows] = await pool.query("SELECT id FROM payroll_settings WHERE id = 1");
+    if (rows.length === 0) {
+      await pool.query(
+        "INSERT INTO payroll_settings (id, late_deduction_mode, late_rate_per_min, absent_deduction_mode, work_days_per_month, work_hours_per_day) VALUES (1, 'per_minute_fixed', 1.00, 'automatic_daily_rate', 22, 8)"
+      );
+    }
+
+    // Safely add missing columns to payroll_entries
+    const tryAddColumn = async (table, colDef) => {
+      try {
+        await pool.query(`ALTER TABLE ${table} ADD COLUMN ${colDef}`);
+      } catch (err) {
+        // Ignore duplicate column errors
+      }
+    };
+
+    await tryAddColumn('payroll_entries', 'absent_days INT DEFAULT 0');
+    await tryAddColumn('payroll_entries', 'absent_deduction DECIMAL(10,2) DEFAULT 0.00');
+    await tryAddColumn('payroll_entries', 'late_deduction DECIMAL(10,2) DEFAULT 0.00');
+
+    await tryAddColumn('payroll_entries_completed', 'absent_days INT DEFAULT 0');
+    await tryAddColumn('payroll_entries_completed', 'absent_deduction DECIMAL(10,2) DEFAULT 0.00');
+    await tryAddColumn('payroll_entries_completed', 'late_deduction DECIMAL(10,2) DEFAULT 0.00');
+
+  } catch (err) {
+    console.warn("ensurePayrollSettingsTable notice:", err.message);
+  }
+};
+
+export const getPayrollSettings = async (req, res) => {
+  try {
+    await ensurePayrollSettingsTable();
+    const [rows] = await pool.query("SELECT * FROM payroll_settings WHERE id = 1");
+    if (rows.length > 0) {
+      return res.json({
+        status: "success",
+        settings: {
+          ...rows[0],
+          late_rate_per_min: parseFloat(rows[0].late_rate_per_min) || 1.00,
+          work_days_per_month: parseInt(rows[0].work_days_per_month, 10) || 22,
+          work_hours_per_day: parseInt(rows[0].work_hours_per_day, 10) || 8
+        }
+      });
+    }
+    return res.json({
+      status: "success",
+      settings: {
+        late_deduction_mode: "per_minute_fixed",
+        late_rate_per_min: 1.00,
+        absent_deduction_mode: "automatic_daily_rate",
+        work_days_per_month: 22,
+        work_hours_per_day: 8
+      }
+    });
+  } catch (error) {
+    console.error("getPayrollSettings error:", error);
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+export const updatePayrollSettings = async (req, res) => {
+  const { late_deduction_mode, late_rate_per_min, absent_deduction_mode, work_days_per_month, work_hours_per_day } = req.body;
+  try {
+    await ensurePayrollSettingsTable();
+    await pool.query(
+      `UPDATE payroll_settings SET 
+         late_deduction_mode = ?, 
+         late_rate_per_min = ?, 
+         absent_deduction_mode = ?, 
+         work_days_per_month = ?, 
+         work_hours_per_day = ? 
+       WHERE id = 1`,
+      [
+        late_deduction_mode || 'per_minute_fixed',
+        parseFloat(late_rate_per_min) || 1.00,
+        absent_deduction_mode || 'automatic_daily_rate',
+        parseInt(work_days_per_month, 10) || 22,
+        parseInt(work_hours_per_day, 10) || 8
+      ]
+    );
+
+    await logAuditTrail(
+      req.user?.id || 1,
+      req.user?.role || 'HR',
+      "UPDATE_PAYROLL_SETTINGS",
+      `Updated payroll policy: Mode=${late_deduction_mode}, Rate=${late_rate_per_min}/min`,
+      req
+    );
+
+    return res.json({ status: "success", message: "Payroll settings saved successfully!" });
+  } catch (error) {
+    console.error("updatePayrollSettings error:", error);
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+function countWorkDaysInPeriod(startDateStr, endDateStr) {
+  if (!startDateStr || !endDateStr) return 11;
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return 11;
+  let workDays = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    const dayOfWeek = cur.getDay(); // 0 = Sun, 6 = Sat
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      workDays++;
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return workDays > 0 ? workDays : 11;
+}
+
 export const processPayrollInit = async (req, res) => {
   const { period_id } = req.query;
 
@@ -229,20 +357,42 @@ export const processPayrollInit = async (req, res) => {
     return res.status(400).json({ status: "error", message: "No Period ID" });
   }
 
+  await ensurePayrollSettingsTable();
+
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
+    // 0. Fetch active HR Payroll Settings
+    const [settingsRows] = await connection.query("SELECT * FROM payroll_settings WHERE id = 1");
+    const settings = settingsRows[0] || {
+      late_deduction_mode: 'per_minute_fixed',
+      late_rate_per_min: 1.00,
+      absent_deduction_mode: 'automatic_daily_rate',
+      work_days_per_month: 22,
+      work_hours_per_day: 8
+    };
+
+    const lateMode = settings.late_deduction_mode || 'per_minute_fixed';
+    const lateRatePerMin = parseFloat(settings.late_rate_per_min) || 1.00;
+    const workDaysPerMonth = parseInt(settings.work_days_per_month, 10) || 22;
+    const workHoursPerDay = parseInt(settings.work_hours_per_day, 10) || 8;
+
     // Fetch period start and end dates
     const [periodRows] = await connection.query("SELECT start_date, end_date FROM payroll_periods WHERE id = ?", [parseInt(period_id, 10)]);
     const period = periodRows[0] || null;
+    const expectedWorkDays = period ? countWorkDaysInPeriod(period.start_date, period.end_date) : 11;
 
     // 1. Get active employees
-    const [activeEmployees] = await connection.query("SELECT id FROM employees WHERE status = 'Active'");
-    const empIds = (activeEmployees || []).map(emp => emp.id);
+    const [activeEmployees] = await connection.query("SELECT id, basic_salary FROM employees WHERE status = 'Active'");
 
     // 2. Insert ignore and calculate DTR metrics from employee_dtr for each employee
-    for (const empId of empIds) {
+    for (const emp of activeEmployees) {
+      const empId = emp.id;
+      const basicSalary = parseFloat(emp.basic_salary) || 25000;
+      const dailyRate = basicSalary / workDaysPerMonth;
+      const hourlyRate = dailyRate / workHoursPerDay;
+
       let daysWorked = 0;
       let otHours = 0;
       let lateMins = 0;
@@ -269,8 +419,28 @@ export const processPayrollInit = async (req, res) => {
         }
       }
 
+      // Calculate absent days & deduction
+      const absentDays = Math.max(0, expectedWorkDays - daysWorked);
+      const absentDeduction = absentDays * dailyRate;
+
+      // Calculate late deduction based on HR policy
+      let lateDeduction = 0;
+      if (lateMode === 'hour_equivalent') {
+        // 1 min late = 1 hour salary deduction (or rounded up hours)
+        lateDeduction = lateMins > 0 ? Math.ceil(lateMins / 60) * hourlyRate : 0;
+      } else if (lateMode === 'hourly_rate_per_min') {
+        lateDeduction = (hourlyRate / 60) * lateMins;
+      } else {
+        // 'per_minute_fixed' (default e.g. 1min = 1 peso)
+        lateDeduction = lateMins * lateRatePerMin;
+      }
+
+      const basePay = dailyRate * daysWorked;
+      const otPay = hourlyRate * 1.25 * otHours;
+      const netPay = Math.max(0, basePay + otPay - lateDeduction);
+
       const [existing] = await connection.query(
-        "SELECT id, days_worked, overtime_hours, late_minutes FROM payroll_entries WHERE period_id = ? AND employee_id = ?",
+        "SELECT id FROM payroll_entries WHERE period_id = ? AND employee_id = ?",
         [parseInt(period_id, 10), empId]
       );
 
@@ -279,18 +449,23 @@ export const processPayrollInit = async (req, res) => {
         const nextId = maxIdRows[0].maxId + 1;
 
         await connection.query(
-          "INSERT INTO payroll_entries (id, period_id, employee_id, days_worked, overtime_hours, late_minutes, net_pay, status) VALUES (?, ?, ?, ?, ?, ?, 0, 'Pending')",
-          [nextId, parseInt(period_id, 10), empId, daysWorked, otHours, lateMins]
+          `INSERT INTO payroll_entries 
+             (id, period_id, employee_id, days_worked, overtime_hours, late_minutes, absent_days, absent_deduction, late_deduction, net_pay, status) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
+          [nextId, parseInt(period_id, 10), empId, daysWorked, otHours, lateMins, absentDays, absentDeduction.toFixed(2), lateDeduction.toFixed(2), netPay.toFixed(2)]
         );
       } else {
-        // Update DTR metrics if current value is 0 or needs refreshing from DTR logs
         await connection.query(
           `UPDATE payroll_entries SET 
              days_worked = GREATEST(days_worked, ?), 
              overtime_hours = GREATEST(overtime_hours, ?), 
-             late_minutes = GREATEST(late_minutes, ?) 
+             late_minutes = GREATEST(late_minutes, ?),
+             absent_days = ?,
+             absent_deduction = ?,
+             late_deduction = ?,
+             net_pay = ?
            WHERE period_id = ? AND employee_id = ?`,
-          [daysWorked, otHours, lateMins, parseInt(period_id, 10), empId]
+          [daysWorked, otHours, lateMins, absentDays, absentDeduction.toFixed(2), lateDeduction.toFixed(2), netPay.toFixed(2), parseInt(period_id, 10), empId]
         );
       }
     }
@@ -309,10 +484,13 @@ export const processPayrollInit = async (req, res) => {
     const formattedEntries = (entries || []).map(entry => ({
       ...entry,
       basic_salary: parseFloat(entry.basic_salary),
-      net_pay: parseFloat(entry.net_pay)
+      net_pay: parseFloat(entry.net_pay),
+      absent_days: parseInt(entry.absent_days, 10) || 0,
+      absent_deduction: parseFloat(entry.absent_deduction) || 0,
+      late_deduction: parseFloat(entry.late_deduction) || 0
     }));
 
-    return res.json({ status: "success", entries: formattedEntries });
+    return res.json({ status: "success", entries: formattedEntries, settings });
 
   } catch (error) {
     await connection.rollback();
@@ -397,12 +575,19 @@ export const savePayroll = async (req, res) => {
         [parseInt(period_id, 10), parseInt(entry.employee_id, 10)]
       );
 
+      const absentDaysVal = parseInt(entry.absent_days, 10) || 0;
+      const absentDeductionVal = parseFloat(entry.absent_deduction) || 0;
+      const lateDeductionVal = parseFloat(entry.late_deduction) || 0;
+
       if (existing.length > 0) {
         const sql_update = `
           UPDATE payroll_entries SET 
             days_worked = ?, 
             overtime_hours = ?, 
             late_minutes = ?, 
+            absent_days = ?,
+            absent_deduction = ?,
+            late_deduction = ?,
             net_pay = ?, 
             status = ? 
           WHERE period_id = ? AND employee_id = ?
@@ -411,6 +596,9 @@ export const savePayroll = async (req, res) => {
           parseInt(entry.days_worked, 10) || 0,
           parseFloat(entry.overtime_hours) || 0,
           parseInt(entry.late_minutes, 10) || 0,
+          absentDaysVal,
+          absentDeductionVal,
+          lateDeductionVal,
           parseFloat(entry.net_pay) || 0,
           finalStatusVal,
           parseInt(period_id, 10),
@@ -422,8 +610,8 @@ export const savePayroll = async (req, res) => {
 
         const sql_insert = `
           INSERT INTO payroll_entries 
-            (id, period_id, employee_id, days_worked, overtime_hours, late_minutes, net_pay, status) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (id, period_id, employee_id, days_worked, overtime_hours, late_minutes, absent_days, absent_deduction, late_deduction, net_pay, status) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         await connection.query(sql_insert, [
           nextId,
@@ -432,6 +620,9 @@ export const savePayroll = async (req, res) => {
           parseInt(entry.days_worked, 10) || 0,
           parseFloat(entry.overtime_hours) || 0,
           parseInt(entry.late_minutes, 10) || 0,
+          absentDaysVal,
+          absentDeductionVal,
+          lateDeductionVal,
           parseFloat(entry.net_pay) || 0,
           finalStatusVal
         ]);
@@ -447,19 +638,18 @@ export const savePayroll = async (req, res) => {
       // Select active records to copy
       const [toArchive] = await connection.query(`
         SELECT pe.period_id, pe.employee_id, CONCAT(e.first_name, ' ', e.last_name) AS full_name, e.position, 
-               pe.days_worked, pe.overtime_hours as ot_hours, pe.late_minutes, pe.net_pay
+               pe.days_worked, pe.overtime_hours as ot_hours, pe.late_minutes, pe.absent_days, pe.absent_deduction, pe.late_deduction, pe.net_pay
         FROM payroll_entries pe
         JOIN employees e ON pe.employee_id = e.id
         WHERE pe.period_id = ?
       `, [parseInt(period_id, 10)]);
 
-      // Insert each row with dynamic manually incremented completed ID
       for (const row of toArchive) {
         nextCompletedId++;
         const sqlArchive = `
           INSERT INTO payroll_entries_completed 
-            (id, period_id, employee_id, full_name, position, days_worked, ot_hours, late_minutes, net_pay)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, period_id, employee_id, full_name, position, days_worked, ot_hours, late_minutes, absent_days, absent_deduction, late_deduction, net_pay)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         await connection.query(sqlArchive, [
           nextCompletedId,
@@ -470,6 +660,9 @@ export const savePayroll = async (req, res) => {
           row.days_worked,
           row.ot_hours,
           row.late_minutes,
+          row.absent_days || 0,
+          row.absent_deduction || 0.00,
+          row.late_deduction || 0.00,
           row.net_pay
         ]);
       }

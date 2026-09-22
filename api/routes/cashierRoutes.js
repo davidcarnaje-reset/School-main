@@ -18,6 +18,26 @@ import {
 import { 
   getPayments, 
   getCollectionReports, 
+import express from 'express';
+
+// Existing controllers
+import getDashboardStats from '../controllers/cashier/getDashboardStats.js';
+import getBillingDetails from '../controllers/cashier/getBillingDetails.js';
+import getBillingList from '../controllers/cashier/getBillingList.js';
+import processBillingPayment from '../controllers/cashier/processBillingPayment.js';
+
+// Newly migrated controllers
+import { 
+  fetchScholarships, 
+  manageScholarships, 
+  getStudentScholarships, 
+  getAllApprovedScholarships, 
+  applyScholarshipToBilling 
+} from '../controllers/cashier/scholarshipsController.js';
+
+import { 
+  getPayments, 
+  getCollectionReports, 
   getServiceRequests, 
   processServicePayment 
 } from '../controllers/cashier/paymentsController.js';
@@ -35,7 +55,9 @@ import {
   getCompletedPeriods, 
   getCompletedPayroll,
   getEmployeePayrollTimesheet,
-  getMyPayslips 
+  getMyPayslips,
+  getPayrollSettings,
+  updatePayrollSettings
 } from '../controllers/cashier/payrollController.js';
 
 const router = express.Router();
@@ -69,6 +91,8 @@ router.post('/payroll/save', savePayroll);
 router.get('/payroll/periods-completed', getCompletedPeriods);
 router.get('/payroll/completed', getCompletedPayroll);
 router.get('/payroll/my-payslips', getMyPayslips);
+router.get('/payroll/settings', getPayrollSettings);
+router.post('/payroll/settings', updatePayrollSettings);
 
 
 // Legacy compatibility endpoints
@@ -106,5 +130,7 @@ router.get('/get_completed_periods.php', getCompletedPeriods);
 router.get('/get_completed_payroll.php', getCompletedPayroll);
 router.get('/payroll/employee-timesheet', getEmployeePayrollTimesheet);
 router.get('/get_employee_payroll_timesheet.php', getEmployeePayrollTimesheet);
+router.get('/get_payroll_settings.php', getPayrollSettings);
+router.post('/save_payroll_settings.php', updatePayrollSettings);
 
 export default router;

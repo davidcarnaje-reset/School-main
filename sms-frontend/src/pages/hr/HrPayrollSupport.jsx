@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { CreditCard, Banknote, ShieldCheck, Calculator, RefreshCw } from 'lucide-react';
+import { CreditCard, Banknote, ShieldCheck, Calculator, RefreshCw, Settings, Save, AlertCircle, Clock, Calendar } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const HrPayrollSupport = () => {
@@ -8,6 +8,28 @@ const HrPayrollSupport = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const themeColor = branding?.theme_color || '#2563eb';
+
+  // HR Settings state
+  const [settings, setSettings] = useState({
+    late_deduction_mode: 'per_minute_fixed',
+    late_rate_per_min: 1.00,
+    absent_deduction_mode: 'automatic_daily_rate',
+    work_days_per_month: 22,
+    work_hours_per_day: 8
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+
+  const fetchPayrollSettings = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/cashier/payroll/settings`);
+      if (res.data?.status === 'success' && res.data?.settings) {
+        setSettings(res.data.settings);
+      }
+    } catch (err) {
+      console.error("Error fetching payroll settings:", err);
+    }
+  };
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -22,8 +44,29 @@ const HrPayrollSupport = () => {
   };
 
   useEffect(() => {
+    fetchPayrollSettings();
     fetchEmployees();
   }, []);
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    setSaveMessage('');
+    try {
+      const res = await axios.post(`${API_BASE_URL}/cashier/payroll/settings`, settings);
+      if (res.data?.status === 'success') {
+        setSaveMessage('HR Payroll Policy saved successfully!');
+        setTimeout(() => setSaveMessage(''), 4000);
+      } else {
+        alert(res.data?.message || 'Failed to save settings');
+      }
+    } catch (err) {
+      console.error("Error saving HR settings:", err);
+      alert('Failed to save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   // Compute breakdown logic
   const calculateCompensation = (basicPay) => {
@@ -42,6 +85,19 @@ const HrPayrollSupport = () => {
     alert("Syncing payroll configurations with Finance/Cashier Ledger completed!\nGross, deductions, and tax withholdings calculations authorized.");
   };
 
+  // Sample simulation for 15 mins late
+  const sampleBasic = 25000;
+  const sampleDailyRate = sampleBasic / (settings.work_days_per_month || 22);
+  const sampleHourlyRate = sampleDailyRate / (settings.work_hours_per_day || 8);
+  let sample15MinLateDeduction = 0;
+  if (settings.late_deduction_mode === 'hour_equivalent') {
+    sample15MinLateDeduction = sampleHourlyRate * 1; // 1 min late = 1 hour salary deduction
+  } else if (settings.late_deduction_mode === 'hourly_rate_per_min') {
+    sample15MinLateDeduction = (sampleHourlyRate / 60) * 15;
+  } else {
+    sample15MinLateDeduction = 15 * parseFloat(settings.late_rate_per_min || 1);
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
       
@@ -50,9 +106,9 @@ const HrPayrollSupport = () => {
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <CreditCard className="text-blue-600" size={32} style={{ color: themeColor }} />
-            Payroll Setup & Verification
+            HR Payroll Policy & Verification
           </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Calculates gross basic salaries, SSS/PhilHealth/PAG-IBIG government deductions, tax withholdings, and take-home pay.</p>
+          <p className="text-sm font-medium text-slate-500 mt-1">Configure late deduction rules (e.g. 1 min = ₱1 peso vs 1 min late = 1 hour deduction) & automatic absence deductions.</p>
         </div>
         <button 
           onClick={handleSyncWithFinance}
@@ -62,6 +118,177 @@ const HrPayrollSupport = () => {
           <Banknote size={16} />
           Sync with Finance
         </button>
+      </div>
+
+      {/* HR PAYROLL RULES CONFIGURATION */}
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-sm space-y-6">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="text-base font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+              <Settings size={20} className="text-blue-600" /> HR Late & Absence Deduction Rules
+            </h3>
+            <p className="text-xs text-slate-400 font-bold mt-1">Set how employee lates and absences automatically deduct from their payroll.</p>
+          </div>
+          {saveMessage && (
+            <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200 animate-pulse">
+              ✓ {saveMessage}
+            </span>
+          )}
+        </div>
+
+        <form onSubmit={handleSaveSettings} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* LATE DEDUCTION MODE */}
+            <div className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200/60 space-y-4">
+              <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                <Clock size={16} className="text-amber-500" /> Late Penalty Policy
+              </label>
+
+              <div className="space-y-3">
+                <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
+                  settings.late_deduction_mode === 'per_minute_fixed' 
+                    ? 'bg-blue-50/80 border-blue-500 ring-2 ring-blue-500/20 shadow-sm' 
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input 
+                    type="radio" 
+                    name="late_deduction_mode" 
+                    value="per_minute_fixed"
+                    checked={settings.late_deduction_mode === 'per_minute_fixed'}
+                    onChange={(e) => setSettings({ ...settings, late_deduction_mode: e.target.value })}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="text-xs font-black text-slate-800 uppercase block">🟢 Fixed Amount Per Minute (1 min = ₱{settings.late_rate_per_min})</span>
+                    <span className="text-[11px] text-slate-500 font-medium">Deducts a fixed peso rate per late minute (e.g. 1 min late = ₱1.00 penalty).</span>
+                  </div>
+                </label>
+
+                {settings.late_deduction_mode === 'per_minute_fixed' && (
+                  <div className="pl-8 pt-1">
+                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Rate per Late Minute (₱)</label>
+                    <input 
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="w-36 p-3 bg-white border border-slate-200 rounded-xl font-mono text-xs font-bold focus:ring-2 ring-blue-500/20 outline-none"
+                      value={settings.late_rate_per_min}
+                      onChange={(e) => setSettings({ ...settings, late_rate_per_min: e.target.value })}
+                    />
+                  </div>
+                )}
+
+                <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
+                  settings.late_deduction_mode === 'hour_equivalent' 
+                    ? 'bg-red-50/80 border-red-500 ring-2 ring-red-500/20 shadow-sm' 
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input 
+                    type="radio" 
+                    name="late_deduction_mode" 
+                    value="hour_equivalent"
+                    checked={settings.late_deduction_mode === 'hour_equivalent'}
+                    onChange={(e) => setSettings({ ...settings, late_deduction_mode: e.target.value })}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="text-xs font-black text-slate-800 uppercase block">🔴 1 Minute Late = 1 Hour Salary Deduction</span>
+                    <span className="text-[11px] text-slate-500 font-medium">Heavy penalty: Late by even 1 minute deducts 1 full hour of hourly salary.</span>
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
+                  settings.late_deduction_mode === 'hourly_rate_per_min' 
+                    ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm' 
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input 
+                    type="radio" 
+                    name="late_deduction_mode" 
+                    value="hourly_rate_per_min"
+                    checked={settings.late_deduction_mode === 'hourly_rate_per_min'}
+                    onChange={(e) => setSettings({ ...settings, late_deduction_mode: e.target.value })}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="text-xs font-black text-slate-800 uppercase block">🔵 Proportional Hourly Minute Rate</span>
+                    <span className="text-[11px] text-slate-500 font-medium">Exact calculation: <code>(Hourly Rate / 60) * Late Minutes</code>.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* ABSENCE & WORKING DAYS POLICY */}
+            <div className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200/60 space-y-4 flex flex-col justify-between">
+              <div>
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2 mb-3">
+                  <Calendar size={16} className="text-blue-500" /> Automatic Absence Deduction Policy
+                </label>
+
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <ShieldCheck size={14} className="text-emerald-600" /> Automatic Deduction Enabled
+                  </p>
+                  <p className="text-[11px] text-emerald-700">When an employee is absent, the system automatically computes missed work days and deducts <code>(Basic Salary / Monthly Work Days)</code> per absent day.</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Standard Days / Month</label>
+                    <input 
+                      type="number"
+                      min="1"
+                      max="31"
+                      className="w-full p-3 bg-white border border-slate-200 rounded-xl font-mono text-xs font-bold focus:ring-2 ring-blue-500/20 outline-none"
+                      value={settings.work_days_per_month}
+                      onChange={(e) => setSettings({ ...settings, work_days_per_month: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Working Hours / Day</label>
+                    <input 
+                      type="number"
+                      min="1"
+                      max="24"
+                      className="w-full p-3 bg-white border border-slate-200 rounded-xl font-mono text-xs font-bold focus:ring-2 ring-blue-500/20 outline-none"
+                      value={settings.work_hours_per_day}
+                      onChange={(e) => setSettings({ ...settings, work_hours_per_day: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SIMULATION PREVIEW */}
+              <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-1 text-xs mt-4">
+                <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-400">
+                  <span>Policy Simulation (15 Mins Late)</span>
+                  <span className="text-amber-400">Basic: ₱25,000</span>
+                </div>
+                <div className="flex justify-between items-center font-bold">
+                  <span>Calculated Deduction:</span>
+                  <span className="text-red-400 font-mono text-sm">₱{sample15MinLateDeduction.toFixed(2)}</span>
+                </div>
+                <p className="text-[9px] text-slate-400 italic">
+                  Hourly Rate: ₱{sampleHourlyRate.toFixed(2)}/hr | Daily Rate: ₱{sampleDailyRate.toFixed(2)}/day
+                </p>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={savingSettings}
+              className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-blue-200 transition-all flex items-center gap-2 disabled:opacity-50"
+              style={{ backgroundColor: themeColor }}
+            >
+              <Save size={16} />
+              {savingSettings ? 'Saving Policy...' : 'Save HR Payroll Rules'}
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* RATES TABLE */}

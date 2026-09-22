@@ -106,6 +106,25 @@ const Payroll = () => {
     end_date: "",
   });
 
+  const [activeSettings, setActiveSettings] = useState({
+    late_deduction_mode: 'per_minute_fixed',
+    late_rate_per_min: 1.00,
+    absent_deduction_mode: 'automatic_daily_rate',
+    work_days_per_month: 22,
+    work_hours_per_day: 8
+  });
+
+  const fetchPayrollSettings = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/cashier/payroll/settings`);
+      if (res.data?.status === 'success' && res.data?.settings) {
+        setActiveSettings(res.data.settings);
+      }
+    } catch (err) {
+      console.error("Error fetching payroll settings:", err);
+    }
+  };
+
   // 2. Fetch Periods function
   const fetchPeriods = async () => {
     try {
@@ -120,6 +139,7 @@ const Payroll = () => {
   useEffect(() => {
     fetchEmployees();
     fetchPeriods();
+    fetchPayrollSettings();
   }, []);
 
   // 4. Handle Create Period
@@ -168,6 +188,9 @@ const Payroll = () => {
       );
       if (res.data.status === "success") {
         setPayrollEntries(res.data.entries);
+        if (res.data.settings) {
+          setActiveSettings(res.data.settings);
+        }
         setSelectedPeriod(period); // Dito mag-u-switch ang view natin
       }
     } catch (err) {
@@ -177,29 +200,42 @@ const Payroll = () => {
     }
   };
 
-  // Function para sa real-time    ng inputs sa table
+  // Function para sa real-time ng inputs sa table
   const updateEntry = (index, field, value) => {
     const newEntries = [...payrollEntries];
 
-    // Gawing whole number ang value (kung hindi net_pay)
-    // Gagamit tayo ng Math.max(0, ...) para walang negative values
     const numericValue = value === "" ? 0 : Math.max(0, parseInt(value));
-
     newEntries[index][field] = numericValue;
 
-    // Computation ng Net Pay
-    const basicSalary = parseFloat(newEntries[index].basic_salary) || 0;
-    const dailyRate = basicSalary / 22; // Assumption: 22 working days
-    const hourlyRate = dailyRate / 8;
+    // Computation ng Net Pay batay sa HR Policy Settings
+    const basicSalary = parseFloat(newEntries[index].basic_salary) || 25000;
+    const workDaysPerMonth = parseInt(activeSettings?.work_days_per_month, 10) || 22;
+    const workHoursPerDay = parseInt(activeSettings?.work_hours_per_day, 10) || 8;
 
-    const basePay = dailyRate * newEntries[index].days_worked;
-    const otPay = hourlyRate * 1.25 * newEntries[index].overtime_hours;
-    // Sample penalty: (Daily Rate / 8 / 60) * late minutes
-    const lateDeduction = (hourlyRate / 60) * newEntries[index].late_minutes;
+    const dailyRate = basicSalary / workDaysPerMonth;
+    const hourlyRate = dailyRate / workHoursPerDay;
+
+    const daysWorked = parseInt(newEntries[index].days_worked, 10) || 0;
+    const otHours = parseFloat(newEntries[index].overtime_hours) || 0;
+    const lateMins = parseInt(newEntries[index].late_minutes, 10) || 0;
+
+    const basePay = dailyRate * daysWorked;
+    const otPay = hourlyRate * 1.25 * otHours;
+
+    let lateDeduction = 0;
+    const lateMode = activeSettings?.late_deduction_mode || 'per_minute_fixed';
+    if (lateMode === 'hour_equivalent') {
+      // 1 min late = 1 hour salary deduction (or rounded up hours)
+      lateDeduction = lateMins > 0 ? Math.ceil(lateMins / 60) * hourlyRate : 0;
+    } else if (lateMode === 'hourly_rate_per_min') {
+      lateDeduction = (hourlyRate / 60) * lateMins;
+    } else {
+      lateDeduction = lateMins * parseFloat(activeSettings?.late_rate_per_min || 1.00);
+    }
 
     const total = basePay + otPay - lateDeduction;
 
-    // Net pay lang ang may decimal
+    newEntries[index].late_deduction = lateDeduction.toFixed(2);
     newEntries[index].net_pay = Math.max(0, total).toFixed(2);
 
     setPayrollEntries(newEntries);
@@ -421,13 +457,19 @@ const Payroll = () => {
                 <span class="label">Days Worked:</span>
                 <span class="value">${entry.days_worked}</span>
               </div>
+              ${entry.absent_days ? `
+              <div class="row" style="color: #dc2626;">
+                <span class="label" style="color: #dc2626;">Absent Days:</span>
+                <span class="value" style="color: #dc2626;">${entry.absent_days} (Deducted: ₱${parseFloat(entry.absent_deduction || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })})</span>
+              </div>
+              ` : ''}
               <div class="row">
                 <span class="label">OT Hours:</span>
-                <span class="value">${entry.ot_hours}</span>
+                <span class="value">${entry.ot_hours || entry.overtime_hours || 0}</span>
               </div>
               <div class="row">
                 <span class="label">Late Minutes:</span>
-                <span class="value">${entry.late_minutes}</span>
+                <span class="value">${entry.late_minutes || 0} ${entry.late_deduction ? `(Deducted: ₱${parseFloat(entry.late_deduction).toLocaleString(undefined, { minimumFractionDigits: 2 })})` : ''}</span>
               </div>
             </div>
 
@@ -1197,6 +1239,32 @@ const Payroll = () => {
             </div>
           </div>
 
+          {/* HR PAYROLL POLICY BANNER */}
+          <div className="bg-blue-50/90 border border-blue-200 p-5 rounded-[2rem] flex flex-wrap items-center justify-between gap-4 text-xs shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-md">
+                <Clock size={20} />
+              </div>
+              <div>
+                <span className="font-black text-slate-800 uppercase block tracking-tight">
+                  Active HR Policy Rule: {
+                    activeSettings?.late_deduction_mode === 'hour_equivalent' 
+                      ? '🔴 Heavy Penalty (1 Min Late = 1 Hour Salary Deduction)' 
+                      : activeSettings?.late_deduction_mode === 'hourly_rate_per_min'
+                      ? '🔵 Proportional Hourly Minute Rate'
+                      : `🟢 Fixed Rate (1 Min = ₱${parseFloat(activeSettings?.late_rate_per_min || 1).toFixed(2)})`
+                  }
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Absence Deduction: Automatic Daily Rate per absent day (Basic Salary / {activeSettings?.work_days_per_month || 22} days).
+                </span>
+              </div>
+            </div>
+            <div className="text-[10px] font-black uppercase text-blue-700 bg-blue-100/80 px-4 py-2 rounded-xl border border-blue-200">
+              ✓ HR Enforced
+            </div>
+          </div>
+
           {/* TABLE SECTION */}
           <div className="bg-white border-4 border-slate-50 rounded-[3rem] overflow-hidden shadow-sm">
             <table className="w-full border-collapse">
@@ -1252,8 +1320,13 @@ const Payroll = () => {
                           }
                         />
                         <span className="text-[8px] font-black text-slate-400 uppercase">
-                          Days
+                          Days Worked
                         </span>
+                        {entry.absent_days > 0 && (
+                          <span className="text-[8px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 mt-1">
+                            {entry.absent_days} Absent Days
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -1276,7 +1349,7 @@ const Payroll = () => {
                       </div>
                     </td>
 
-                    {/* Late Input */}
+                    {/* Late Input & Deduction */}
                     <td className="p-8">
                       <div className="flex flex-col items-center gap-1">
                         <input
@@ -1292,6 +1365,11 @@ const Payroll = () => {
                         <span className="text-[8px] font-black text-slate-400 uppercase">
                           Minutes
                         </span>
+                        {parseFloat(entry.late_deduction || 0) > 0 && (
+                          <span className="text-[8px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 mt-1">
+                            -₱{parseFloat(entry.late_deduction).toFixed(2)}
+                          </span>
+                        )}
                       </div>
                     </td>
 

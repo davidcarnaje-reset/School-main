@@ -189,7 +189,7 @@ const TeacherActivities = () => {
         <div className="w-full mt-4 animate-slide-up">
 
           {/* 🟢 EXACT GOOGLE CLASSROOM HERO BANNER 🟢 */}
-          <div className="relative w-full h-[240px] rounded-[1.5rem] overflow-hidden mb-6 shadow-md" style={{ background: 'linear-gradient(135deg, #d49a2a 0%, #4a545c 100%)' }}>
+          <div className="relative w-full h-[240px] rounded-[1.5rem] overflow-hidden mb-6 shadow-md" style={{ background: selectedClassForView ? 'linear-gradient(135deg, #d49a2a 0%, #4a545c 100%)' : 'linear-gradient(135deg, #475569 0%, #1e293b 100%)' }}>
             {/* Malaking Curve na Transparent sa Kanan */}
             <div className="absolute right-[-10%] top-[-20%] w-[450px] h-[450px] bg-black/10 rounded-full" />
 
@@ -206,30 +206,42 @@ const TeacherActivities = () => {
             {/* Texts (Bottom Left) */}
             <div className="absolute bottom-6 left-8 z-10">
               <h1 className="text-white text-[2.4rem] leading-none font-bold tracking-tight mb-2 drop-shadow-sm">
-                {selectedClassForView ? selectedClassForView.subject_description : 'Earth and Life Science'}
+                {selectedClassForView ? selectedClassForView.subject_description : 'No Assigned Class'}
               </h1>
               <p className="text-white/90 text-[1.1rem] font-semibold drop-shadow-sm">
-                {selectedClassForView ? `${selectedClassForView.section_name || selectedClassForView.section} • ${selectedClassForView.grade_level || ''}` : 'Malabhan • Grade 11'}
+                {selectedClassForView ? `${selectedClassForView.section_name || selectedClassForView.section} • ${selectedClassForView.grade_level || ''}` : 'No Section / Schedule Assigned'}
               </p>
             </div>
           </div>
 
-          <div className="w-full max-w-4xl mx-auto">
-            <div className="bg-white/60 backdrop-blur-md border border-white rounded-2xl p-6 shadow-sm mb-6 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-lg shrink-0 shadow-sm" style={{ backgroundColor: themeColor }}>
-                {user?.full_name?.charAt(0) || 'T'}
+          {assignedClasses.length === 0 ? (
+            <div className="w-full max-w-4xl mx-auto py-12 px-8 bg-amber-50/80 border-2 border-amber-200/80 rounded-3xl text-center space-y-3 shadow-sm">
+              <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                ⚠️
               </div>
-              <div className="flex-1 bg-white border border-slate-200 rounded-full px-5 py-3.5 text-slate-500 font-bold text-sm cursor-pointer hover:bg-slate-50 transition-colors shadow-inner" onClick={() => alert("Announcement creation coming soon!")}>
-                Announce something to your class
-              </div>
+              <h3 className="text-xl font-black text-amber-900 uppercase">No Class Schedule Assigned</h3>
+              <p className="text-xs text-amber-800 font-semibold max-w-md mx-auto leading-relaxed">
+                You do not have any active subject or section assigned to your teacher account yet. Please contact the <strong>School Admin or Registrar</strong> to assign classes to your schedule.
+              </p>
             </div>
+          ) : (
+            <div className="w-full max-w-4xl mx-auto">
+              <div className="bg-white/60 backdrop-blur-md border border-white rounded-2xl p-6 shadow-sm mb-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-lg shrink-0 shadow-sm" style={{ backgroundColor: themeColor }}>
+                  {user?.full_name?.charAt(0) || 'T'}
+                </div>
+                <div className="flex-1 bg-white border border-slate-200 rounded-full px-5 py-3.5 text-slate-500 font-bold text-sm cursor-pointer hover:bg-slate-50 transition-colors shadow-inner" onClick={() => alert("Announcement creation coming soon!")}>
+                  Announce something to your class
+                </div>
+              </div>
 
-            <div className="text-center py-16 bg-white/40 border border-white rounded-3xl backdrop-blur-md shadow-sm">
-              <MessageSquare size={54} className="mx-auto text-slate-300 mb-4" />
-              <p className="text-slate-600 font-black text-xl">This is where you can talk to your class</p>
-              <p className="text-slate-500 text-sm mt-2 font-semibold">Use the stream to share announcements, syllabi, and engaging materials.</p>
+              <div className="text-center py-16 bg-white/40 border border-white rounded-3xl backdrop-blur-md shadow-sm">
+                <MessageSquare size={54} className="mx-auto text-slate-300 mb-4" />
+                <p className="text-slate-600 font-black text-xl">This is where you can talk to your class</p>
+                <p className="text-slate-500 text-sm mt-2 font-semibold">Use the stream to share announcements, syllabi, and engaging materials.</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
