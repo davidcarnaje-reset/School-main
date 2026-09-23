@@ -18,26 +18,6 @@ import {
 import { 
   getPayments, 
   getCollectionReports, 
-import express from 'express';
-
-// Existing controllers
-import getDashboardStats from '../controllers/cashier/getDashboardStats.js';
-import getBillingDetails from '../controllers/cashier/getBillingDetails.js';
-import getBillingList from '../controllers/cashier/getBillingList.js';
-import processBillingPayment from '../controllers/cashier/processBillingPayment.js';
-
-// Newly migrated controllers
-import { 
-  fetchScholarships, 
-  manageScholarships, 
-  getStudentScholarships, 
-  getAllApprovedScholarships, 
-  applyScholarshipToBilling 
-} from '../controllers/cashier/scholarshipsController.js';
-
-import { 
-  getPayments, 
-  getCollectionReports, 
   getServiceRequests, 
   processServicePayment 
 } from '../controllers/cashier/paymentsController.js';

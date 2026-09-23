@@ -3,9 +3,47 @@ import { logAuditTrail } from '../../utils/auditLogger.js';
 
 export const getClassAssignData = async (req, res) => {
   try {
-    const [teachers] = await pool.query(
-      "SELECT id, full_name FROM users WHERE role = 'teacher' AND status = 'Active' ORDER BY full_name ASC"
-    );
+    const [teachers] = await pool.query(`
+      SELECT 
+        u.id, 
+        COALESCE(NULLIF(u.full_name, ''), CONCAT(u.first_name, ' ', u.last_name)) AS full_name,
+        u.first_name,
+        u.last_name,
+        (
+          SELECT e.department 
+          FROM employees e 
+          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS department,
+        (
+          SELECT e.position 
+          FROM employees e 
+          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS position,
+        (
+          SELECT e.assigned_levels 
+          FROM employees e 
+          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS assigned_levels,
+        (
+          SELECT e.assigned_roles 
+          FROM employees e 
+          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS assigned_roles
+      FROM users u
+      WHERE (
+        u.role IN ('teacher', 'Teacher', 'Faculty', 'faculty')
+        OR EXISTS (
+          SELECT 1 FROM employees e 
+          WHERE (e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))))
+          AND (e.department = 'Faculty' OR e.position LIKE '%Teacher%')
+        )
+      ) AND (u.status = 'Active' OR u.status IS NULL)
+      ORDER BY u.last_name ASC, u.first_name ASC
+    `);
     const [subjects] = await pool.query(
       "SELECT id, subject_code, subject_description, grade_level_applicable, program_id, level_category FROM subjects ORDER BY subject_code ASC"
     );
@@ -23,6 +61,9 @@ export const getClassAssignData = async (req, res) => {
         ca.subject_id, 
         ca.section_id, 
         ca.room_id, 
+        ca.days,
+        ca.start_time,
+        ca.end_time,
         ca.schedule, 
         ca.school_year,
         u.full_name as teacher_name, 

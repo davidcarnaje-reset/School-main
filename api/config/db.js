@@ -185,8 +185,24 @@ pool.on('error', (err) => {
     } catch (e) {
       // Ignore
     }
+
+    // 4. Add assigned_levels and assigned_roles to employees table if missing
+    try {
+      await pool.query("ALTER TABLE employees ADD COLUMN assigned_levels TEXT NULL");
+    } catch (e) {}
+    try {
+      await pool.query("ALTER TABLE employees ADD COLUMN assigned_roles TEXT NULL");
+    } catch (e) {}
+
+    // 5. Add adviser_id and adviser_name to sections table if missing
+    try {
+      await pool.query("ALTER TABLE sections ADD COLUMN adviser_id INT NULL");
+    } catch (e) {}
+    try {
+      await pool.query("ALTER TABLE sections ADD COLUMN adviser_name VARCHAR(255) NULL");
+    } catch (e) {}
   } catch (err) {
-    console.error("Failed to patch middle_name and suffix columns:", err.message);
+    console.error("Failed to patch schema columns:", err.message);
   }
 })();
 

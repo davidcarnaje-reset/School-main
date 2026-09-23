@@ -4,9 +4,14 @@ import { logAuditTrail } from '../../utils/auditLogger.js';
 export const getSections = async (req, res) => {
   try {
     const sql_sections = `
-      SELECT s.*, ap.program_code, ap.program_description, ap.major 
+      SELECT s.*, ap.program_code, ap.program_description, ap.major,
+             COALESCE(NULLIF(s.adviser_name, ''), NULLIF(u.full_name, ''), CONCAT(u.first_name, ' ', u.last_name)) AS adviser_name,
+             u.email as adviser_email,
+             u.first_name as adviser_fname,
+             u.last_name as adviser_lname
       FROM sections s 
       LEFT JOIN academic_programs ap ON s.program_id = ap.id 
+      LEFT JOIN users u ON s.adviser_id = u.id
       ORDER BY s.id DESC
     `;
     const [sections] = await pool.query(sql_sections);
@@ -18,10 +23,54 @@ export const getSections = async (req, res) => {
     `;
     const [programs] = await pool.query(sql_programs);
 
+    const [teachers] = await pool.query(`
+      SELECT 
+        u.id, 
+        COALESCE(NULLIF(u.full_name, ''), CONCAT(u.first_name, ' ', u.last_name)) AS full_name, 
+        u.first_name, 
+        u.last_name, 
+        u.email,
+        (
+          SELECT e.department 
+          FROM employees e 
+          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS department,
+        (
+          SELECT e.position 
+          FROM employees e 
+          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS position,
+        (
+          SELECT e.assigned_levels 
+          FROM employees e 
+          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS assigned_levels,
+        (
+          SELECT e.assigned_roles 
+          FROM employees e 
+          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS assigned_roles
+      FROM users u 
+      WHERE (
+        u.role IN ('teacher', 'Teacher', 'Faculty', 'faculty', 'instructor', 'Instructor', 'professor', 'Professor')
+        OR EXISTS (
+          SELECT 1 FROM employees e 
+          WHERE (e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))))
+          AND (e.department = 'Faculty' OR e.position LIKE '%Teacher%' OR e.position LIKE '%Faculty%')
+        )
+      ) AND (u.status = 'Active' OR u.status IS NULL)
+      ORDER BY u.last_name ASC, u.first_name ASC
+    `);
+
     return res.status(200).json({
       status: "success",
       sections: sections || [],
-      programs: programs || []
+      programs: programs || [],
+      teachers: teachers || []
     });
   } catch (error) {
     console.error("getSections error:", error);
@@ -30,7 +79,7 @@ export const getSections = async (req, res) => {
 };
 
 export const createSection = async (req, res) => {
-  const { section_name, grade_level, department, program_id, max_capacity } = req.body;
+  const { section_name, grade_level, department, program_id, max_capacity, adviser_id } = req.body;
 
   if (!section_name || !grade_level || !department) {
     return res.status(400).json({ status: "error", message: "Section Name, Grade Level and Department are required." });
@@ -45,12 +94,25 @@ export const createSection = async (req, res) => {
       finalProgramId = parseInt(program_id, 10);
     }
 
+    let finalAdviserId = null;
+    let finalAdviserName = null;
+    if (department !== 'College' && adviser_id && adviser_id !== '') {
+      finalAdviserId = parseInt(adviser_id, 10);
+      const [teacherRows] = await connection.query(
+        "SELECT COALESCE(NULLIF(full_name, ''), CONCAT(first_name, ' ', last_name)) AS name FROM users WHERE id = ?",
+        [finalAdviserId]
+      );
+      if (teacherRows.length > 0) {
+        finalAdviserName = teacherRows[0].name;
+      }
+    }
+
     const [maxIdRows] = await connection.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM sections FOR UPDATE");
     const nextId = maxIdRows[0].maxId + 1;
 
     const sql = `
-      INSERT INTO sections (id, section_name, grade_level, department, program_id, max_capacity) 
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO sections (id, section_name, grade_level, department, program_id, max_capacity, adviser_id, adviser_name) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     await connection.query(sql, [
       nextId,
@@ -58,7 +120,9 @@ export const createSection = async (req, res) => {
       grade_level.trim(),
       department.trim(),
       finalProgramId,
-      parseInt(max_capacity, 10) || 40
+      parseInt(max_capacity, 10) || 40,
+      finalAdviserId,
+      finalAdviserName
     ]);
 
     await connection.commit();
@@ -66,7 +130,7 @@ export const createSection = async (req, res) => {
       req.user?.id || 1,
       req.user?.role || 'Registrar',
       "CREATE_SECTION",
-      `Created section: ${section_name} (Grade: ${grade_level}, Max Capacity: ${max_capacity})`,
+      `Created section: ${section_name} (Grade: ${grade_level}, Max Capacity: ${max_capacity}, Adviser: ${finalAdviserName || 'None'})`,
       req
     );
     return res.status(201).json({ status: "success", message: "Section created!" });
@@ -87,6 +151,22 @@ export const getSectionDetails = async (req, res) => {
   }
 
   try {
+    const sql_section = `
+      SELECT s.*, ap.program_code, ap.program_description, ap.major,
+             COALESCE(NULLIF(s.adviser_name, ''), NULLIF(u.full_name, ''), CONCAT(u.first_name, ' ', u.last_name)) AS adviser_name,
+             u.email AS adviser_email,
+             u.phone_number AS adviser_phone,
+             emp.employee_id AS adviser_emp_id,
+             emp.position AS adviser_position
+      FROM sections s
+      LEFT JOIN academic_programs ap ON s.program_id = ap.id
+      LEFT JOIN users u ON s.adviser_id = u.id
+      LEFT JOIN employees emp ON u.id = emp.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(emp.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(emp.last_name)))
+      WHERE s.id = ?
+    `;
+    const [sectionRows] = await pool.query(sql_section, [parseInt(section_id, 10)]);
+    const sectionInfo = sectionRows.length > 0 ? sectionRows[0] : null;
+
     const sql_students = `
       SELECT s.student_id, s.first_name, s.last_name, s.gender, e.status
       FROM enrollments e
@@ -112,6 +192,7 @@ export const getSectionDetails = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      section: sectionInfo,
       students: students || [],
       schedules: schedules || [],
       enrolled_count: (students || []).length
@@ -170,7 +251,7 @@ export const getSectionsForEnrollment = async (req, res) => {
 };
 
 export const updateSection = async (req, res) => {
-  const { id, section_name, grade_level, department, program_id, max_capacity } = req.body;
+  const { id, section_name, grade_level, department, program_id, max_capacity, adviser_id } = req.body;
 
   if (!id || !section_name || !grade_level || !department) {
     return res.status(400).json({ status: "error", message: "Section ID, Name, Grade Level and Department are required." });
@@ -182,13 +263,28 @@ export const updateSection = async (req, res) => {
       finalProgramId = parseInt(program_id, 10);
     }
 
+    let finalAdviserId = null;
+    let finalAdviserName = null;
+    if (department !== 'College' && adviser_id && adviser_id !== '') {
+      finalAdviserId = parseInt(adviser_id, 10);
+      const [teacherRows] = await pool.query(
+        "SELECT COALESCE(NULLIF(full_name, ''), CONCAT(first_name, ' ', last_name)) AS name FROM users WHERE id = ?",
+        [finalAdviserId]
+      );
+      if (teacherRows.length > 0) {
+        finalAdviserName = teacherRows[0].name;
+      }
+    }
+
     const sql = `
       UPDATE sections SET 
         section_name = ?, 
         grade_level = ?, 
         department = ?, 
         program_id = ?, 
-        max_capacity = ? 
+        max_capacity = ?,
+        adviser_id = ?,
+        adviser_name = ?
       WHERE id = ?
     `;
     await pool.query(sql, [
@@ -197,6 +293,8 @@ export const updateSection = async (req, res) => {
       department.trim(),
       finalProgramId,
       parseInt(max_capacity, 10) || 40,
+      finalAdviserId,
+      finalAdviserName,
       parseInt(id, 10)
     ]);
 
@@ -204,7 +302,7 @@ export const updateSection = async (req, res) => {
       req.user?.id || 1,
       req.user?.role || 'Registrar',
       "UPDATE_SECTION",
-      `Updated section ID: ${id} to name: ${section_name} (Grade: ${grade_level}, Max Capacity: ${max_capacity})`,
+      `Updated section ID: ${id} to name: ${section_name} (Grade: ${grade_level}, Max Capacity: ${max_capacity}, Adviser: ${finalAdviserName || 'None'})`,
       req
     );
     return res.status(200).json({ status: "success", message: "Section updated successfully!" });

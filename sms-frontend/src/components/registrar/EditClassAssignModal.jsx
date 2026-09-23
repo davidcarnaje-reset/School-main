@@ -1,12 +1,94 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { X, CheckCircle, RefreshCw } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext'; // Ayusin ang path kung kailangan
+import { X, CheckCircle, RefreshCw, Clock, Calendar, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const DAYS_MAPPING = [
-  { label: 'M' }, { label: 'T' }, { label: 'W' }, 
-  { label: 'Th' }, { label: 'F' }, { label: 'S' },
+  { label: 'M', full: 'Monday' }, 
+  { label: 'T', full: 'Tuesday' }, 
+  { label: 'W', full: 'Wednesday' }, 
+  { label: 'Th', full: 'Thursday' }, 
+  { label: 'F', full: 'Friday' }, 
+  { label: 'S', full: 'Saturday' },
 ];
+
+const convertTo24Hour = (timeStr) => {
+  if (!timeStr) return '';
+  const ampmMatch = timeStr.match(/(AM|PM)/i);
+  if (!ampmMatch) {
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      const h = parts[0].padStart(2, '0');
+      const m = parts[1].substring(0, 2).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    return '';
+  }
+  const isPM = /PM/i.test(ampmMatch[0]);
+  const cleanTime = timeStr.replace(/(AM|PM)/i, '').trim();
+  let [hours, minutes] = cleanTime.split(':');
+  let h = parseInt(hours, 10);
+  let m = minutes ? minutes.substring(0, 2) : '00';
+  if (isPM && h < 12) h += 12;
+  if (!isPM && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const parseScheduleString = (scheduleStr) => {
+  if (!scheduleStr) return { days: [], startTime: '08:00', endTime: '09:00' };
+
+  const str = String(scheduleStr).trim();
+  const timeMatch = str.match(/(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)/i);
+
+  let startTime24 = '08:00';
+  let endTime24 = '09:00';
+  let daysPart = str;
+
+  if (timeMatch) {
+    startTime24 = convertTo24Hour(timeMatch[1].trim()) || '08:00';
+    endTime24 = convertTo24Hour(timeMatch[2].trim()) || '09:00';
+    daysPart = str.substring(0, timeMatch.index).trim();
+  }
+
+  const recognizedDays = [];
+  if (daysPart.includes(',')) {
+    daysPart.split(',').map(d => d.trim()).forEach(d => {
+      if (['M', 'T', 'W', 'Th', 'F', 'S'].includes(d) && !recognizedDays.includes(d)) {
+        recognizedDays.push(d);
+      }
+    });
+  } else {
+    let remaining = daysPart.replace(/\s+/g, '');
+    let i = 0;
+    while (i < remaining.length) {
+      if (remaining.substring(i, i + 2) === 'Th') {
+        if (!recognizedDays.includes('Th')) recognizedDays.push('Th');
+        i += 2;
+      } else {
+        const char = remaining[i];
+        if (['M', 'T', 'W', 'F', 'S'].includes(char)) {
+          if (!recognizedDays.includes(char)) recognizedDays.push(char);
+        }
+        i += 1;
+      }
+    }
+  }
+
+  return {
+    days: recognizedDays,
+    startTime: startTime24,
+    endTime: endTime24
+  };
+};
+
+const formatTime12h = (time) => {
+  if (!time) return '';
+  let [h, m] = time.split(':');
+  let hours = parseInt(h, 10);
+  let ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${String(hours).padStart(2, '0')}:${m ? m.substring(0, 2) : '00'} ${ampm}`;
+};
 
 const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subjects, sections, rooms, onSuccess, showAlert }) => {
     const { token, API_BASE_URL } = useAuth();
@@ -17,29 +99,37 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
     // Populate form kapag bumukas ang modal
     useEffect(() => {
         if (isOpen && assignmentData) {
+            let initialDays = [];
+            let initialStart = '08:00';
+            let initialEnd = '09:00';
+
+            // Check if days / times are already provided directly
+            if (assignmentData.days && assignmentData.start_time && assignmentData.end_time) {
+                initialDays = assignmentData.days.split(',').map(d => d.trim()).filter(Boolean);
+                initialStart = assignmentData.start_time.slice(0, 5);
+                initialEnd = assignmentData.end_time.slice(0, 5);
+            } else if (assignmentData.schedule) {
+                // Parse fallback from schedule text
+                const parsed = parseScheduleString(assignmentData.schedule);
+                initialDays = parsed.days;
+                initialStart = parsed.startTime;
+                initialEnd = parsed.endTime;
+            }
+
+            setSelectedDays(initialDays);
             setFormData({
                 id: assignmentData.id,
                 teacher_id: assignmentData.teacher_id || '',
                 subject_id: assignmentData.subject_id || '',
                 section_id: assignmentData.section_id || '',
                 room_id: assignmentData.room_id || '',
-                days: assignmentData.days || '',
-                start_time: assignmentData.start_time || '08:00:00',
-                end_time: assignmentData.end_time || '09:00:00',
-                schedule: assignmentData.schedule || ''
+                days: initialDays.join(','),
+                start_time: initialStart,
+                end_time: initialEnd,
+                schedule: assignmentData.schedule || (initialDays.length > 0 ? `${initialDays.join('')} ${formatTime12h(initialStart)} - ${formatTime12h(initialEnd)}` : '')
             });
-            // Gawing array yung days (Hal: "M,W,F" -> ['M', 'W', 'F'])
-            setSelectedDays(assignmentData.days ? assignmentData.days.split(',') : []);
         }
     }, [isOpen, assignmentData]);
-
-    const formatTime12h = (time) => {
-        if (!time) return '';
-        let [h, m] = time.split(':');
-        let ampm = h >= 12 ? 'pm' : 'am';
-        h = h % 12 || 12;
-        return `${h}:${m} ${ampm}`;
-    };
 
     const updateScheduleString = useCallback((daysArr, start, end) => {
         if (daysArr.length === 0) {
@@ -53,7 +143,9 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
     }, []);
 
     const toggleDay = (dayLabel) => {
-        const newDays = selectedDays.includes(dayLabel) ? selectedDays.filter(d => d !== dayLabel) : [...selectedDays, dayLabel];
+        const newDays = selectedDays.includes(dayLabel) 
+            ? selectedDays.filter(d => d !== dayLabel) 
+            : [...selectedDays, dayLabel];
         setSelectedDays(newDays);
         updateScheduleString(newDays, formData.start_time, formData.end_time);
     };
@@ -94,13 +186,15 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
         return matchesProg && (secGrade === subGrade);
     });
 
+    const isScheduleModified = assignmentData?.schedule && formData.schedule && assignmentData.schedule.trim() !== formData.schedule.trim();
+
     return (
         <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
             <form onSubmit={handleSave} className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div>
                         <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Edit Class Record</h3>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Update Master Schedule</p>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Update Master Schedule & Assignment</p>
                     </div>
                     <button type="button" onClick={onClose} className="p-3 bg-white text-slate-300 hover:text-red-500 rounded-2xl shadow-sm transition-all"><X size={20}/></button>
                 </div>
@@ -148,22 +242,102 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
                             </select>
                         </div>
 
-                        {/* SCHEDULE CONFIG */}
+                        {/* SCHEDULE CONFIGURATION BOX */}
                         <div className="col-span-2 bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 space-y-4">
-                            <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Schedule Configuration</label>
-                            <div className="flex flex-wrap gap-2">
-                                {DAYS_MAPPING.map(day => (
-                                    <button key={day.label} type="button" onClick={() => toggleDay(day.label)} className={`w-12 h-12 rounded-xl font-black text-xs transition-all border ${selectedDays.includes(day.label) ? 'bg-amber-500 text-white border-amber-500 shadow-lg scale-105' : 'bg-white text-slate-400 border-slate-200'}`}>
-                                        {day.label}
-                                    </button>
-                                ))}
+                            <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Schedule Configuration</label>
+                                <span className="text-[10px] font-bold text-amber-700/70">
+                                    {selectedDays.length > 0 ? `${selectedDays.length} day(s) configured` : 'No days configured'}
+                                </span>
                             </div>
-                            <div className="flex gap-4">
-                                <input type="time" value={formData.start_time} onChange={(e) => {setFormData({...formData, start_time: e.target.value}); updateScheduleString(selectedDays, e.target.value, formData.end_time);}} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-amber-500" />
-                                <input type="time" value={formData.end_time} onChange={(e) => {setFormData({...formData, end_time: e.target.value}); updateScheduleString(selectedDays, formData.start_time, e.target.value);}} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-amber-500" />
+
+                            {/* CURRENT ACTIVE SCHEDULE BANNER */}
+                            <div className="bg-white p-4 rounded-2xl border border-amber-200/80 shadow-sm flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-black shadow-inner">
+                                        <Clock size={18} />
+                                    </div>
+                                    <div>
+                                        <span className="text-[9px] font-black text-amber-600 uppercase tracking-wider block">Current Schedule</span>
+                                        <span className="text-xs font-black text-slate-700 tracking-tight">
+                                            {assignmentData?.schedule || 'No schedule assigned'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <span className="text-[10px] font-black px-3 py-1 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 uppercase tracking-wider">
+                                    Existing
+                                </span>
                             </div>
-                            <div className="p-3 bg-white rounded-xl text-center border-2 border-dashed border-amber-200">
-                                <p className="text-xs font-black text-amber-600 uppercase tracking-tighter">New Schedule: {formData.schedule || 'None'}</p>
+
+                            {/* DAYS SELECTION */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Configure Days</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {DAYS_MAPPING.map(day => {
+                                        const isSelected = selectedDays.includes(day.label);
+                                        return (
+                                            <button 
+                                                key={day.label} 
+                                                type="button" 
+                                                onClick={() => toggleDay(day.label)} 
+                                                className={`w-12 h-12 rounded-xl font-black text-xs transition-all border ${
+                                                    isSelected 
+                                                        ? 'bg-amber-500 text-white border-amber-500 shadow-md scale-105' 
+                                                        : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300'
+                                                }`}
+                                            >
+                                                {day.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* TIME PICKERS */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Start Time</label>
+                                    <input 
+                                        type="time" 
+                                        value={formData.start_time || '08:00'} 
+                                        onChange={(e) => {
+                                            const newStart = e.target.value;
+                                            setFormData(prev => ({ ...prev, start_time: newStart })); 
+                                            updateScheduleString(selectedDays, newStart, formData.end_time);
+                                        }} 
+                                        className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-amber-500 shadow-sm" 
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">End Time</label>
+                                    <input 
+                                        type="time" 
+                                        value={formData.end_time || '09:00'} 
+                                        onChange={(e) => {
+                                            const newEnd = e.target.value;
+                                            setFormData(prev => ({ ...prev, end_time: newEnd })); 
+                                            updateScheduleString(selectedDays, formData.start_time, newEnd);
+                                        }} 
+                                        className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-amber-500 shadow-sm" 
+                                    />
+                                </div>
+                            </div>
+
+                            {/* NEW / CONFIGURED SCHEDULE PREVIEW */}
+                            <div className={`p-3.5 bg-white rounded-xl text-center border-2 border-dashed ${isScheduleModified ? 'border-amber-400 bg-amber-50/30' : 'border-amber-200'}`}>
+                                <div className="flex items-center justify-center gap-2">
+                                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider">
+                                        {isScheduleModified ? 'New Configured Schedule:' : 'Configured Schedule:'}
+                                    </span>
+                                    <span className="text-xs font-black text-amber-700 uppercase tracking-tight">
+                                        {formData.schedule || 'None (Select Days & Time)'}
+                                    </span>
+                                </div>
+                                {isScheduleModified && (
+                                    <p className="text-[9px] font-bold text-amber-600 mt-1 uppercase tracking-widest">
+                                        ● Changes detected — will be updated upon saving
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </div>

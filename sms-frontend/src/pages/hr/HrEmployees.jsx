@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Users, Search, UserPlus, Shield, Mail, Edit, Phone, Download,
-  Award, X, FileText, CheckCircle, AlertCircle, Upload 
+  Award, X, FileText, CheckCircle, AlertCircle, Upload, Building2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { download201FormPDF } from '../../utils/employee201FormGenerator';
@@ -67,9 +67,11 @@ const HrEmployees = () => {
     middle_name: '',
     last_name: '',
     suffix: '',
-    email: '',
-    position: 'TEACHER',
-    department: 'Administration',
+    academic_category: 'College',
+    position: 'College Instructor',
+    department: 'Faculty - College of Computer Studies',
+    assigned_levels: ['College'],
+    assigned_roles: ['Academic Faculty'],
     basic_salary: 25000,
     status: 'Active',
     phone_number: '',
@@ -197,8 +199,13 @@ const HrEmployees = () => {
       }
     }
 
+    const payload = {
+      ...formData,
+      ...(editingEmp ? { id: editingEmp.id, employee_id: editingEmp.employee_id } : {})
+    };
+
     try {
-      const res = await axios.post(`${API_BASE_URL}/employee-portal/hire`, formData);
+      const res = await axios.post(`${API_BASE_URL}/employee-portal/hire`, payload);
       if (res.data?.success) {
         alert(res.data.message || `EIS Action completed: Hired/Modified ${formData.first_name} ${formData.last_name}.`);
         fetchEmployees();
@@ -222,9 +229,11 @@ const HrEmployees = () => {
       middle_name: '',
       last_name: '',
       suffix: '',
-      email: '',
-      position: 'TEACHER',
-      department: 'Faculty',
+      academic_category: 'College',
+      position: 'College Instructor',
+      department: 'Faculty - College of Computer Studies',
+      assigned_levels: ['College'],
+      assigned_roles: ['Academic Faculty'],
       basic_salary: 25000,
       status: 'Active',
       phone_number: '',
@@ -261,6 +270,34 @@ const HrEmployees = () => {
     setEmailError('');
     setPhoneError('');
     
+    // Helper to parse multi-select levels & roles
+    const parseLevels = () => {
+      if (Array.isArray(emp.assigned_levels)) return emp.assigned_levels;
+      if (typeof emp.assigned_levels === 'string' && emp.assigned_levels.trim()) {
+        return emp.assigned_levels.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      const dept = emp.department || '';
+      const lvls = [];
+      if (dept.includes('College') || dept.includes('Faculty') || emp.position?.includes('Professor') || emp.position?.includes('Dean') || emp.position?.includes('Instructor')) lvls.push('College');
+      if (dept.includes('Senior High') || dept.includes('SHS') || emp.position?.includes('SHS')) lvls.push('Senior High School');
+      if (dept.includes('Basic Education') || dept.includes('Elementary') || dept.includes('Junior High') || dept.includes('Kinder')) lvls.push('Basic Education');
+      return lvls.length ? lvls : ['College'];
+    };
+
+    const parseRoles = () => {
+      if (Array.isArray(emp.assigned_roles)) return emp.assigned_roles;
+      if (typeof emp.assigned_roles === 'string' && emp.assigned_roles.trim()) {
+        return emp.assigned_roles.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      const pos = emp.position || '';
+      const roles = [];
+      if (pos.includes('Dean') || pos.includes('Principal') || pos.includes('Head') || pos.includes('Lead') || pos.includes('Chair')) roles.push('Academic Management (Dean/Head)');
+      if (pos.includes('Professor') || pos.includes('Instructor') || pos.includes('Teacher') || pos.includes('Faculty')) roles.push('Academic Faculty');
+      if (pos.includes('STAFF') || pos.includes('OFFICER') || pos.includes('CASHIER') || pos.includes('REGISTRAR') || pos.includes('ADMIN')) roles.push('Administrative / Operations');
+      if (pos.includes('IT')) roles.push('IT Support');
+      return roles.length ? roles : ['Academic Faculty'];
+    };
+
     // Parse mock statutory data if none exists
     setFormData({
       first_name: emp.first_name || '',
@@ -268,8 +305,17 @@ const HrEmployees = () => {
       last_name: emp.last_name || '',
       suffix: emp.suffix || '',
       email: emp.email || '',
-      position: emp.position || 'TEACHER',
-      department: emp.department || 'Faculty',
+      academic_category: (emp.department || '').includes('Basic Education') || (emp.department || '').includes('Elementary') || (emp.department || '').includes('Junior High') 
+        ? 'Basic Education' 
+        : (emp.department || '').includes('Senior High') || (emp.department || '').includes('SHS')
+        ? 'Senior High School'
+        : (emp.department || '').includes('Administration') || (emp.department || '').includes('IT System') || (emp.department || '').includes('Cashier') || (emp.department || '').includes('Registrar')
+        ? 'Non-Teaching Operations'
+        : 'College',
+      position: emp.position || 'College Instructor',
+      department: emp.department || 'Faculty - College of Computer Studies',
+      assigned_levels: parseLevels(),
+      assigned_roles: parseRoles(),
       basic_salary: emp.basic_salary || 25000,
       status: emp.status || 'Active',
       phone_number: emp.phone_number || '',
@@ -407,9 +453,75 @@ const HrEmployees = () => {
                       <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-0.5"><Mail size={12}/> {emp.email}</span>
                     </td>
                     <td className="py-4 pr-4">
-                      <div className="space-y-1">
-                        <span className="inline-block text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full">{emp.position}</span>
-                        <p className="text-[10px] text-slate-400 font-semibold">{emp.department || 'Administration'}</p>
+                      <div className="space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className={`inline-block text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                            (emp.position || '').includes('Dean') || (emp.position || '').includes('Principal')
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : (emp.position || '').includes('Head') || (emp.position || '').includes('Lead') || (emp.position || '').includes('Chair')
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : (emp.position || '').includes('Professor') || (emp.position || '').includes('Instructor') || (emp.position || '').includes('Faculty')
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-slate-50 text-slate-700 border-slate-200'
+                          }`}>
+                            {emp.position || 'Academic Faculty'}
+                          </span>
+                        </div>
+
+                        {/* Multi-tag Level Badges */}
+                        <div className="flex flex-wrap gap-1">
+                          {(Array.isArray(emp.assigned_levels) 
+                            ? emp.assigned_levels 
+                            : typeof emp.assigned_levels === 'string' && emp.assigned_levels.trim() 
+                            ? emp.assigned_levels.split(',').map(s => s.trim()) 
+                            : [emp.department?.includes('Senior High') ? 'SHS' : emp.department?.includes('Basic Education') ? 'Basic Ed' : 'College']
+                          ).map((lvlStr, i) => {
+                            const lvl = lvlStr.trim();
+                            const isCollege = lvl.includes('College');
+                            const isSHS = lvl.includes('Senior') || lvl.includes('SHS');
+                            const isBasic = lvl.includes('Basic') || lvl.includes('Elem') || lvl.includes('JHS');
+                            return (
+                              <span 
+                                key={i} 
+                                className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                                  isCollege 
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                                    : isSHS 
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                                    : isBasic 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}
+                              >
+                                {isCollege ? '🎓 College' : isSHS ? '🏫 SHS' : isBasic ? '🎒 Basic Ed' : lvl}
+                              </span>
+                            );
+                          })}
+
+                          {/* Multi-tag Functional Roles */}
+                          {(Array.isArray(emp.assigned_roles) 
+                            ? emp.assigned_roles 
+                            : typeof emp.assigned_roles === 'string' && emp.assigned_roles.trim() 
+                            ? emp.assigned_roles.split(',').map(s => s.trim()) 
+                            : []
+                          ).map((roleStr, i) => {
+                            const r = roleStr.trim();
+                            if (r.includes('Management') || r.includes('Dean') || r.includes('Head')) {
+                              return <span key={'r'+i} className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">👑 Leadership</span>;
+                            }
+                            if (r.includes('Admin') || r.includes('Operations')) {
+                              return <span key={'r'+i} className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-rose-50 text-rose-700 border-rose-200">⚙️ Operations</span>;
+                            }
+                            if (r.includes('IT')) {
+                              return <span key={'r'+i} className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-cyan-50 text-cyan-700 border-cyan-200">💻 IT Staff</span>;
+                            }
+                            return null;
+                          })}
+                        </div>
+
+                        <p className="text-[10px] text-slate-500 font-bold flex items-center gap-1">
+                          <Building2 size={12} className="text-slate-400"/> {emp.department || 'General Faculty'}
+                        </p>
                       </div>
                     </td>
                     <td className="py-4 pr-4">
@@ -523,25 +635,163 @@ const HrEmployees = () => {
                       <p className="text-[9px] text-slate-400 font-semibold">Standard PH 11-digit mobile (e.g. 09171234567)</p>
                     )}
                   </div>
+                  {/* MULTI-SELECT ASSIGNED ACADEMIC LEVELS */}
+                  <div className="space-y-2 md:col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                        <span>🎓</span> Assigned Academic Levels Taught (Multi-Select)
+                      </label>
+                      <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                        {(formData.assigned_levels || []).length} Level(s) Selected
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-semibold mb-2">Check all academic divisions handled by this employee:</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {[
+                        { id: 'College', label: 'College / Higher Ed', icon: '🎓' },
+                        { id: 'Senior High School', label: 'Senior High School (SHS)', icon: '🏫' },
+                        { id: 'Basic Education', label: 'Basic Ed (Kinder / Elem / JHS)', icon: '🎒' }
+                      ].map(lvl => {
+                        const isChecked = (formData.assigned_levels || []).includes(lvl.id);
+                        return (
+                          <div 
+                            key={lvl.id} 
+                            onClick={() => {
+                              const current = formData.assigned_levels || [];
+                              const updated = current.includes(lvl.id)
+                                ? current.filter(l => l !== lvl.id)
+                                : [...current, lvl.id];
+                              setFormData(prev => ({ ...prev, assigned_levels: updated.length ? updated : [lvl.id] }));
+                            }}
+                            className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold cursor-pointer select-none transition-all active:scale-[0.98] ${
+                              isChecked 
+                                ? 'bg-blue-50/90 border-blue-300 text-blue-800 shadow-sm ring-1 ring-blue-300/50' 
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100/80 hover:border-slate-300'
+                            }`}
+                          >
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked} 
+                              readOnly
+                              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none" 
+                            />
+                            <span>{lvl.icon} {lvl.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* MULTI-SELECT CROSS-FUNCTIONAL ROLES */}
+                  <div className="space-y-2 md:col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                        <span>💼</span> Cross-Functional Roles & Responsibilities (Multi-Select)
+                      </label>
+                      <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        {(formData.assigned_roles || []).length} Role(s) Selected
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-semibold mb-2">Check all dual responsibilities held (e.g. Faculty + Dean/Head + Admin Operations):</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { id: 'Academic Faculty', label: 'Academic Faculty / Teaching Staff', icon: '🧑‍🏫' },
+                        { id: 'Academic Management (Dean/Head)', label: 'Academic Management (Dean / Chair / Principal)', icon: '👑' },
+                        { id: 'Administrative / Operations', label: 'Administrative / Operations Officer', icon: '⚙️' },
+                        { id: 'IT Support', label: 'IT System Support Staff', icon: '💻' }
+                      ].map(roleItem => {
+                        const isChecked = (formData.assigned_roles || []).includes(roleItem.id);
+                        return (
+                          <div 
+                            key={roleItem.id} 
+                            onClick={() => {
+                              const current = formData.assigned_roles || [];
+                              const updated = current.includes(roleItem.id)
+                                ? current.filter(r => r !== roleItem.id)
+                                : [...current, roleItem.id];
+                              setFormData(prev => ({ ...prev, assigned_roles: updated.length ? updated : [roleItem.id] }));
+                            }}
+                            className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold cursor-pointer select-none transition-all active:scale-[0.98] ${
+                              isChecked 
+                                ? 'bg-indigo-50/90 border-indigo-300 text-indigo-800 shadow-sm ring-1 ring-indigo-300/50' 
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100/80 hover:border-slate-300'
+                            }`}
+                          >
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked} 
+                              readOnly
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer pointer-events-none" 
+                            />
+                            <span>{roleItem.icon} {roleItem.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Job Title / Position</label>
-                    <select name="position" value={formData.position} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
-                      <option value="TEACHER">Academic Teacher</option>
-                      <option value="IT STAFF">IT Support Staff</option>
-                      <option value="REGISTRAR STAFF">Registrar Officer</option>
-                      <option value="CASHIER STAFF">Finance Cashier</option>
-                      <option value="CUSTODIAN STAFF">Facilities Custodian</option>
-                      <option value="NURSE STAFF">Clinic Nurse</option>
+                    <label className="text-[10px] font-black uppercase text-slate-400">Primary Department / Unit</label>
+                    <select name="department" value={formData.department} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer">
+                      <optgroup label="College / Higher Education">
+                        <option value="Faculty - College of Computer Studies">College of Computer Studies</option>
+                        <option value="Faculty - College of Business & Accountancy">College of Business & Accountancy</option>
+                        <option value="Faculty - College of Education">College of Education</option>
+                        <option value="Faculty - College of Engineering & Architecture">College of Engineering & Architecture</option>
+                        <option value="Faculty - College of Arts & Sciences">College of Arts & Sciences</option>
+                        <option value="Faculty - College of Nursing & Allied Health">College of Nursing & Allied Health</option>
+                      </optgroup>
+                      <optgroup label="Senior High School (SHS)">
+                        <option value="Senior High School - STEM Track">SHS - STEM Track Department</option>
+                        <option value="Senior High School - ABM Track">SHS - ABM Track Department</option>
+                        <option value="Senior High School - HUMSS Track">SHS - HUMSS Track Department</option>
+                        <option value="Senior High School - TVL Track">SHS - TVL Track Department</option>
+                      </optgroup>
+                      <optgroup label="Basic Education (Kinder / Elem / JHS)">
+                        <option value="Basic Education - Elementary Dept">Elementary Department</option>
+                        <option value="Basic Education - Junior High Dept">Junior High School (JHS) Dept</option>
+                        <option value="Basic Education - Kindergarten Dept">Kindergarten Department</option>
+                      </optgroup>
+                      <optgroup label="Operations & Administration">
+                        <option value="Administration">Operations Administration</option>
+                        <option value="IT System Office">IT System Office</option>
+                        <option value="Finance Cashier">Cashier Finance Dept</option>
+                        <option value="Registrar Academic Dept">Registrar Academic Dept</option>
+                        <option value="Clinic & Health Office">Clinic & Health Office</option>
+                        <option value="Facilities & Maintenance">Facilities & Maintenance</option>
+                      </optgroup>
                     </select>
                   </div>
+
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Department</label>
-                    <select name="department" value={formData.department} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
-                      <option value="Faculty">Faculty (Academic)</option>
-                      <option value="Administration">Operations Administration</option>
-                      <option value="IT Office">IT System Office</option>
-                      <option value="Finance Cashier">Cashier Finance Dept</option>
-                      <option value="Registrar Academics">Registrar Academic Dept</option>
+                    <label className="text-[10px] font-black uppercase text-slate-400">Position / Academic Rank</label>
+                    <select name="position" value={formData.position} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer">
+                      <optgroup label="College Academic Positions">
+                        <option value="College Dean">College Dean (Academic Department Head)</option>
+                        <option value="Program Head / Chair">Program Head / Department Chair</option>
+                        <option value="Full Professor">Full Professor</option>
+                        <option value="Associate Professor">Associate Professor</option>
+                        <option value="Assistant Professor">Assistant Professor</option>
+                        <option value="College Instructor">College Instructor</option>
+                      </optgroup>
+                      <optgroup label="Senior High School Positions">
+                        <option value="SHS Principal / Coordinator">SHS Principal / Academic Coordinator</option>
+                        <option value="Strand Track Lead">Strand Track Lead / Coordinator</option>
+                        <option value="SHS Faculty">SHS Faculty Teacher</option>
+                      </optgroup>
+                      <optgroup label="Basic Education Positions">
+                        <option value="Basic Ed Principal">Basic Ed Principal</option>
+                        <option value="Grade Level Coordinator">Grade Level Coordinator</option>
+                        <option value="Subject Teacher">Subject Teacher / Class Adviser</option>
+                      </optgroup>
+                      <optgroup label="Operations & Support Roles">
+                        <option value="ADMIN OFFICER">Administrative Officer</option>
+                        <option value="IT STAFF">IT Support Staff</option>
+                        <option value="REGISTRAR STAFF">Registrar Officer</option>
+                        <option value="CASHIER STAFF">Finance Cashier</option>
+                        <option value="CUSTODIAN STAFF">Facilities Custodian</option>
+                        <option value="NURSE STAFF">Clinic Nurse</option>
+                      </optgroup>
                     </select>
                   </div>
                   <div className="space-y-1.5">

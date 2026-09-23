@@ -8,14 +8,15 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import HelpTutorialModal from '../../components/shared/HelpTutorialModal';
 import { printCertificateOfRegistration } from '../../utils/printCOR';
+import { getProvinces, getCitiesByProvince, getBarangaysByCity } from '../../utils/phAddressService';
 
 // Reusable Components WITH SUPPORT FOR MAX AND MAXLENGTH
-function Input({ label, type="text", value, onChange, placeholder, required=false, max, maxLength }) {
+function Input({ label, type="text", value, onChange, placeholder, required=false, max, maxLength, disabled=false }) {
   return (
     <div className="space-y-1.5">
       <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">{label} {required && '*'}</label>
-      <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required} max={max} maxLength={maxLength}
-             className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm" />
+      <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required} max={max} maxLength={maxLength} disabled={disabled}
+             className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" />
     </div>
   );
 }
@@ -179,13 +180,7 @@ const StudentManagement = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [successData, setSuccessData] = useState(null);
 
-  // --- DAGDAG: PROVINCE AT CITY DATA ---
-  const PHILIPPINE_PLACES = {
-    "Bulacan": ["Obando", "Meycauayan", "Marilao", "Bocaue", "Malolos", "Baliuag"],
-    "Metro Manila": ["Valenzuela", "Caloocan", "Quezon City", "Manila", "Malabon", "Navotas"],
-    "Pampanga": ["San Fernando", "Angeles", "Mabalacat", "Guagua"],
-    "Rizal": ["Antipolo", "Taytay", "Cainta", "Binangonan"]
-  };
+
 
   const gradeLevels = [
     'Kinder', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 
@@ -270,10 +265,10 @@ const fetchData = async () => {
       email: `juan.${Math.floor(Math.random()*1000)}@example.com`,
       mobile_no: '+639171234567',
       address_house: '#123 Rizal Street, Subd. Phase 1',
-      address_brgy: 'Brgy. Poblacion',
+      address_brgy: 'Poblacion',
       address_province: 'Bulacan',
-      address_city: 'Malolos',
-      address_zip: '3000',
+      address_city: 'Bocaue',
+      address_zip: '3017',
       elem_name: 'Malolos Central Elementary School',
       elem_year: '2018',
       elem_address: 'Malolos, Bulacan',
@@ -817,21 +812,45 @@ const fetchData = async () => {
                   <Input label="Email Address" type="email" value={formData.email} onChange={v=>setFormData({...formData, email:v})} placeholder="Ex. juan.delacruz@email.com" required/>
                   <Input label="Mobile Number" value={formData.mobile_no} onChange={v => handlePhoneInput(v, 'mobile_no')} placeholder="Ex. 09123456789 or +639123456789" required/>
                   <div className="md:col-span-2"><Input label="House No. / Street" value={formData.address_house} onChange={v=>setFormData({...formData, address_house:v})} placeholder="Ex. #123 Rizal Street, Subd. Phase 1" required/></div>
-                  <Input label="Barangay" value={formData.address_brgy} onChange={v=>setFormData({...formData, address_brgy:v})} placeholder="Ex. Brgy. Poblacion / Brgy. Central" required/>
-                  
-                  {/* DYNAMIC PROVINCE/CITY DROPDOWNS */}
+
+                  {/* PROVINCE */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Province *</label>
-                    <select value={formData.address_province} onChange={e => setFormData({...formData, address_province: e.target.value, address_city: ''})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm">
+                    <select 
+                      value={formData.address_province} 
+                      onChange={e => setFormData({...formData, address_province: e.target.value, address_city: '', address_brgy: ''})} 
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm cursor-pointer"
+                    >
                         <option value="">-- Select Province --</option>
-                        {Object.keys(PHILIPPINE_PLACES).map(p => <option key={p} value={p}>{p}</option>)}
+                        {getProvinces().map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
                     </select>
                   </div>
+
+                  {/* CITY / MUNICIPALITY */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">City / Municipality *</label>
-                    <select disabled={!formData.address_province} value={formData.address_city} onChange={e => setFormData({...formData, address_city: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm disabled:opacity-50">
-                        <option value="">-- Select City --</option>
-                        {formData.address_province && PHILIPPINE_PLACES[formData.address_province].map(c => <option key={c} value={c}>{c}</option>)}
+                    <select 
+                      disabled={!formData.address_province} 
+                      value={formData.address_city} 
+                      onChange={e => setFormData({...formData, address_city: e.target.value, address_brgy: ''})} 
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                        <option value="">-- Select City / Municipality --</option>
+                        {formData.address_province && getCitiesByProvince(formData.address_province).map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* BARANGAY */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Barangay *</label>
+                    <select 
+                      disabled={!formData.address_city} 
+                      value={formData.address_brgy} 
+                      onChange={e => setFormData({...formData, address_brgy: e.target.value})} 
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                        <option value="">-- Select Barangay --</option>
+                        {formData.address_city && getBarangaysByCity(formData.address_city, formData.address_province).map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
                     </select>
                   </div>
 
@@ -842,47 +861,162 @@ const fetchData = async () => {
               {/* STEP 3: EDUCATIONAL INFO */}
               {currentStep === 3 && (
                 <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                  {/* GRADE SCHOOL (ELEMENTARY) */}
+                  {/* ELEMENTARY */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                    <h4 className="md:col-span-3 text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                      <GraduationCap size={14}/> Elementary School (Graduated) *
-                    </h4>
-                    <div className="md:col-span-2">
-                      <Input label="Name of School *" value={formData.elem_name} onChange={v=>setFormData({...formData, elem_name:v})} placeholder="Ex. Malolos Elementary School" required/>
+                    <div className="md:col-span-3 flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/60">
+                      <h4 className="text-xs font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                        <GraduationCap size={16}/> Elementary School (Graduated)
+                      </h4>
+                      <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all shadow-sm">
+                        <input 
+                          type="checkbox" 
+                          checked={formData.elem_name === 'N/A'} 
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, elem_name: 'N/A', elem_year: 'N/A', elem_address: 'N/A' });
+                            } else {
+                              setFormData({ ...formData, elem_name: '', elem_year: '', elem_address: '' });
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                        />
+                        <span>Not Applicable / First Time Enrollee (Kinder / Elem)</span>
+                      </label>
                     </div>
-                    <Input label="Year Graduated" value={formData.elem_year} onChange={v=>handleNumberOnly(v, 'elem_year', 4)} placeholder="Ex. 2020" maxLength="4"/>
+                    <div className="md:col-span-2">
+                      <Input 
+                        label="Name of School" 
+                        value={formData.elem_name} 
+                        onChange={v=>setFormData({...formData, elem_name:v})} 
+                        placeholder="Ex. Malolos Elementary School" 
+                        disabled={formData.elem_name === 'N/A'}
+                        required={formData.elem_name !== 'N/A'}
+                      />
+                    </div>
+                    <Input 
+                      label="Year Graduated" 
+                      value={formData.elem_year} 
+                      onChange={v=>handleNumberOnly(v, 'elem_year', 4)} 
+                      placeholder="Ex. 2020" 
+                      maxLength="4"
+                      disabled={formData.elem_name === 'N/A'}
+                    />
                     <div className="md:col-span-3">
-                      <Input label="School Address" value={formData.elem_address} onChange={v=>setFormData({...formData, elem_address:v})} placeholder="Ex. Malolos, Bulacan"/>
+                      <Input 
+                        label="School Address" 
+                        value={formData.elem_address} 
+                        onChange={v=>setFormData({...formData, elem_address:v})} 
+                        placeholder="Ex. Malolos, Bulacan"
+                        disabled={formData.elem_name === 'N/A'}
+                      />
                     </div>
                   </div>
 
-                  {/* JUNIOR HIGH SCHOOL */}
+                  {/* JHS */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                    <h4 className="md:col-span-3 text-xs font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2">
-                      <GraduationCap size={14}/> Junior High School (JHS)
-                    </h4>
-                    <div className="md:col-span-2">
-                      <Input label="Name of School" value={formData.jhs_name} onChange={v=>setFormData({...formData, jhs_name:v})} placeholder="Ex. Bulacan National High School"/>
+                    <div className="md:col-span-3 flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/60">
+                      <h4 className="text-xs font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2">
+                        <GraduationCap size={16}/> Junior High School (JHS)
+                      </h4>
+                      <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all shadow-sm">
+                        <input 
+                          type="checkbox" 
+                          checked={formData.jhs_name === 'N/A'} 
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, jhs_name: 'N/A', jhs_year: 'N/A', jhs_address: 'N/A' });
+                            } else {
+                              setFormData({ ...formData, jhs_name: '', jhs_year: '', jhs_address: '' });
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                        />
+                        <span>Not Applicable / No JHS Record</span>
+                      </label>
                     </div>
-                    <Input label="Year Completed" value={formData.jhs_year} onChange={v=>handleNumberOnly(v, 'jhs_year', 4)} placeholder="Ex. 2024" maxLength="4"/>
+                    <div className="md:col-span-2">
+                      <Input 
+                        label="Name of School" 
+                        value={formData.jhs_name} 
+                        onChange={v=>setFormData({...formData, jhs_name:v})} 
+                        placeholder="Ex. Bulacan National High School"
+                        disabled={formData.jhs_name === 'N/A'}
+                      />
+                    </div>
+                    <Input 
+                      label="Year Completed" 
+                      value={formData.jhs_year} 
+                      onChange={v=>handleNumberOnly(v, 'jhs_year', 4)} 
+                      placeholder="Ex. 2024" 
+                      maxLength="4"
+                      disabled={formData.jhs_name === 'N/A'}
+                    />
                     <div className="md:col-span-3">
-                      <Input label="School Address" value={formData.jhs_address} onChange={v=>setFormData({...formData, jhs_address:v})} placeholder="Ex. Malolos, Bulacan"/>
+                      <Input 
+                        label="School Address" 
+                        value={formData.jhs_address} 
+                        onChange={v=>setFormData({...formData, jhs_address:v})} 
+                        placeholder="Ex. Malolos, Bulacan"
+                        disabled={formData.jhs_name === 'N/A'}
+                      />
                     </div>
                   </div>
 
-                  {/* SENIOR HIGH SCHOOL */}
+                  {/* SHS */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                    <h4 className="md:col-span-3 text-xs font-black text-pink-500 uppercase tracking-widest flex items-center gap-2">
-                      <GraduationCap size={14}/> Senior High School (SHS)
-                    </h4>
-                    <div className="md:col-span-2">
-                      <Input label="Name of School" value={formData.shs_name} onChange={v=>setFormData({...formData, shs_name:v})} placeholder="Ex. St. Jude Senior High Academy"/>
+                    <div className="md:col-span-3 flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/60">
+                      <h4 className="text-xs font-black text-pink-500 uppercase tracking-widest flex items-center gap-2">
+                        <GraduationCap size={16}/> Senior High School (SHS)
+                      </h4>
+                      <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all shadow-sm">
+                        <input 
+                          type="checkbox" 
+                          checked={formData.shs_name === 'N/A'} 
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, shs_name: 'N/A', shs_year: 'N/A', shs_address: 'N/A', shs_strand: 'N/A' });
+                            } else {
+                              setFormData({ ...formData, shs_name: '', shs_year: '', shs_address: '', shs_strand: '' });
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-pink-600 focus:ring-pink-500 border-slate-300 cursor-pointer"
+                        />
+                        <span>Not Applicable / No SHS Record</span>
+                      </label>
                     </div>
-                    <Input label="Year Completed" value={formData.shs_year} onChange={v=>handleNumberOnly(v, 'shs_year', 4)} placeholder="Ex. 2026" maxLength="4"/>
                     <div className="md:col-span-2">
-                      <Input label="School Address" value={formData.shs_address} onChange={v=>setFormData({...formData, shs_address:v})} placeholder="Ex. Valenzuela City"/>
+                      <Input 
+                        label="Name of School" 
+                        value={formData.shs_name} 
+                        onChange={v=>setFormData({...formData, shs_name:v})} 
+                        placeholder="Ex. St. Jude Senior High Academy"
+                        disabled={formData.shs_name === 'N/A'}
+                      />
                     </div>
-                    <Input label="Strand / Track" value={formData.shs_strand} onChange={v=>setFormData({...formData, shs_strand:v})} placeholder="Ex. STEM, ABM, HUMSS, TVL"/>
+                    <Input 
+                      label="Year Completed" 
+                      value={formData.shs_year} 
+                      onChange={v=>handleNumberOnly(v, 'shs_year', 4)} 
+                      placeholder="Ex. 2026" 
+                      maxLength="4"
+                      disabled={formData.shs_name === 'N/A'}
+                    />
+                    <div className="md:col-span-2">
+                      <Input 
+                        label="School Address" 
+                        value={formData.shs_address} 
+                        onChange={v=>setFormData({...formData, shs_address:v})} 
+                        placeholder="Ex. Valenzuela City"
+                        disabled={formData.shs_name === 'N/A'}
+                      />
+                    </div>
+                    <Input 
+                      label="Strand / Track" 
+                      value={formData.shs_strand} 
+                      onChange={v=>setFormData({...formData, shs_strand:v})} 
+                      placeholder="Ex. STEM, ABM, HUMSS, TVL"
+                      disabled={formData.shs_name === 'N/A'}
+                    />
                   </div>
                 </div>
               )}

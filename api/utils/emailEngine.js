@@ -140,7 +140,7 @@ const generateEmailHtml = (schoolName, themeColor, headerTitle, title, contentHt
 };
 
 /**
- * Sends a clean, premium HTML welcome email to the newly enrolled student.
+ * Sends an Admission Application Approved / Admission Success email to the student upon registration.
  */
 export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, password, req) => {
   const branding = await getEmailBranding();
@@ -148,7 +148,7 @@ export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, p
 
   const contentHtml = `
     <h2>Congratulations, ${studentName}!</h2>
-    <p>Your enrollment has been successfully processed and verified by the school registrar. We are thrilled to welcome you to the academic year!</p>
+    <p>Your admission application has been successfully processed and verified by the school registrar.</p>
     
     <div style="background-color: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid ${branding.themeColor}; text-align: left;">
       <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 700; margin-bottom: 8px;">Your Account Credentials</div>
@@ -156,7 +156,7 @@ export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, p
       <div style="font-size: 14px; color: #334155;"><strong style="color: #0f172a;">Password:</strong> <span style="font-family: monospace; font-size: 15px; font-weight: 700; color: ${branding.themeColor};">${password}</span></div>
     </div>
 
-    <p>You can now use these credentials to access the Student Portal, check your class schedule, grade evaluations, and financial billing statements.</p>
+    <p>Please note that to complete your official enrollment, kindly proceed to payment at the Cashier or check your financial billing statement via the Student Portal.</p>
     
     <div class="button-container">
       <a href="${frontendUrl}" class="btn" target="_blank">Access Student Portal</a>
@@ -166,25 +166,74 @@ export const sendStudentWelcomeEmail = async (toEmail, studentName, studentId, p
   const htmlTemplate = generateEmailHtml(
     branding.schoolName, 
     branding.themeColor, 
-    "Enrollment Success", 
-    "Welcome to School", 
+    "Admission Success", 
+    "Admission Application Approved", 
     contentHtml
   );
 
   const mailOptions = {
     from: `"${branding.schoolName} Registrar" <${process.env.SMTP_USER}>`,
     to: toEmail,
-    subject: `Enrollment Successful - Student ID: ${studentId}`,
+    subject: `Admission Application Approved - Student ID: ${studentId}`,
     html: htmlTemplate,
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✉️ Welcome email successfully sent to ${toEmail}. Message ID: ${info.messageId}`);
+    console.log(`✉️ Admission success email successfully sent to ${toEmail}. Message ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error(`❌ Failed to send welcome email to ${toEmail}:`, error);
+    console.error(`❌ Failed to send admission success email to ${toEmail}:`, error);
     throw new Error(`Email sending failed: ${error.message}`);
+  }
+};
+
+/**
+ * Sends an official Enrollment Success email to the student when payment is processed at the Cashier.
+ */
+export const sendOfficialEnrollmentSuccessEmail = async (toEmail, studentName, studentId, req) => {
+  const branding = await getEmailBranding();
+  const frontendUrl = getFrontendUrl(req);
+
+  const contentHtml = `
+    <h2>Official Enrollment Confirmed, ${studentName}!</h2>
+    <p>Your payment transaction has been processed and verified by the Cashier. You are now officially <strong>ENROLLED</strong> for the academic school year!</p>
+    
+    <div style="background-color: #f0fdf4; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #16a34a; text-align: left;">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #166534; font-weight: 700; margin-bottom: 8px;">Enrollment Summary</div>
+      <div style="font-size: 14px; margin-bottom: 6px; color: #14532d;"><strong style="color: #0f172a;">Student ID:</strong> <span style="font-family: monospace; font-size: 15px; font-weight: 700; color: #16a34a;">${studentId}</span></div>
+      <div style="font-size: 14px; color: #14532d;"><strong style="color: #0f172a;">Enrollment Status:</strong> <span style="font-weight: 800; color: #16a34a;">OFFICIALLY ENROLLED</span></div>
+    </div>
+
+    <p>You can now log in to the Student Portal to view your class schedule, official receipts, and academic records.</p>
+    
+    <div class="button-container">
+      <a href="${frontendUrl}" class="btn" target="_blank">Go to Student Portal</a>
+    </div>
+  `;
+
+  const htmlTemplate = generateEmailHtml(
+    branding.schoolName, 
+    branding.themeColor, 
+    "Enrollment Success", 
+    "Official Enrollment Confirmed", 
+    contentHtml
+  );
+
+  const mailOptions = {
+    from: `"${branding.schoolName} Registrar" <${process.env.SMTP_USER}>`,
+    to: toEmail,
+    subject: `Official Enrollment Confirmed - Student ID: ${studentId}`,
+    html: htmlTemplate,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✉️ Official enrollment success email successfully sent to ${toEmail}. Message ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error(`❌ Failed to send official enrollment success email to ${toEmail}:`, error);
+    return { success: false, error: error.message };
   }
 };
 

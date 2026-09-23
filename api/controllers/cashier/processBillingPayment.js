@@ -1,5 +1,6 @@
 import pool from '../../config/db.js';
 import { logAuditTrail } from '../../utils/auditLogger.js';
+import { sendOfficialEnrollmentSuccessEmail } from '../../utils/emailEngine.js';
 
 const processBillingPayment = async (req, res) => {
   const { student_id, allocations, mark_as_enrolled } = req.body;
@@ -81,6 +82,19 @@ const processBillingPayment = async (req, res) => {
         "UPDATE enrollments SET status = 'Enrolled' WHERE student_id = ? AND status = 'Assessed'",
         [student_id]
       );
+
+      // Fetch student details for official enrollment email notification
+      const [studentInfoRows] = await connection.query(
+        "SELECT email, first_name, last_name FROM students WHERE student_id = ? LIMIT 1",
+        [student_id]
+      );
+      if (studentInfoRows.length > 0 && studentInfoRows[0].email) {
+        const student = studentInfoRows[0];
+        const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
+        sendOfficialEnrollmentSuccessEmail(student.email, studentName, student_id, req).catch(err => {
+          console.error("Non-blocking official enrollment email error:", err.message);
+        });
+      }
     }
 
     await connection.commit();

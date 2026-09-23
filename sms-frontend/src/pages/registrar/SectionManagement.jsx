@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { LayoutGrid, Plus, Search, Layers, Users, BookOpen, GraduationCap, X, Edit, Trash2 } from 'lucide-react';
+import { LayoutGrid, Plus, Search, Layers, Users, BookOpen, GraduationCap, X, Edit, Trash2, UserCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import SectionDetailsModal from '../../components/registrar/SectionDetailsModal';
 
@@ -8,6 +8,7 @@ const SectionManagement = () => {
   const { API_BASE_URL } = useAuth();
   const [sections, setSections] = useState([]);
   const [allPrograms, setAllPrograms] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +28,8 @@ const SectionManagement = () => {
     grade_level: '',
     department: 'K-10',
     program_id: '',
-    max_capacity: 40
+    max_capacity: 40,
+    adviser_id: ''
   });
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -48,7 +50,8 @@ const SectionManagement = () => {
       grade_level: section.grade_level,
       department: section.department,
       program_id: section.program_id || '',
-      max_capacity: section.max_capacity
+      max_capacity: section.max_capacity,
+      adviser_id: section.adviser_id || ''
     });
     setShowEditModal(true);
   };
@@ -58,7 +61,65 @@ const SectionManagement = () => {
     if (['Grade 11', 'Grade 12'].includes(level)) dept = 'SHS';
     if (['1st Year', '2nd Year', '3rd Year', '4th Year'].includes(level)) dept = 'College';
     
-    setEditFormData({ ...editFormData, grade_level: level, department: dept, program_id: '' });
+    setEditFormData({ 
+      ...editFormData, 
+      grade_level: level, 
+      department: dept, 
+      program_id: '',
+      adviser_id: dept === 'College' ? '' : editFormData.adviser_id
+    });
+  };
+
+  // Helper para salaain ang mga teachers batay sa academic levels na inassign sa HR
+  const isTeacherEligibleForDept = (teacher, targetDept) => {
+    if (!teacher) return false;
+
+    // 1. Suriin ang assigned_levels na in-tag ng HR
+    let levels = [];
+    if (Array.isArray(teacher.assigned_levels)) {
+      levels = teacher.assigned_levels;
+    } else if (typeof teacher.assigned_levels === 'string' && teacher.assigned_levels.trim() !== '') {
+      levels = teacher.assigned_levels.split(',').map(s => s.trim());
+    }
+
+    if (levels.length > 0) {
+      if (targetDept === 'K-10' || targetDept === 'Basic Ed' || targetDept === 'Basic Education') {
+        return levels.some(lvl => /basic|elem|kinder|jhs|k-10|k10/i.test(lvl));
+      }
+      if (targetDept === 'SHS' || targetDept === 'Senior High') {
+        return levels.some(lvl => /shs|senior/i.test(lvl));
+      }
+      if (targetDept === 'College') {
+        return levels.some(lvl => /college|higher/i.test(lvl));
+      }
+      return false;
+    }
+
+    // 2. Fallback: Kung walang explicit assigned_levels (legacy record), suriin ang department o position
+    const deptStr = (teacher.department || '').toLowerCase();
+    const posStr = (teacher.position || '').toLowerCase();
+
+    if (targetDept === 'K-10') {
+      if (deptStr.includes('college') || posStr.includes('college') || deptStr.includes('dean') || posStr.includes('dean') || posStr.includes('professor')) {
+        return false; // College faculty lamang
+      }
+      if (deptStr.includes('shs') || deptStr.includes('senior high') || posStr.includes('shs')) {
+        return false; // SHS faculty lamang
+      }
+      return true; // Pwede sa Basic Ed
+    }
+
+    if (targetDept === 'SHS') {
+      if (deptStr.includes('college') && !deptStr.includes('shs')) {
+        return false; // College faculty lamang
+      }
+      if ((deptStr.includes('elem') || deptStr.includes('kinder') || deptStr.includes('basic ed')) && !deptStr.includes('shs')) {
+        return false; // Elementary / Kinder faculty lamang
+      }
+      return true; // Pwede sa SHS
+    }
+
+    return false;
   };
 
   const handleEditSubmit = async (e) => {
@@ -111,7 +172,8 @@ const SectionManagement = () => {
     grade_level: '',
     department: 'K-10',
     program_id: '',
-    max_capacity: 40
+    max_capacity: 40,
+    adviser_id: ''
   });
 
   useEffect(() => { fetchSectionsAndPrograms(); }, []);
@@ -122,7 +184,17 @@ const SectionManagement = () => {
       const res = await axios.get(`${API_BASE_URL}/registrar/manage_sections.php`);
       setSections(res.data.sections || []);
       setAllPrograms(res.data.programs || []);
-    } catch (err) { console.error("Fetch Error:", err); }
+      if (res.data.teachers && res.data.teachers.length > 0) {
+        setTeachers(res.data.teachers);
+      } else {
+        const classRes = await axios.get(`${API_BASE_URL}/registrar/class_assign_data.php`);
+        if (classRes.data?.teachers) {
+          setTeachers(classRes.data.teachers);
+        }
+      }
+    } catch (err) { 
+      console.error("Fetch Error:", err); 
+    }
     setLoading(false);
   };
 
@@ -131,7 +203,13 @@ const SectionManagement = () => {
     if (['Grade 11', 'Grade 12'].includes(level)) dept = 'SHS';
     if (['1st Year', '2nd Year', '3rd Year', '4th Year'].includes(level)) dept = 'College';
     
-    setFormData({ ...formData, grade_level: level, department: dept, program_id: '' });
+    setFormData({ 
+      ...formData, 
+      grade_level: level, 
+      department: dept, 
+      program_id: '',
+      adviser_id: dept === 'College' ? '' : formData.adviser_id
+    });
   };
 
   const filteredPrograms = allPrograms.filter(p => p.department === formData.department);
@@ -143,7 +221,7 @@ const SectionManagement = () => {
       if (res.data.status === 'success') {
         setShowModal(false);
         fetchSectionsAndPrograms();
-        setFormData({ section_name: '', grade_level: '', department: 'K-10', program_id: '', max_capacity: 40 });
+        setFormData({ section_name: '', grade_level: '', department: 'K-10', program_id: '', max_capacity: 40, adviser_id: '' });
       }
     } catch (err) { alert("Error saving section"); }
   };
@@ -168,8 +246,9 @@ const SectionManagement = () => {
       const matchCode = s.program_code?.toLowerCase().includes(term);
       const matchDesc = s.program_description?.toLowerCase().includes(term);
       const matchMajor = s.major?.toLowerCase().includes(term);
+      const matchAdviser = s.adviser_name?.toLowerCase().includes(term);
 
-      if (!matchName && !matchLevel && !matchDept && !matchCode && !matchDesc && !matchMajor) {
+      if (!matchName && !matchLevel && !matchDept && !matchCode && !matchDesc && !matchMajor && !matchAdviser) {
         return false;
       }
     }
@@ -189,7 +268,7 @@ const SectionManagement = () => {
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100"
+          className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 cursor-pointer"
         >
           <Plus size={20} /> Create Section
         </button>
@@ -203,14 +282,14 @@ const SectionManagement = () => {
           <input 
             type="text" 
             value={searchTerm}
-            placeholder="Filter by name, level, or strand..." 
+            placeholder="Filter by name, level, strand, or adviser..." 
             className="flex-1 p-2 font-bold text-slate-600 outline-none bg-transparent"
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
             <button 
               onClick={() => setSearchTerm('')} 
-              className="p-1 hover:bg-slate-100 rounded-full text-slate-400 mr-2 transition-all"
+              className="p-1 hover:bg-slate-100 rounded-full text-slate-400 mr-2 transition-all cursor-pointer"
               title="Clear search"
             >
               <X size={18} />
@@ -276,46 +355,65 @@ const SectionManagement = () => {
           {filteredSections.map((s) => (
             <div 
               key={s.id} 
-              className="bg-white rounded-[2.5rem] p-8 shadow-sm border-2 border-slate-50 hover:border-blue-200 transition-all group relative cursor-pointer"
+              className="bg-white rounded-[2.5rem] p-8 shadow-sm border-2 border-slate-50 hover:border-blue-200 transition-all group relative cursor-pointer flex flex-col justify-between"
               onClick={() => handleCardClick(s)}
             >
-              <div className="flex justify-between items-start mb-4">
-                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                  s.department === 'College' ? 'bg-purple-100 text-purple-600' : 
-                  s.department === 'SHS' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
-                }`}>
-                  {s.department}
-                </span>
-                <div className="flex items-center gap-1 z-10" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={(e) => handleEditClick(e, s)}
-                    className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-blue-600 cursor-pointer"
-                    title="Edit Section"
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button
-                    onClick={(e) => handleDeleteClick(e, s)}
-                    className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-red-600 cursor-pointer"
-                    title="Delete Section"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                  <Layers className="text-slate-100 group-hover:text-blue-100 transition-colors ml-2" size={32} />
+              <div>
+                <div className="flex justify-between items-start mb-4">
+                  <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                    s.department === 'College' ? 'bg-purple-100 text-purple-600' : 
+                    s.department === 'SHS' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
+                  }`}>
+                    {s.department}
+                  </span>
+                  <div className="flex items-center gap-1 z-10" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={(e) => handleEditClick(e, s)}
+                      className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-blue-600 cursor-pointer"
+                      title="Edit Section"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteClick(e, s)}
+                      className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-red-600 cursor-pointer"
+                      title="Delete Section"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <Layers className="text-slate-100 group-hover:text-blue-100 transition-colors ml-2" size={32} />
+                  </div>
                 </div>
-              </div>
 
-              <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">{s.section_name}</h2>
-              <p className="text-blue-600 font-black text-xs uppercase mt-2 tracking-widest">{s.grade_level}</p>
-              
-              {s.program_code && (
-                <div className="mt-4 flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <GraduationCap size={16} className="text-slate-400" />
-                  <p className="text-[10px] font-bold text-slate-500 uppercase truncate">
-                    {s.program_code} - {s.major || s.program_description}
-                  </p>
-                </div>
-              )}
+                <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">{s.section_name}</h2>
+                <p className="text-blue-600 font-black text-xs uppercase mt-2 tracking-widest">{s.grade_level}</p>
+                
+                {s.program_code && (
+                  <div className="mt-4 flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <GraduationCap size={16} className="text-slate-400" />
+                    <p className="text-[10px] font-bold text-slate-500 uppercase truncate">
+                      {s.program_code} - {s.major || s.program_description}
+                    </p>
+                  </div>
+                )}
+
+                {/* ADVISER INFO BADGE (SHOWN FOR BASIC ED & SHS, HIDDEN FOR COLLEGE) */}
+                {s.department !== 'College' && (
+                  <div className={`mt-4 flex items-center gap-2.5 p-3 rounded-2xl border transition-all ${
+                    s.adviser_name 
+                      ? 'bg-purple-50/70 border-purple-100/80 text-purple-900' 
+                      : 'bg-slate-50 border-dashed border-slate-200 text-slate-400'
+                  }`}>
+                    <UserCheck size={16} className={s.adviser_name ? 'text-purple-600 shrink-0' : 'text-slate-300 shrink-0'} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Class Adviser</p>
+                      <p className={`text-xs font-black uppercase truncate ${s.adviser_name ? 'text-slate-800' : 'text-slate-400 italic'}`}>
+                        {s.adviser_name || 'No Adviser Assigned'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6">
                 <div className="flex items-center gap-2">
@@ -347,7 +445,7 @@ const SectionManagement = () => {
               <h2 className="font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                 <Plus className="text-blue-600" /> New Section Record
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white rounded-full transition-all"><X className="text-slate-400" /></button>
+              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white rounded-full transition-all cursor-pointer"><X className="text-slate-400" /></button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-10 space-y-5">
@@ -356,7 +454,7 @@ const SectionManagement = () => {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Grade Level</label>
                   <select 
                     required 
-                    className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
+                    className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 cursor-pointer"
                     onChange={(e) => handleLevelChange(e.target.value)}
                   >
                     <option value="">Select Level</option>
@@ -371,7 +469,7 @@ const SectionManagement = () => {
                     </label>
                     <select 
                       required 
-                      className="w-full p-4 bg-blue-50 text-blue-900 border-2 border-blue-100 rounded-2xl font-bold outline-none"
+                      className="w-full p-4 bg-blue-50 text-blue-900 border-2 border-blue-100 rounded-2xl font-bold outline-none cursor-pointer"
                       onChange={(e) => setFormData({...formData, program_id: e.target.value})}
                     >
                       <option value="">-- Choose Program --</option>
@@ -381,6 +479,38 @@ const SectionManagement = () => {
                     </select>
                   </div>
                 )}
+
+                {/* ASSIGN CLASS ADVISER (FOR BASIC ED & SHS ONLY) */}
+                {formData.department !== 'College' && (() => {
+                  const eligibleTeachers = teachers.filter(t => isTeacherEligibleForDept(t, formData.department));
+                  return (
+                    <div className="col-span-2 animate-in slide-in-from-top-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-black text-purple-600 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                          <UserCheck size={14} /> Assign Class Adviser (Tagapayo)
+                        </label>
+                        <span className="text-[9px] font-black uppercase text-purple-600 bg-purple-100/70 px-2 py-0.5 rounded-md">
+                          {formData.department === 'SHS' ? 'SHS Faculty' : 'Basic Ed Faculty'}
+                        </span>
+                      </div>
+                      <select 
+                        value={formData.adviser_id || ''}
+                        className="w-full p-4 bg-purple-50 text-purple-900 border-2 border-purple-100 rounded-2xl font-bold outline-none cursor-pointer focus:border-purple-400"
+                        onChange={e => setFormData({...formData, adviser_id: e.target.value})}
+                      >
+                        <option value="">-- No Adviser Assigned --</option>
+                        {eligibleTeachers.map(t => (
+                          <option key={t.id} value={t.id}>{t.full_name || `${t.first_name} ${t.last_name}`}</option>
+                        ))}
+                      </select>
+                      {eligibleTeachers.length === 0 && (
+                        <p className="text-[10px] text-amber-600 font-bold mt-1.5 ml-1">
+                          ⚠️ Walang guro na naka-tag sa HR para sa {formData.department === 'SHS' ? 'Senior High School' : 'Basic Education'}. I-tag muna ang guro sa HR Registry.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="col-span-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Section Name</label>
@@ -395,7 +525,7 @@ const SectionManagement = () => {
                 </div>
               </div>
 
-              <button className="w-full bg-slate-900 text-white py-6 rounded-2xl font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 mt-4 active:scale-95">
+              <button className="w-full bg-slate-900 text-white py-6 rounded-2xl font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 mt-4 active:scale-95 cursor-pointer">
                 Save Section Record
               </button>
             </form>
@@ -411,7 +541,7 @@ const SectionManagement = () => {
               <h2 className="font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                 <Edit className="text-blue-600" /> Edit Section Record
               </h2>
-              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-white rounded-full transition-all"><X className="text-slate-400" /></button>
+              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-white rounded-full transition-all cursor-pointer"><X className="text-slate-400" /></button>
             </div>
 
             <form onSubmit={handleEditSubmit} className="p-10 space-y-5">
@@ -421,7 +551,7 @@ const SectionManagement = () => {
                   <select 
                     required 
                     value={editFormData.grade_level}
-                    className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
+                    className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 cursor-pointer"
                     onChange={(e) => handleEditLevelChange(e.target.value)}
                   >
                     <option value="">Select Level</option>
@@ -437,7 +567,7 @@ const SectionManagement = () => {
                     <select 
                       required 
                       value={editFormData.program_id}
-                      className="w-full p-4 bg-blue-50 text-blue-900 border-2 border-blue-100 rounded-2xl font-bold outline-none"
+                      className="w-full p-4 bg-blue-50 text-blue-900 border-2 border-blue-100 rounded-2xl font-bold outline-none cursor-pointer"
                       onChange={(e) => setEditFormData({...editFormData, program_id: e.target.value})}
                     >
                       <option value="">-- Choose Program --</option>
@@ -447,6 +577,38 @@ const SectionManagement = () => {
                     </select>
                   </div>
                 )}
+
+                {/* ASSIGN CLASS ADVISER (FOR BASIC ED & SHS ONLY) */}
+                {editFormData.department !== 'College' && (() => {
+                  const eligibleTeachers = teachers.filter(t => isTeacherEligibleForDept(t, editFormData.department));
+                  return (
+                    <div className="col-span-2 animate-in slide-in-from-top-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] font-black text-purple-600 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                          <UserCheck size={14} /> Assign Class Adviser (Tagapayo)
+                        </label>
+                        <span className="text-[9px] font-black uppercase text-purple-600 bg-purple-100/70 px-2 py-0.5 rounded-md">
+                          {editFormData.department === 'SHS' ? 'SHS Faculty' : 'Basic Ed Faculty'}
+                        </span>
+                      </div>
+                      <select 
+                        value={editFormData.adviser_id || ''}
+                        className="w-full p-4 bg-purple-50 text-purple-900 border-2 border-purple-100 rounded-2xl font-bold outline-none cursor-pointer focus:border-purple-400"
+                        onChange={e => setEditFormData({...editFormData, adviser_id: e.target.value})}
+                      >
+                        <option value="">-- No Adviser Assigned --</option>
+                        {eligibleTeachers.map(t => (
+                          <option key={t.id} value={t.id}>{t.full_name || `${t.first_name} ${t.last_name}`}</option>
+                        ))}
+                      </select>
+                      {eligibleTeachers.length === 0 && (
+                        <p className="text-[10px] text-amber-600 font-bold mt-1.5 ml-1">
+                          ⚠️ Walang guro na naka-tag sa HR para sa {editFormData.department === 'SHS' ? 'Senior High School' : 'Basic Education'}. I-tag muna ang guro sa HR Registry.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="col-span-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Section Name</label>
@@ -471,7 +633,7 @@ const SectionManagement = () => {
                 </div>
               </div>
 
-              <button className="w-full bg-blue-600 text-white py-6 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 mt-4 active:scale-95">
+              <button className="w-full bg-blue-600 text-white py-6 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 mt-4 active:scale-95 cursor-pointer">
                 Update Section Record
               </button>
             </form>

@@ -569,9 +569,11 @@ export const markEmployeeNotificationRead = async (req, res) => {
   }
 };
 
-// Hire/Register Employee (Statutory IDs, Documents, User Account setup and email invitation)
+// Hire/Register or Update Employee (Statutory IDs, Documents, User Account setup and email invitation)
 export const hireEmployee = async (req, res) => {
   const {
+    id,
+    employee_id,
     first_name,
     middle_name,
     last_name,
@@ -585,6 +587,8 @@ export const hireEmployee = async (req, res) => {
     employment_history,
     employment_status,
     salary_type,
+    assigned_levels,
+    assigned_roles,
 
     sss_number,
     philhealth_number,
@@ -624,81 +628,151 @@ export const hireEmployee = async (req, res) => {
     }
 
     const schoolId = req.school_id || 1;
-    let employeeNumber = '';
+    const middleInitial = middle_name ? `${middle_name.trim().charAt(0)}.` : '';
+    const suffixStr = suffix ? ` ${suffix.trim()}` : '';
+    const fullName = `${first_name.trim()} ${middleInitial} ${last_name.trim()}${suffixStr}`.replace(/\s+/g, ' ');
+    const mappedRole = (position || '').toLowerCase().includes('teacher') || (position || '').toLowerCase().includes('professor') || (position || '').toLowerCase().includes('instructor') ? 'teacher' : (position || '').toLowerCase().split(' ')[0] || 'staff';
 
-    // 1. Check if user already exists in users table
-    const [userRows] = await pool.query("SELECT id, role FROM users WHERE email = ?", [email]);
-    let nextUserId;
-
-    if (userRows.length === 0) {
-      // Create user account
-      const username = email.split('@')[0];
-      const tempPassword = 'Temp_' + Math.random().toString(36).substring(2, 10) + '!';
-      const hashedPassword = await bcrypt.hash(tempPassword, 10);
-      const middleInitial = middle_name ? `${middle_name.trim().charAt(0)}.` : '';
-      const suffixStr = suffix ? ` ${suffix.trim()}` : '';
-      const fullName = `${first_name.trim()} ${middleInitial} ${last_name.trim()}${suffixStr}`.replace(/\s+/g, ' ');
-      const verificationToken = 'token_' + Math.random().toString(36).substring(2, 15);
-
-      const [idRows] = await pool.query("SELECT MAX(id) as maxId FROM users");
-      nextUserId = (idRows[0].maxId || 0) + 1;
-
-      // Register user
-      const mappedRole = position.toLowerCase().includes('teacher') ? 'teacher' : position.toLowerCase().split(' ')[0] || 'staff';
-
-      await pool.query(
-        `INSERT INTO users (id, username, password, first_name, middle_name, last_name, suffix, full_name, email, phone_number, role, status, is_verified, verification_token, school_id) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-        [nextUserId, username, hashedPassword, first_name, middle_name || null, last_name, suffix || null, fullName, email, phone_number || null, mappedRole, status, verificationToken, schoolId]
+    // 1. Check if employee already exists by ID, employee_id, or Name
+    let existingEmp = null;
+    if (id) {
+      const [empById] = await pool.query("SELECT * FROM employees WHERE id = ?", [id]);
+      if (empById.length > 0) existingEmp = empById[0];
+    }
+    if (!existingEmp && employee_id) {
+      const [empByEmpId] = await pool.query("SELECT * FROM employees WHERE employee_id = ?", [employee_id]);
+      if (empByEmpId.length > 0) existingEmp = empByEmpId[0];
+    }
+    if (!existingEmp && first_name && last_name) {
+      const [empByName] = await pool.query(
+        "SELECT * FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))",
+        [first_name.trim(), last_name.trim()]
       );
-
-      // Get Prefix & generate employee number
-      const [settingsRows] = await pool.query("SELECT prefix_faculty, prefix_staff FROM school_settings WHERE id = ?", [schoolId]);
-      const facultyPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_faculty) ? settingsRows[0].prefix_faculty : 'SF';
-      const staffPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_staff) ? settingsRows[0].prefix_staff : 'SA';
-      const isFaculty = position.toLowerCase().includes('teacher');
-      const customPrefix = isFaculty ? facultyPrefix : staffPrefix;
-      const currentYear = new Date().getFullYear();
-      const idPrefix = `${customPrefix}${currentYear}-`;
-
-      const [lastEmployeeRows] = await pool.query(
-        "SELECT employee_id FROM employees WHERE employee_id LIKE ? ORDER BY id DESC LIMIT 1",
-        [`${idPrefix}%`]
-      );
-
-      let newNum = "0001";
-      if (lastEmployeeRows.length > 0) {
-        const lastEmployeeId = lastEmployeeRows[0].employee_id;
-        const lastNum = parseInt(lastEmployeeId.substring(idPrefix.length), 10);
-        if (!isNaN(lastNum)) {
-          newNum = String(lastNum + 1).padStart(4, '0');
-        }
-      }
-      employeeNumber = `${idPrefix}${newNum}`;
-
-      // Send the invitation / credentials email
-      try {
-        await sendStaffInvitationEmail(email, fullName, mappedRole, verificationToken, username, req);
-      } catch (emailErr) {
-        console.error("Email send failed for new EIS hire:", emailErr.message);
-      }
-    } else {
-      nextUserId = userRows[0].id;
-      const middleInitial = middle_name ? `${middle_name.trim().charAt(0)}.` : '';
-      const suffixStr = suffix ? ` ${suffix.trim()}` : '';
-      const fullName = `${first_name.trim()} ${middleInitial} ${last_name.trim()}${suffixStr}`.replace(/\s+/g, ' ');
-
-      // Update phone_number, middle_name, suffix, full_name in users table if changed
-      await pool.query(
-        "UPDATE users SET phone_number = ?, middle_name = ?, suffix = ?, full_name = ? WHERE id = ?",
-        [phone_number || null, middle_name || null, suffix || null, fullName, nextUserId]
-      );
+      if (empByName.length > 0) existingEmp = empByName[0];
     }
 
-    // 2. Insert or update record in employees table
-    const [empCheck] = await pool.query("SELECT id, employee_id FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))", [first_name, last_name]);
+    if (existingEmp) {
+      // ===============================================
+      // UPDATE EXISTING EMPLOYEE & LINKED USER ACCOUNT
+      // ===============================================
+      const empDbId = existingEmp.id;
 
-    if (empCheck.length === 0) {
+      const levelsStr = Array.isArray(assigned_levels) ? assigned_levels.join(', ') : (assigned_levels || '');
+      const rolesStr = Array.isArray(assigned_roles) ? assigned_roles.join(', ') : (assigned_roles || '');
+
+      await pool.query(
+        `UPDATE employees SET
+          first_name = ?, middle_name = ?, last_name = ?, suffix = ?, email = ?,
+          position = ?, department = ?, basic_salary = ?, status = ?, phone_number = ?,
+          assigned_levels = ?, assigned_roles = ?,
+          sss_number = ?, philhealth_number = ?, pagibig_number = ?, tin_number = ?, hmo_covered = ?, hmo_details = ?,
+          psa_status = ?, psa_file = ?, coe_status = ?, coe_file = ?, nbi_status = ?, nbi_file = ?,
+          sss_doc_status = ?, sss_doc_file = ?, philhealth_doc_status = ?, philhealth_doc_file = ?,
+          pagibig_doc_status = ?, pagibig_doc_file = ?, tin_doc_status = ?, tin_doc_file = ?, employment_history = ?,
+          employment_status = ?, salary_type = ?
+         WHERE id = ?`,
+        [
+          first_name.trim(), middle_name || null, last_name.trim(), suffix || null, email.trim(),
+          position, department, parseFloat(basic_salary) || 0, status || 'Active', phone_number || null,
+          levelsStr, rolesStr,
+          sss_number || null, philhealth_number || null, pagibig_number || null, tin_number || null, hmo_covered || 'No', hmo_details || null,
+          psa_status || 'Pending', psa_file || null, coe_status || 'Pending', coe_file || null, nbi_status || 'Pending', nbi_file || null,
+          sss_doc_status || 'Pending', sss_doc_file || null, philhealth_doc_status || 'Pending', philhealth_doc_file || null,
+          pagibig_doc_status || 'Pending', pagibig_doc_file || null, tin_doc_status || 'Pending', tin_doc_file || null, employment_history || 'Updated Profile',
+          employment_status || 'Probationary',
+          salary_type || 'Monthly',
+          empDbId
+        ]
+      );
+
+      // Sync user account in users table if exists
+      const targetEmail = existingEmp.email || email;
+      await pool.query(
+        `UPDATE users SET 
+          first_name = ?, middle_name = ?, last_name = ?, suffix = ?, full_name = ?, email = ?, phone_number = ?, status = ?, role = ?
+         WHERE email = ? OR email = ? OR (TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?)))`,
+        [
+          first_name.trim(), middle_name || null, last_name.trim(), suffix || null, fullName, email.trim(), phone_number || null, status || 'Active', mappedRole,
+          email.trim(), targetEmail, existingEmp.first_name, existingEmp.last_name
+        ]
+      );
+
+      await logAuditTrail(
+        req.user?.id || 1,
+        req.user?.role || 'Admin',
+        "EIS_UPDATE",
+        `Updated employee record: ${fullName} (${position})`,
+        req
+      );
+
+      return res.status(200).json({ success: true, message: `Successfully updated employee profile for ${fullName}.` });
+
+    } else {
+      // ===============================================
+      // REGISTER NEW EMPLOYEE & USER ACCOUNT
+      // ===============================================
+      let employeeNumber = employee_id;
+
+      // 1. Check if user already exists in users table
+      const [userRows] = await pool.query("SELECT id, role FROM users WHERE email = ?", [email]);
+      let nextUserId;
+
+      if (userRows.length === 0) {
+        // Create user account
+        const username = email.split('@')[0];
+        const tempPassword = 'Temp_' + Math.random().toString(36).substring(2, 10) + '!';
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        const verificationToken = 'token_' + Math.random().toString(36).substring(2, 15);
+
+        const [idRows] = await pool.query("SELECT MAX(id) as maxId FROM users");
+        nextUserId = (idRows[0].maxId || 0) + 1;
+
+        await pool.query(
+          `INSERT INTO users (id, username, password, first_name, middle_name, last_name, suffix, full_name, email, phone_number, role, status, is_verified, verification_token, school_id) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+          [nextUserId, username, hashedPassword, first_name.trim(), middle_name || null, last_name.trim(), suffix || null, fullName, email.trim(), phone_number || null, mappedRole, status || 'Active', verificationToken, schoolId]
+        );
+
+        // Get Prefix & generate employee number
+        const [settingsRows] = await pool.query("SELECT prefix_faculty, prefix_staff FROM school_settings WHERE id = ?", [schoolId]);
+        const facultyPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_faculty) ? settingsRows[0].prefix_faculty : 'SF';
+        const staffPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_staff) ? settingsRows[0].prefix_staff : 'SA';
+        const isFaculty = (position || '').toLowerCase().includes('teacher') || (position || '').toLowerCase().includes('professor') || (position || '').toLowerCase().includes('instructor');
+        const customPrefix = isFaculty ? facultyPrefix : staffPrefix;
+        const currentYear = new Date().getFullYear();
+        const idPrefix = `${customPrefix}${currentYear}-`;
+
+        const [lastEmployeeRows] = await pool.query(
+          "SELECT employee_id FROM employees WHERE employee_id LIKE ? ORDER BY id DESC LIMIT 1",
+          [`${idPrefix}%`]
+        );
+
+        let newNum = "0001";
+        if (lastEmployeeRows.length > 0) {
+          const lastEmployeeId = lastEmployeeRows[0].employee_id;
+          const lastNum = parseInt(lastEmployeeId.substring(idPrefix.length), 10);
+          if (!isNaN(lastNum)) {
+            newNum = String(lastNum + 1).padStart(4, '0');
+          }
+        }
+        if (!employeeNumber) {
+          employeeNumber = `${idPrefix}${newNum}`;
+        }
+
+        // Send the invitation / credentials email
+        try {
+          await sendStaffInvitationEmail(email, fullName, mappedRole, verificationToken, username, req);
+        } catch (emailErr) {
+          console.error("Email send failed for new EIS hire:", emailErr.message);
+        }
+      } else {
+        nextUserId = userRows[0].id;
+        await pool.query(
+          "UPDATE users SET phone_number = ?, middle_name = ?, suffix = ?, full_name = ? WHERE id = ?",
+          [phone_number || null, middle_name || null, suffix || null, fullName, nextUserId]
+        );
+      }
+
       if (!employeeNumber) {
         const currentYear = new Date().getFullYear();
         employeeNumber = `EMP-${currentYear}-${String(nextUserId).padStart(4, '0')}`;
@@ -706,17 +780,22 @@ export const hireEmployee = async (req, res) => {
       const [maxEmpRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
       const nextEmpId = maxEmpRows[0].maxId + 1;
 
+      const levelsStr = Array.isArray(assigned_levels) ? assigned_levels.join(', ') : (assigned_levels || '');
+      const rolesStr = Array.isArray(assigned_roles) ? assigned_roles.join(', ') : (assigned_roles || '');
+
       await pool.query(
         `INSERT INTO employees (
-          id, employee_id, first_name, middle_name, last_name, suffix, position, department, basic_salary, status, phone_number,
+          id, employee_id, first_name, middle_name, last_name, suffix, position, department, basic_salary, status, phone_number, email,
+          assigned_levels, assigned_roles,
           sss_number, philhealth_number, pagibig_number, tin_number, hmo_covered, hmo_details,
           psa_status, psa_file, coe_status, coe_file, nbi_status, nbi_file,
           sss_doc_status, sss_doc_file, philhealth_doc_status, philhealth_doc_file,
           pagibig_doc_status, pagibig_doc_file, tin_doc_status, tin_doc_file, employment_history, employment_status,
           salary_type
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          nextEmpId, employeeNumber, first_name, middle_name || null, last_name, suffix || null, position, department, parseFloat(basic_salary), status, phone_number || null,
+          nextEmpId, employeeNumber, first_name.trim(), middle_name || null, last_name.trim(), suffix || null, position, department, parseFloat(basic_salary) || 0, status || 'Active', phone_number || null, email.trim(),
+          levelsStr, rolesStr,
           sss_number || null, philhealth_number || null, pagibig_number || null, tin_number || null, hmo_covered || 'No', hmo_details || null,
           psa_status || 'Pending', psa_file || null, coe_status || 'Pending', coe_file || null, nbi_status || 'Pending', nbi_file || null,
           sss_doc_status || 'Pending', sss_doc_file || null, philhealth_doc_status || 'Pending', philhealth_doc_file || null,
@@ -725,39 +804,17 @@ export const hireEmployee = async (req, res) => {
           salary_type || 'Monthly'
         ]
       );
-    } else {
-      const empDbId = empCheck[0].id;
-      await pool.query(
-        `UPDATE employees SET
-          middle_name = ?, suffix = ?, position = ?, department = ?, basic_salary = ?, status = ?, phone_number = ?,
-          sss_number = ?, philhealth_number = ?, pagibig_number = ?, tin_number = ?, hmo_covered = ?, hmo_details = ?,
-          psa_status = ?, psa_file = ?, coe_status = ?, coe_file = ?, nbi_status = ?, nbi_file = ?,
-          sss_doc_status = ?, sss_doc_file = ?, philhealth_doc_status = ?, philhealth_doc_file = ?,
-          pagibig_doc_status = ?, pagibig_doc_file = ?, tin_doc_status = ?, tin_doc_file = ?, employment_history = ?,
-          employment_status = ?, salary_type = ?
-         WHERE id = ?`,
-        [
-          middle_name || null, suffix || null, position, department, parseFloat(basic_salary), status, phone_number || null,
-          sss_number || null, philhealth_number || null, pagibig_number || null, tin_number || null, hmo_covered || 'No', hmo_details || null,
-          psa_status || 'Pending', psa_file || null, coe_status || 'Pending', coe_file || null, nbi_status || 'Pending', nbi_file || null,
-          sss_doc_status || 'Pending', sss_doc_file || null, philhealth_doc_status || 'Pending', philhealth_doc_file || null,
-          pagibig_doc_status || 'Pending', pagibig_doc_file || null, tin_doc_status || 'Pending', tin_doc_file || null, employment_history || 'Hired Active',
-          employment_status || 'Probationary',
-          salary_type || 'Monthly',
-          empDbId
-        ]
+
+      await logAuditTrail(
+        req.user?.id || 1,
+        req.user?.role || 'Admin',
+        "EIS_HIRE",
+        `Hired/Registered employee: ${fullName} (${position})`,
+        req
       );
+
+      return res.status(200).json({ success: true, message: "Employee registered and user account credentials dispatched." });
     }
-
-    await logAuditTrail(
-      req.user?.id || 1,
-      req.user?.role || 'Admin',
-      "EIS_HIRE",
-      `Hired/Registered employee: ${first_name} ${last_name} (${position})`,
-      req
-    );
-
-    return res.status(200).json({ success: true, message: "Employee registered and user account credentials dispatched." });
   } catch (error) {
     console.error("hireEmployee error:", error);
     return res.status(500).json({ success: false, message: error.message });
