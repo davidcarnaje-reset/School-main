@@ -11,7 +11,12 @@ const SubjectDetailsModal = ({ isOpen, onClose, subject, classes, loading }) => 
                 {/* MODAL HEADER */}
                 <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-blue-50">
                     <div>
-                        <h3 className="text-2xl font-black text-blue-900 uppercase tracking-tighter">{subject.subject_code}</h3>
+                        <div className="flex items-center gap-3">
+                            <h3 className="text-2xl font-black text-blue-900 uppercase tracking-tighter">{subject.subject_code}</h3>
+                            <span className="text-[10px] font-black bg-blue-600 text-white px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                                <Clock size={10} /> {subject.minutes_per_session || 60}m × {subject.frequency_per_week || 5}/wk ({(((subject.minutes_per_session || 60) * (subject.frequency_per_week || 5)) / 60).toFixed(1)} hrs/wk)
+                            </span>
+                        </div>
                         <p className="text-xs text-blue-600 font-bold uppercase tracking-widest mt-1">{subject.subject_description}</p>
                     </div>
                     <button onClick={onClose} className="p-3 bg-white text-slate-400 hover:text-red-500 rounded-2xl shadow-sm transition-all">

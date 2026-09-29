@@ -558,7 +558,17 @@ const UserManagement = () => {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">First Name</label>
                   <input type="text" required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm font-bold"
-                    value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} placeholder="Juan" />
+                    value={formData.first_name} onChange={(e) => {
+                      const val = e.target.value;
+                      const cleanFirst = val.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const cleanLast = (formData.last_name || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const autoUser = cleanFirst && cleanLast ? `${cleanFirst}.${cleanLast}` : (cleanFirst || cleanLast);
+                      setFormData({
+                        ...formData, 
+                        first_name: val,
+                        ...(!isEditMode ? { username: autoUser } : {})
+                      });
+                    }} placeholder="Juan" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Middle Name</label>
@@ -568,7 +578,17 @@ const UserManagement = () => {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Last Name</label>
                   <input type="text" required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm font-bold"
-                    value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} placeholder="Dela Cruz" />
+                    value={formData.last_name} onChange={(e) => {
+                      const val = e.target.value;
+                      const cleanFirst = (formData.first_name || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const cleanLast = val.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const autoUser = cleanFirst && cleanLast ? `${cleanFirst}.${cleanLast}` : (cleanFirst || cleanLast);
+                      setFormData({
+                        ...formData, 
+                        last_name: val,
+                        ...(!isEditMode ? { username: autoUser } : {})
+                      });
+                    }} placeholder="Dela Cruz" />
                 </div>
               </div>
 

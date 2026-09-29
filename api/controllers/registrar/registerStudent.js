@@ -81,6 +81,39 @@ const registerStudent = async (req, res) => {
   const connection = await db.getConnection();
 
   try {
+    // 0. Proactive validation: Check if email or LRN is already registered
+    const cleanEmail = email.trim().toLowerCase();
+    const [existingStudentEmail] = await connection.query(
+      "SELECT id, student_id, first_name, last_name FROM students WHERE LOWER(TRIM(email)) = ? LIMIT 1",
+      [cleanEmail]
+    );
+
+    if (existingStudentEmail.length > 0) {
+      connection.release();
+      const st = existingStudentEmail[0];
+      return res.status(400).json({
+        success: false,
+        message: `The email address "${email}" is already registered to student ${st.first_name} ${st.last_name} (${st.student_id}). Please use a different or unique email address.`
+      });
+    }
+
+    if (lrn && String(lrn).trim() && String(lrn).trim().toUpperCase() !== 'N/A') {
+      const cleanLrn = String(lrn).trim();
+      const [existingStudentLrn] = await connection.query(
+        "SELECT id, student_id, first_name, last_name FROM students WHERE lrn = ? LIMIT 1",
+        [cleanLrn]
+      );
+
+      if (existingStudentLrn.length > 0) {
+        connection.release();
+        const st = existingStudentLrn[0];
+        return res.status(400).json({
+          success: false,
+          message: `The LRN "${cleanLrn}" is already registered to student ${st.first_name} ${st.last_name} (${st.student_id}).`
+        });
+      }
+    }
+
     await connection.beginTransaction();
 
     // 1. Compute next sequential student_id with custom prefix indicator (K-12 vs College)
@@ -322,9 +355,29 @@ const registerStudent = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error("Register student transaction error:", error);
+
+    if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062 || (error.message && error.message.includes('Duplicate entry'))) {
+      if (error.message.includes('students.email') || error.message.includes('email')) {
+        return res.status(400).json({
+          success: false,
+          message: `The email address "${email}" is already registered. Please use a unique email address.`
+        });
+      }
+      if (error.message.includes('students.lrn') || error.message.includes('lrn')) {
+        return res.status(400).json({
+          success: false,
+          message: `The LRN "${lrn}" is already registered to another student.`
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: "A record with this email or student information already exists in the system."
+      });
+    }
+
     return res.status(500).json({
       success: false,
-      message: "Database transaction error: " + error.message
+      message: "Database error during registration: " + error.message
     });
   } finally {
     connection.release();

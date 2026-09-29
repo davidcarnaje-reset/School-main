@@ -7,6 +7,7 @@ import getSubjects from '../controllers/registrar/getSubjects.js';
 import registerStudent from '../controllers/registrar/registerStudent.js';
 import encodeSubjects from '../controllers/registrar/encodeSubjects.js';
 import getRegistrarDashboard from '../controllers/registrar/getRegistrarDashboard.js';
+import checkUniqueness from '../controllers/registrar/checkUniqueness.js';
 
 // Newly migrated controllers
 import { getAcademicPrograms, addAcademicProgram, updateAcademicProgram, deleteAcademicProgram, bulkImportAcademicPrograms } from '../controllers/registrar/academicPrograms.js';
@@ -41,6 +42,8 @@ router.get('/students', getStudentsList);
 router.get('/students-list', getStudentsList);
 router.get('/subjects', getSubjects);
 router.get('/dashboard-stats', getRegistrarDashboard);
+router.get('/check-uniqueness', checkUniqueness);
+router.post('/check-uniqueness', checkUniqueness);
 router.post('/register-student', upload.single('profile_image'), registerStudent);
 router.post('/encode-subjects', encodeSubjects);
 router.get('/curriculum-years', getCurriculumYears);

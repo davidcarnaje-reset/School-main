@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { X, CheckCircle, RefreshCw, Clock, Calendar, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, RefreshCw, Clock, Calendar, AlertCircle, Globe, Building2, Layers, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const DAYS_MAPPING = [
@@ -10,6 +10,16 @@ const DAYS_MAPPING = [
   { label: 'Th', full: 'Thursday' }, 
   { label: 'F', full: 'Friday' }, 
   { label: 'S', full: 'Saturday' },
+];
+
+const ONLINE_PLATFORMS = [
+  'Google Meet',
+  'Zoom',
+  'Microsoft Teams',
+  'Institutional LMS',
+  'Canvas',
+  'Asynchronous Portal',
+  'Other'
 ];
 
 const convertTo24Hour = (timeStr) => {
@@ -123,6 +133,9 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
                 subject_id: assignmentData.subject_id || '',
                 section_id: assignmentData.section_id || '',
                 room_id: assignmentData.room_id || '',
+                delivery_mode: assignmentData.delivery_mode || 'Face-to-Face',
+                online_platform: assignmentData.online_platform || 'Google Meet',
+                meeting_link: assignmentData.meeting_link || '',
                 days: initialDays.join(','),
                 start_time: initialStart,
                 end_time: initialEnd,
@@ -154,6 +167,9 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
         e.preventDefault();
         if (selectedDays.length === 0) return showAlert('error', 'Missing Information', 'Please select schedule days.');
         if (formData.start_time >= formData.end_time) return showAlert('error', 'Invalid Schedule', 'End Time must be after Start Time.');
+        if (formData.delivery_mode !== 'Online' && !formData.room_id) {
+            return showAlert('error', 'Missing Venue', 'Please select a physical classroom/venue.');
+        }
 
         setSaveLoading(true);
         try {
@@ -194,7 +210,7 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
                 <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div>
                         <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Edit Class Record</h3>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Update Master Schedule & Assignment</p>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Update Master Schedule, Venue & Modality</p>
                     </div>
                     <button type="button" onClick={onClose} className="p-3 bg-white text-slate-300 hover:text-red-500 rounded-2xl shadow-sm transition-all"><X size={20}/></button>
                 </div>
@@ -204,7 +220,7 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
                         {/* TEACHER */}
                         <div className="col-span-2 space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assign Teacher</label>
-                            <select required value={formData.teacher_id} onChange={e=>setFormData({...formData, teacher_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500">
+                            <select required value={formData.teacher_id} onChange={e=>setFormData({...formData, teacher_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 text-sm">
                                 <option value="">-- Select Faculty Member --</option>
                                 {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
                             </select>
@@ -213,7 +229,7 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
                         {/* SECTION */}
                         <div className="col-span-2 space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Section</label>
-                            <select required value={formData.section_id} onChange={e=>setFormData({...formData, section_id: e.target.value, subject_id: ''})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500">
+                            <select required value={formData.section_id} onChange={e=>setFormData({...formData, section_id: e.target.value, subject_id: ''})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 text-sm">
                                 <option value="">-- Select Section --</option>
                                 {sections.map(sec => <option key={sec.id} value={sec.id}>{sec.section_name} ({sec.grade_level})</option>)}
                             </select>
@@ -222,25 +238,91 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
                         {/* SUBJECT */}
                         <div className="col-span-2 space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Subject Load</label>
-                            <select required disabled={!formData.section_id} value={formData.subject_id} onChange={e=>setFormData({...formData, subject_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 disabled:opacity-50">
+                            <select required disabled={!formData.section_id} value={formData.subject_id} onChange={e=>setFormData({...formData, subject_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 disabled:opacity-50 text-sm">
                                 <option value="">-- Select Eligible Subject --</option>
                                 {eligibleSubjects.map(s => <option key={s.id} value={s.id}>{s.subject_code} - {s.subject_description}</option>)}
                             </select>
                         </div>
 
-                        {/* ROOM */}
+                        {/* DELIVERY MODALITY SELECTION */}
                         <div className="col-span-2 space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Room / Venue</label>
-                            <select required value={formData.room_id} onChange={e=>setFormData({...formData, room_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500">
-                                <option value="">-- Select Academic Venue --</option>
-                                {rooms.map(r => {
-                                    const roomLabel = (r.room_name?.trim().toLowerCase() === 'room' && r.room_number)
-                                      ? `Room ${r.room_number}`
-                                      : `${r.room_name}${r.room_number ? ` (${r.room_number})` : ''}`;
-                                    return <option key={r.id} value={r.id}>{roomLabel} ({r.room_type})</option>;
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Learning Modality</label>
+                            <div className="grid grid-cols-3 gap-3">
+                                {[
+                                    { mode: 'Face-to-Face', icon: Building2, label: 'Face-to-Face', desc: 'Physical Classroom' },
+                                    { mode: 'Online', icon: Globe, label: 'Online Class', desc: 'Virtual Platform' },
+                                    { mode: 'Hybrid', icon: Layers, label: 'Hybrid Modality', desc: 'Blended Session' }
+                                ].map(item => {
+                                    const IconComponent = item.icon;
+                                    const isSelected = (formData.delivery_mode || 'Face-to-Face') === item.mode;
+                                    return (
+                                        <button
+                                            key={item.mode}
+                                            type="button"
+                                            onClick={() => setFormData({
+                                                ...formData,
+                                                delivery_mode: item.mode,
+                                                room_id: item.mode === 'Online' ? '' : formData.room_id
+                                            })}
+                                            className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 ${
+                                                isSelected
+                                                    ? 'bg-blue-50/80 border-blue-500 text-blue-800 shadow-sm ring-2 ring-blue-500/20'
+                                                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            <div className={`p-2.5 rounded-xl ${isSelected ? 'bg-blue-600 text-white' : 'bg-white text-slate-400 shadow-xs'}`}>
+                                                <IconComponent size={16} />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-black tracking-tight">{item.label}</div>
+                                                <div className="text-[9px] font-bold text-slate-400">{item.desc}</div>
+                                            </div>
+                                        </button>
+                                    );
                                 })}
-                            </select>
+                            </div>
                         </div>
+
+                        {/* ROOM / VENUE OR ONLINE PLATFORM */}
+                        {formData.delivery_mode === 'Online' ? (
+                            <div className="col-span-2 grid grid-cols-2 gap-4 bg-sky-50/50 p-5 rounded-2xl border border-sky-100">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-sky-700 uppercase tracking-widest ml-1">Virtual Platform</label>
+                                    <select 
+                                        value={formData.online_platform || 'Google Meet'} 
+                                        onChange={e => setFormData({ ...formData, online_platform: e.target.value })}
+                                        className="w-full p-3.5 bg-white border border-sky-200 rounded-xl font-bold text-xs outline-none focus:border-sky-500 shadow-sm"
+                                    >
+                                        {ONLINE_PLATFORMS.map(platform => (
+                                            <option key={platform} value={platform}>{platform}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-sky-700 uppercase tracking-widest ml-1">Meeting / Class Link (Optional)</label>
+                                    <input 
+                                        type="url" 
+                                        placeholder="https://meet.google.com/..." 
+                                        value={formData.meeting_link || ''} 
+                                        onChange={e => setFormData({ ...formData, meeting_link: e.target.value })}
+                                        className="w-full p-3.5 bg-white border border-sky-200 rounded-xl font-medium text-xs outline-none focus:border-sky-500 shadow-sm"
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="col-span-2 space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Room / Venue</label>
+                                <select required value={formData.room_id || ''} onChange={e=>setFormData({...formData, room_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 text-sm">
+                                    <option value="">-- Select Academic Venue --</option>
+                                    {rooms.map(r => {
+                                        const roomLabel = (r.room_name?.trim().toLowerCase() === 'room' && r.room_number)
+                                          ? `Room ${r.room_number}`
+                                          : `${r.room_name}${r.room_number ? ` (${r.room_number})` : ''}`;
+                                        return <option key={r.id} value={r.id}>{roomLabel} ({r.room_type})</option>;
+                                    })}
+                                </select>
+                            </div>
+                        )}
 
                         {/* SCHEDULE CONFIGURATION BOX */}
                         <div className="col-span-2 bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 space-y-4">

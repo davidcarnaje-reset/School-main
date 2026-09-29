@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { 
   BookOpen, Plus, Search, Layers, FileText, 
-  Trash2, X, CheckCircle, RefreshCw, GraduationCap, Filter, AlertTriangle, Download, Upload, FileSpreadsheet, AlertCircle, Check
+  Trash2, X, CheckCircle, RefreshCw, GraduationCap, Filter, AlertTriangle, Download, Upload, FileSpreadsheet, AlertCircle, Check, Clock
 } from 'lucide-react';
 import SubjectDetailsModal from '../../components/registrar/SubjectDetailsModal';
 import { useAuth } from '../../context/AuthContext';
@@ -45,11 +45,23 @@ const RegistrarSubjects = () => {
     'College': { levels: ['1st Year', '2nd Year', '3rd Year', '4th Year'], needsProgram: true }
   };
 
-  // ARCHITECT FIX: Idinagdag ang subject_type sa initial form para mapadala sa DB
+  // ARCHITECT FIX: Idinagdag ang scheduling parameters para sa K-10, SHS, at College
   const initialForm = {
-    level_category: 'K-10', subject_type: 'None', subject_code: '', subject_description: '',
-    units: 0, grade_level_applicable: 'Grade 1', program_id: '', semester: 'N/A',
-    curriculum_year: '2024-2025'
+    level_category: 'K-10', 
+    subject_type: 'None', 
+    subject_code: '', 
+    subject_description: '',
+    units: 0, 
+    lec_units: 3,
+    lab_units: 0,
+    lab_type: 'Computer Laboratory',
+    day_pattern: 'Mon-Fri',
+    grade_level_applicable: 'Grade 1', 
+    program_id: '', 
+    semester: 'N/A',
+    curriculum_year: '2025-2026',
+    minutes_per_session: 60,
+    frequency_per_week: 5
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -77,36 +89,100 @@ const RegistrarSubjects = () => {
     finally { setLoading(false); }
   };
 
+  const getAvailablePrograms = (category, curYear) => {
+    const dept = category === 'SHS' ? 'SHS' : 'College';
+    const deptPrograms = (programs || []).filter(p => p.department === dept);
+    if (!curYear) return deptPrograms;
+    const byYear = deptPrograms.filter(p => p.curriculum_year === curYear);
+    return byYear.length > 0 ? byYear : deptPrograms;
+  };
+
   const handleLevelCategoryChange = (cat) => {
-    const newUnits = (cat === 'College') ? 3 : 0;
-    
-    // ARCHITECT FIX: Dynamic na default subject_type base sa category
+    let newUnits = 0;
+    let newLecUnits = 0;
+    let newLabUnits = 0;
+    let newLabType = '';
     let newSubjectType = 'None';
-    if (cat === 'College') newSubjectType = 'GE';
-    if (cat === 'SHS') newSubjectType = 'Core';
+    let newProgramId = '';
+    let newMinutes = 60;
+    let newFrequency = 5;
+    let newPattern = 'Mon-Fri';
+
+    if (cat === 'College') {
+      newLecUnits = 3;
+      newLabUnits = 0;
+      newUnits = 3;
+      newLabType = 'Computer Laboratory';
+      newSubjectType = 'GE';
+      newProgramId = 'GE';
+      newMinutes = 90;
+      newFrequency = 2; // e.g. TTh 1.5 hrs x 2 = 3 hrs
+      newPattern = 'TTh (2x 1.5 hrs)';
+    } else if (cat === 'SHS') {
+      newUnits = 0;
+      newLecUnits = 0;
+      newLabUnits = 0;
+      newLabType = '';
+      newSubjectType = 'Core';
+      newProgramId = 'GE';
+      newMinutes = 60;
+      newFrequency = 4; // Option A: Mon-Thu 1 hr x 4 = 4 hrs
+      newPattern = 'Mon-Thu (4x 1 hr)';
+    } else {
+      newUnits = 0;
+      newLecUnits = 0;
+      newLabUnits = 0;
+      newLabType = '';
+      newSubjectType = 'None';
+      newProgramId = '';
+      newMinutes = 60;
+      newFrequency = 5; // e.g. Daily Mon-Fri = 5 hrs
+      newPattern = 'Mon-Fri (5x 1 hr)';
+    }
 
     setFormData({
       ...formData, 
       level_category: cat, 
       grade_level_applicable: LEVEL_CONFIG[cat].levels[0],
-      program_id: '', 
-      semester: cat === 'K-10' ? 'N/A' : '1st', 
+      program_id: newProgramId, 
+      semester: cat === 'K-10' ? 'N/A' : (formData.semester && formData.semester !== 'N/A' ? formData.semester : '1st'), 
       units: newUnits,
-      subject_type: newSubjectType // Idinagdag ang subject_type dito
+      lec_units: newLecUnits,
+      lab_units: newLabUnits,
+      lab_type: newLabType,
+      day_pattern: newPattern,
+      subject_type: newSubjectType,
+      minutes_per_session: newMinutes,
+      frequency_per_week: newFrequency
+    });
+  };
+
+  const handleSubjectTypeChange = (newType) => {
+    let newProgId = formData.program_id;
+    if (newType === 'Core' || newType === 'GE') {
+      newProgId = 'GE';
+    } else if (newType === 'Major' || newType === 'Specialized') {
+      if (newProgId === 'GE' || !newProgId) {
+        const available = getAvailablePrograms(formData.level_category, formData.curriculum_year);
+        newProgId = available.length > 0 ? String(available[0].id) : '';
+      }
+    }
+
+    setFormData({
+      ...formData,
+      subject_type: newType,
+      program_id: newProgId
     });
   };
 
   const handleCurriculumYearChange = (newYear) => {
     setFormData(prev => {
-      const filteredPrograms = programs.filter(p => 
-        p.department === (prev.level_category === 'SHS' ? 'SHS' : 'College') &&
-        (p.curriculum_year === newYear || (!p.curriculum_year && newYear === '2024-2025'))
-      );
+      const filteredPrograms = getAvailablePrograms(prev.level_category, newYear);
       const isValidProg = prev.program_id === 'GE' || filteredPrograms.some(p => p.id?.toString() === prev.program_id?.toString());
       return {
         ...prev,
         curriculum_year: newYear,
-        program_id: isValidProg ? prev.program_id : ''
+        program_id: isValidProg ? prev.program_id : (prev.subject_type === 'Core' || prev.subject_type === 'GE' ? 'GE' : (filteredPrograms[0]?.id ? String(filteredPrograms[0].id) : ''))
       };
     });
   };
@@ -200,7 +276,9 @@ const RegistrarSubjects = () => {
       { header: 'Grade / Year Level', key: 'grade_level_applicable', width: 22 },
       { header: 'Program Code', key: 'program_code', width: 20 },
       { header: 'Semester', key: 'semester', width: 15 },
-      { header: 'Curriculum Year', key: 'curriculum_year', width: 22 }
+      { header: 'Curriculum Year', key: 'curriculum_year', width: 22 },
+      { header: 'Minutes Per Session', key: 'minutes_per_session', width: 20 },
+      { header: 'Sessions / Week', key: 'frequency_per_week', width: 18 }
     ];
 
     // Header styling
@@ -601,12 +679,18 @@ const RegistrarSubjects = () => {
                         <div>
                           <p className="text-sm font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors">{item.subject_code}</p>
                            <p className="text-xs font-bold text-slate-500 mt-1">{item.subject_description}</p>
-                           <div className="flex gap-2 items-center mt-1">
+                           <div className="flex gap-2 flex-wrap items-center mt-1.5">
                              {item.subject_type && item.subject_type !== 'None' && (
-                               <span className="text-[9px] font-black uppercase text-indigo-500">{item.subject_type}</span>
+                               <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                                 {item.subject_type}
+                                </span>
                              )}
+                             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                               <Clock size={11} className="text-blue-500" />
+                               {item.minutes_per_session || 60}m × {item.frequency_per_week || 5}/wk ({(((item.minutes_per_session || 60) * (item.frequency_per_week || 5)) / 60).toFixed(1)}h/wk)
+                             </span>
                              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">
-                               Curriculum: {item.curriculum_year || '2024-2025'}
+                               Curriculum: {item.curriculum_year || '2025-2026'}
                              </span>
                            </div>
                         </div>
@@ -644,7 +728,21 @@ const RegistrarSubjects = () => {
                          </div>
                       </td>
                       <td className="p-6 text-center">
-                         <span className="text-lg font-black text-slate-600">{item.units}<span className="text-[10px] text-slate-400 font-bold ml-0.5">u</span></span>
+                         <div>
+                            <span className="text-base font-black text-slate-700">{item.units || 0}<span className="text-[10px] text-slate-400 font-bold ml-0.5">u</span></span>
+                            {item.level_category === 'College' && (
+                              <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                                <span className="text-[9px] font-bold text-slate-400">
+                                  {item.lec_units || item.units || 0}Lec / {item.lab_units || 0}Lab
+                                </span>
+                                {item.lab_units > 0 && item.lab_type && (
+                                  <span className="text-[8px] font-black uppercase text-purple-600 bg-purple-50 border border-purple-100 px-1 py-0.2 rounded mt-0.5">
+                                    {item.lab_type}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                         </div>
                       </td>
                       <td className="p-6 text-center">
                          {/* 🛑 ARCHITECT FIX: Binago ang onClick para tawagin ang Custom Modal */}
@@ -701,55 +799,156 @@ const RegistrarSubjects = () => {
       {/* SMART MODAL (ADD SUBJECT) */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
-          {/* KEEP YOUR ORIGINAL ADD FORM HERE */}
-          <form onSubmit={handleSave} className="bg-white rounded-[3rem] w-full max-w-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <form onSubmit={handleSave} className="bg-white rounded-[2.5rem] w-full max-w-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div>
                 <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Register Subject</h3>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Curriculum Database</p>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Automated Timetable & Curriculum Database</p>
               </div>
-              <button type="button" onClick={() => setShowModal(false)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><X size={24}/></button>
+              <button type="button" onClick={() => setShowModal(false)} className="p-2 text-slate-400 hover:text-red-500 rounded-xl hover:bg-slate-100 transition-all"><X size={22}/></button>
             </div>
 
-            <div className="p-10 overflow-y-auto space-y-6">
-              <div className="space-y-3">
+            <div className="px-8 py-6 overflow-y-auto space-y-5">
+              {/* ACADEMIC LEVEL SWITCHER */}
+              <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Academic Category</label>
                  <div className="grid grid-cols-3 gap-3">
                     {Object.keys(LEVEL_CONFIG).map(cat => (
-                       <button key={cat} type="button" onClick={() => handleLevelCategoryChange(cat)}
-                          className={`py-4 rounded-2xl font-black text-xs uppercase tracking-widest border-2 transition-all ${formData.level_category === cat ? 'bg-blue-50 border-blue-600 text-blue-600 shadow-lg scale-105' : 'bg-white border-slate-100 text-slate-300'}`}>
-                          {cat}
+                       <button 
+                          key={cat} 
+                          type="button" 
+                          onClick={() => handleLevelCategoryChange(cat)}
+                          className={`py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 ${
+                            formData.level_category === cat 
+                              ? cat === 'College' 
+                                ? 'bg-purple-50 border-purple-600 text-purple-700 shadow-md scale-[1.02]' 
+                                : cat === 'SHS' 
+                                ? 'bg-amber-50 border-amber-600 text-amber-700 shadow-md scale-[1.02]' 
+                                : 'bg-blue-50 border-blue-600 text-blue-600 shadow-md scale-[1.02]' 
+                              : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
+                          }`}
+                       >
+                          <span>{cat}</span>
+                          <span className="text-[9px] font-bold opacity-75">
+                            {cat === 'K-10' ? 'Kinder - Gr.10' : cat === 'SHS' ? 'Grade 11 - 12' : 'Higher Ed (Units)'}
+                          </span>
                        </button>
                     ))}
                  </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1.5">
+              {/* GENERAL SUBJECT DETAILS */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Subject Code *</label>
-                  <input required type="text" placeholder="MATH101" value={formData.subject_code} onChange={e=>setFormData({...formData, subject_code: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold transition-all" />
+                  <input 
+                    required 
+                    type="text" 
+                    placeholder={formData.level_category === 'College' ? 'IT 101' : formData.level_category === 'SHS' ? 'GENMATH' : 'ENG 7'} 
+                    value={formData.subject_code} 
+                    onChange={e => setFormData({ ...formData, subject_code: e.target.value })} 
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-all text-sm uppercase" 
+                  />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Units (Credit)</label>
-                  <input type="number" min="0" value={formData.units} onChange={e => setFormData({...formData, units: e.target.value})} disabled={formData.level_category !== 'College'} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${formData.level_category !== 'College' ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-70' : 'bg-slate-100 text-slate-800 focus:ring-2 focus:ring-blue-500' }`} />
-                </div>
-                <div className="col-span-2 space-y-1.5">
+
+                {/* Units input / breakdown display */}
+                {formData.level_category === 'College' ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-purple-600 uppercase ml-1">Total Units (Credit)</label>
+                      <span className="text-[9px] font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                        {((parseInt(formData.lec_units, 10) || 0) + (parseInt(formData.lab_units, 10) || 0))} Units Total
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="text-[9px] font-bold text-slate-500 mb-0.5">Lec Units</div>
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max="10" 
+                          required 
+                          value={formData.lec_units} 
+                          onChange={e => {
+                            const lec = parseInt(e.target.value, 10) || 0;
+                            const lab = parseInt(formData.lab_units, 10) || 0;
+                            setFormData({ ...formData, lec_units: lec, units: lec + lab });
+                          }} 
+                          className="w-full p-2.5 bg-purple-50/50 border border-purple-200 rounded-xl outline-none focus:border-purple-500 font-black text-sm text-slate-800" 
+                        />
+                      </div>
+                      <div>
+                        <div className="text-[9px] font-bold text-slate-500 mb-0.5">Lab Units</div>
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max="5" 
+                          required 
+                          value={formData.lab_units} 
+                          onChange={e => {
+                            const lab = parseInt(e.target.value, 10) || 0;
+                            const lec = parseInt(formData.lec_units, 10) || 0;
+                            setFormData({ 
+                              ...formData, 
+                              lab_units: lab, 
+                              units: lec + lab,
+                              lab_type: lab > 0 && !formData.lab_type ? 'Computer Laboratory' : formData.lab_type 
+                            });
+                          }} 
+                          className="w-full p-2.5 bg-purple-50/50 border border-purple-200 rounded-xl outline-none focus:border-purple-500 font-black text-sm text-slate-800" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Units (Credit)</label>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        value={0} 
+                        disabled 
+                        className="w-full p-3.5 bg-slate-100 border border-slate-200 text-slate-400 rounded-xl outline-none font-bold text-sm cursor-not-allowed opacity-80" 
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-200/80 px-2 py-0.5 rounded">
+                        Non-Credit ({formData.level_category})
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="col-span-2 space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Full Description *</label>
-                  <input required type="text" placeholder="e.g. Fundamentals of Mathematics" value={formData.subject_description} onChange={e=>setFormData({...formData, subject_description: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold" />
+                  <input 
+                    required 
+                    type="text" 
+                    placeholder="e.g. Fundamentals of Mathematics / Oral Communication" 
+                    value={formData.subject_description} 
+                    onChange={e => setFormData({ ...formData, subject_description: e.target.value })} 
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold text-sm" 
+                  />
                 </div>
-                <div className="space-y-1.5">
+
+                <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Grade / Year Level</label>
-                  <select value={formData.grade_level_applicable} onChange={e=>setFormData({...formData, grade_level_applicable: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500">
+                  <select 
+                    value={formData.grade_level_applicable} 
+                    onChange={e => setFormData({ ...formData, grade_level_applicable: e.target.value })} 
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500 text-sm"
+                  >
                     {LEVEL_CONFIG[formData.level_category].levels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
                   </select>
                 </div>
                 
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Curriculum Year *</label>
-                  <select value={formData.curriculum_year} onChange={e => handleCurriculumYearChange(e.target.value)} className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500">
+                  <select 
+                    value={formData.curriculum_year} 
+                    onChange={e => handleCurriculumYearChange(e.target.value)} 
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500 text-sm"
+                  >
                     {curriculumYearsList.length === 0 ? (
                       <>
-                        <option value="2023-2024">2023-2024</option>
                         <option value="2024-2025">2024-2025</option>
                         <option value="2025-2026">2025-2026</option>
                         <option value="2026-2027">2026-2027</option>
@@ -763,55 +962,438 @@ const RegistrarSubjects = () => {
                     )}
                   </select>
                 </div>
+
+                {/* Semester (for SHS and College) */}
+                {formData.level_category !== 'K-10' && (
+                  <div className="space-y-1 animate-in slide-in-from-top-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Semester</label>
+                    <select 
+                      value={formData.semester || '1st'} 
+                      onChange={e => setFormData({ ...formData, semester: e.target.value })} 
+                      className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500 text-sm"
+                    >
+                      <option value="1st">1st Semester</option>
+                      <option value="2nd">2nd Semester</option>
+                      <option value="Summer">Summer</option>
+                    </select>
+                  </div>
+                )}
                 
-                {/* ARCHITECT FIX: Dito nilagay ang Subject Type Selection para sa College at SHS */}
+                {/* Subject Type Selection para sa College at SHS */}
                 {LEVEL_CONFIG[formData.level_category].needsProgram && (
-                   <div className="space-y-1.5 animate-in slide-in-from-top-2">
+                   <div className="space-y-1 animate-in slide-in-from-top-2">
                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Subject Type</label>
-                     <select required value={formData.subject_type} onChange={e => setFormData({...formData, subject_type: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500">
+                     <select 
+                        required 
+                        value={formData.subject_type} 
+                        onChange={e => handleSubjectTypeChange(e.target.value)} 
+                        className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-blue-500 text-sm"
+                     >
                        {formData.level_category === 'College' && (
                          <>
                            <option value="GE">General Education (GE)</option>
                            <option value="Major">Major Subject</option>
+                           <option value="Elective">Elective / Professional</option>
                          </>
                        )}
                        {formData.level_category === 'SHS' && (
                          <>
                            <option value="Core">Core Subject</option>
                            <option value="Applied">Applied Subject</option>
+                           <option value="Specialized">Specialized Subject</option>
                          </>
                        )}
                      </select>
                    </div>
                 )}
 
+                {/* Program / Course / Strand Link */}
                 {LEVEL_CONFIG[formData.level_category].needsProgram && (
-                   <div className="col-span-2 space-y-1.5 animate-in slide-in-from-top-2">
-                     <label className="text-[10px] font-black text-blue-500 uppercase ml-1">Program / Course Link</label>
-                      <select required value={formData.program_id} onChange={e => setFormData({...formData, program_id: e.target.value})} className="w-full p-4 bg-blue-50 border-2 border-blue-100 text-blue-900 rounded-2xl font-bold outline-none">
+                   <div className="col-span-2 space-y-1.5 animate-in slide-in-from-top-2 mt-1">
+                     <div className="flex items-center justify-between ml-1">
+                       <label className="text-[10px] font-black text-blue-600 uppercase">
+                         {formData.level_category === 'SHS' ? 'Strand Link / Applicability *' : 'Program Link / Applicability *'}
+                       </label>
+                       {(formData.subject_type === 'Core' || formData.subject_type === 'GE') && (
+                         <span className="text-[9px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded-full">
+                           Auto-selected: Applicable to All {formData.level_category === 'SHS' ? 'Strands' : 'Courses'}
+                         </span>
+                       )}
+                     </div>
+                      <select 
+                        required 
+                        value={formData.program_id} 
+                        onChange={e => setFormData({ ...formData, program_id: e.target.value })} 
+                        className="w-full p-3.5 bg-blue-50/60 border-2 border-blue-200 text-blue-950 rounded-xl font-bold outline-none focus:border-blue-500 text-sm shadow-sm"
+                      >
                         <option value="" disabled>-- Choose Program / Strand --</option>
-                        <option value="GE">{formData.level_category === 'SHS' ? 'Applicable to All Strands' : 'Applicable to All Courses'}</option>
-                        {programs
-                          .filter(p => 
-                            p.department === (formData.level_category === 'SHS' ? 'SHS' : 'College') &&
-                            (p.curriculum_year === formData.curriculum_year || (!p.curriculum_year && formData.curriculum_year === '2024-2025'))
-                          )
-                          .map(p => (
-                             <option key={p.id} value={p.id}>
-                               {p.program_code} {p.program_description ? `- ${p.program_description}` : ''} {p.major ? `(Major in ${p.major.replace(/^major\s+in\s+/i, '')})` : ''}
-                             </option>
-                          ))
-                        }
+                        <option value="GE">
+                          {formData.level_category === 'SHS' ? '🌐 Applicable to All Strands (Core / General)' : '🌐 Applicable to All Degree Courses (General Education)'}
+                        </option>
+                        {getAvailablePrograms(formData.level_category, formData.curriculum_year).map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.program_code} {p.program_description ? `- ${p.program_description}` : ''} {p.major ? `(${p.major.replace(/^major\s+in\s+/i, '')})` : ''}
+                            </option>
+                        ))}
                       </select>
                    </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* 🚀 LEVEL-SPECIFIC AUTOMATIC SCHEDULER PARAMETERS SECTION */}
+                {/* ========================================================================= */}
+                
+                {/* 1. K-10 SCHEDULER CONFIGURATION */}
+                {formData.level_category === 'K-10' && (
+                  <div className="col-span-2 bg-gradient-to-br from-blue-50/80 via-sky-50/40 to-slate-50 p-5 rounded-2xl border border-blue-200 space-y-4 mt-2 animate-in fade-in duration-300">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock size={18} className="text-blue-600" />
+                        <div>
+                          <span className="text-xs font-black text-slate-800 uppercase tracking-tight">K-10 Automatic Timetable Config</span>
+                          <p className="text-[10px] text-blue-600 font-bold">Elementary & Junior High School</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black text-blue-700 bg-white px-2.5 py-1 rounded-full border border-blue-200 shadow-sm">
+                        ⏱️ {((formData.minutes_per_session || 60) * (formData.frequency_per_week || 5))} mins/wk ({(((formData.minutes_per_session || 60) * (formData.frequency_per_week || 5)) / 60).toFixed(1)} hrs/wk)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Minutes per session */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-600 uppercase ml-1">Minutes per Session *</label>
+                        <div className="relative">
+                          <input 
+                            type="number" 
+                            min="30" 
+                            max="120" 
+                            step="5" 
+                            required 
+                            value={formData.minutes_per_session} 
+                            onChange={e => setFormData({ ...formData, minutes_per_session: parseInt(e.target.value, 10) || 0 })} 
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-black text-sm text-slate-800 shadow-sm pr-12" 
+                          />
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">mins</span>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          {[45, 50, 60].map(m => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, minutes_per_session: m })}
+                              className={`flex-1 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                formData.minutes_per_session === m 
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                              }`}
+                            >
+                              {m} mins
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Weekly frequency */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-600 uppercase ml-1">Weekly Frequency *</label>
+                        <select 
+                          value={formData.frequency_per_week} 
+                          onChange={e => setFormData({ ...formData, frequency_per_week: parseInt(e.target.value, 10) || 1 })} 
+                          className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-black text-sm text-slate-800 shadow-sm cursor-pointer"
+                        >
+                          <option value={5}>5x a week (Daily: Mon - Fri) — Major Subject</option>
+                          <option value={4}>4x a week (4 Days / Mon - Thu)</option>
+                          <option value={3}>3x a week (3 Days / MWF)</option>
+                          <option value={2}>2x a week (2 Days / TTh) — ESP / EPP / MAPEH</option>
+                          <option value={1}>1x a week (1 Day / Special Activity)</option>
+                        </select>
+                        <p className="text-[9px] text-slate-400 font-medium ml-1">
+                          Karaniwang 5x/wk para sa major, 2x-3x/wk para sa ESP/EPP/MAPEH.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Engine Behavior Notice */}
+                    <div className="p-3 bg-blue-100/60 rounded-xl border border-blue-200 flex items-start gap-2.5">
+                      <span className="text-base">🏠</span>
+                      <div className="text-[10px] text-blue-900 leading-relaxed">
+                        <strong className="font-extrabold uppercase">Home Room Allocation:</strong> Buong linggo pumapasok ang mga mag-aaral sa iisang silid-aralan. Maglalagay ang scheduler ng tig-isang slot sa mismong Home Room ng bawat section at hahanapin ang available subject teacher na may forte sa subject na ito.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. SENIOR HIGH SCHOOL (SHS) SCHEDULER CONFIGURATION */}
+                {formData.level_category === 'SHS' && (
+                  <div className="col-span-2 bg-gradient-to-br from-amber-50/80 via-orange-50/30 to-slate-50 p-5 rounded-2xl border border-amber-200 space-y-4 mt-2 animate-in fade-in duration-300">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock size={18} className="text-amber-600" />
+                        <div>
+                          <span className="text-xs font-black text-slate-800 uppercase tracking-tight">SHS Timetable & Session Patterns</span>
+                          <p className="text-[10px] text-amber-700 font-bold">Grade 11 & Grade 12 (Block Sectioning)</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black text-amber-800 bg-white px-2.5 py-1 rounded-full border border-amber-200 shadow-sm">
+                        ⏱️ {((formData.minutes_per_session || 60) * (formData.frequency_per_week || 4))} mins/wk ({(((formData.minutes_per_session || 60) * (formData.frequency_per_week || 4)) / 60).toFixed(1)} hrs/wk)
+                      </span>
+                    </div>
+
+                    {/* Session Pattern Selector Cards */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-600 uppercase ml-1">Select SHS Session Pattern / Frequency *</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {/* Option A */}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            minutes_per_session: 60, 
+                            frequency_per_week: 4, 
+                            day_pattern: 'Mon-Thu (4x 1 hr)' 
+                          })}
+                          className={`p-3 rounded-xl border-2 text-left transition-all ${
+                            formData.minutes_per_session === 60 && formData.frequency_per_week === 4
+                              ? 'bg-amber-100/70 border-amber-500 shadow-sm'
+                              : 'bg-white border-slate-200 hover:border-amber-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800">Option A: 4x a week (1 hr each)</span>
+                            <span className="text-[9px] font-extrabold bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">4 hrs/wk</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">4 sessions × 60 mins (Hal. Lunes hanggang Huwebes)</p>
+                        </button>
+
+                        {/* Option B */}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            minutes_per_session: 120, 
+                            frequency_per_week: 2, 
+                            day_pattern: 'MW or TTh (2x 2 hrs)' 
+                          })}
+                          className={`p-3 rounded-xl border-2 text-left transition-all ${
+                            formData.minutes_per_session === 120 && formData.frequency_per_week === 2
+                              ? 'bg-amber-100/70 border-amber-500 shadow-sm'
+                              : 'bg-white border-slate-200 hover:border-amber-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800">Option B: 2x a week (2 hrs each)</span>
+                            <span className="text-[9px] font-extrabold bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">4 hrs/wk</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">2 sessions × 120 mins (Paired MW o TTh slots)</p>
+                        </button>
+
+                        {/* Option C */}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            minutes_per_session: 60, 
+                            frequency_per_week: 5, 
+                            day_pattern: 'Daily Mon-Fri (5x 1 hr)' 
+                          })}
+                          className={`p-3 rounded-xl border-2 text-left transition-all ${
+                            formData.minutes_per_session === 60 && formData.frequency_per_week === 5
+                              ? 'bg-amber-100/70 border-amber-500 shadow-sm'
+                              : 'bg-white border-slate-200 hover:border-amber-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800">Option C: 5x a week (1 hr each)</span>
+                            <span className="text-[9px] font-extrabold bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">5 hrs/wk</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">5 sessions × 60 mins (Daily Mon-Fri Major)</p>
+                        </button>
+
+                        {/* Option D */}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            minutes_per_session: 240, 
+                            frequency_per_week: 1, 
+                            day_pattern: '1x Block (4 hrs Practical/TVL)' 
+                          })}
+                          className={`p-3 rounded-xl border-2 text-left transition-all ${
+                            formData.minutes_per_session === 240 && formData.frequency_per_week === 1
+                              ? 'bg-amber-100/70 border-amber-500 shadow-sm'
+                              : 'bg-white border-slate-200 hover:border-amber-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800">Option D: 1x a week (4 hrs Block)</span>
+                            <span className="text-[9px] font-extrabold bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">4 hrs/wk</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">1 session × 240 mins (TVL / Laboratory Continuous)</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Engine Behavior Notice */}
+                    <div className="p-3 bg-amber-100/60 rounded-xl border border-amber-200 flex items-start gap-2.5">
+                      <span className="text-base">🏢</span>
+                      <div className="text-[10px] text-amber-900 leading-relaxed">
+                        <strong className="font-extrabold uppercase">Paired Day Optimization:</strong> Ipapares ng algorithm ang magkatugmang araw (Mon-Wed o Tue-Thu) kapag 2 hours ang session pattern para sa organisadong schedule ng guro at section room.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. COLLEGE (HIGHER EDUCATION) SCHEDULER CONFIGURATION */}
+                {formData.level_category === 'College' && (
+                  <div className="col-span-2 bg-gradient-to-br from-purple-50/80 via-indigo-50/30 to-slate-50 p-5 rounded-2xl border border-purple-200 space-y-4 mt-2 animate-in fade-in duration-300">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock size={18} className="text-purple-600" />
+                        <div>
+                          <span className="text-xs font-black text-slate-800 uppercase tracking-tight">College Lecture & Laboratory Engine</span>
+                          <p className="text-[10px] text-purple-700 font-bold">Credit Unit Based & Multi-Facility Scheduling</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black text-purple-800 bg-white px-2.5 py-1 rounded-full border border-purple-200 shadow-sm">
+                        Total Units: {(parseInt(formData.lec_units, 10) || 0) + (parseInt(formData.lab_units, 10) || 0)} Units ({formData.lec_units || 0} Lec + {formData.lab_units || 0} Lab)
+                      </span>
+                    </div>
+
+                    {/* Lecture Pattern Selector */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-600 uppercase ml-1">Lecture Schedule Pattern *</label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                        {/* Pattern 1: TTh 1.5 hrs */}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            minutes_per_session: 90, 
+                            frequency_per_week: 2, 
+                            day_pattern: 'TTh (2x 1.5 hrs)' 
+                          })}
+                          className={`p-3 rounded-xl border-2 text-left transition-all ${
+                            formData.minutes_per_session === 90 && formData.frequency_per_week === 2
+                              ? 'bg-purple-100/80 border-purple-600 shadow-sm'
+                              : 'bg-white border-slate-200 hover:border-purple-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800">TTh (2x 1.5 hrs)</span>
+                            <span className="text-[9px] font-extrabold bg-purple-200 text-purple-900 px-1 py-0.5 rounded">3.0 hrs/wk</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">2 sessions × 90 mins (Tue / Thu)</p>
+                        </button>
+
+                        {/* Pattern 2: MWF 1.0 hr */}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            minutes_per_session: 60, 
+                            frequency_per_week: 3, 
+                            day_pattern: 'MWF (3x 1.0 hr)' 
+                          })}
+                          className={`p-3 rounded-xl border-2 text-left transition-all ${
+                            formData.minutes_per_session === 60 && formData.frequency_per_week === 3
+                              ? 'bg-purple-100/80 border-purple-600 shadow-sm'
+                              : 'bg-white border-slate-200 hover:border-purple-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800">MWF (3x 1.0 hr)</span>
+                            <span className="text-[9px] font-extrabold bg-purple-200 text-purple-900 px-1 py-0.5 rounded">3.0 hrs/wk</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">3 sessions × 60 mins (Mon / Wed / Fri)</p>
+                        </button>
+
+                        {/* Pattern 3: 1x Block 3.0 hrs */}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            minutes_per_session: 180, 
+                            frequency_per_week: 1, 
+                            day_pattern: '1x Block (3.0 hrs)' 
+                          })}
+                          className={`p-3 rounded-xl border-2 text-left transition-all ${
+                            formData.minutes_per_session === 180 && formData.frequency_per_week === 1
+                              ? 'bg-purple-100/80 border-purple-600 shadow-sm'
+                              : 'bg-white border-slate-200 hover:border-purple-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-800">1x 3.0 hrs Block</span>
+                            <span className="text-[9px] font-extrabold bg-purple-200 text-purple-900 px-1 py-0.5 rounded">3.0 hrs/wk</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">1 session × 180 mins (Weekend/Block)</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Laboratory Specific Configuration (when Lab Units > 0) */}
+                    {parseInt(formData.lab_units, 10) > 0 && (
+                      <div className="p-4 bg-white rounded-2xl border-2 border-purple-200 space-y-3 animate-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🧪</span>
+                            <div>
+                              <span className="text-xs font-black text-purple-950 uppercase">Laboratory Session Allocation</span>
+                              <p className="text-[10px] text-purple-600 font-bold">1 Continuous 3-Hour Practical Block per week (180 mins)</p>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-purple-600 text-white px-2 py-0.5 rounded-md">
+                            1x 3 Hours Practical
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-purple-900 uppercase ml-1">Designated Laboratory Facility Type *</label>
+                          <select 
+                            required 
+                            value={formData.lab_type || 'Computer Laboratory'} 
+                            onChange={e => setFormData({ ...formData, lab_type: e.target.value })} 
+                            className="w-full p-3 bg-purple-50/50 border border-purple-200 text-purple-950 rounded-xl font-bold outline-none focus:border-purple-600 text-xs shadow-sm cursor-pointer"
+                          >
+                            <option value="Computer Laboratory">🖥️ Computer Laboratory (IT / CS / Programming)</option>
+                            <option value="Science / Chemistry Laboratory">🔬 Science / Chemistry / Physics / Biology Laboratory</option>
+                            <option value="Speech / Audio-Visual Laboratory">🗣️ Speech / Audio-Visual Laboratory</option>
+                            <option value="Culinary / Commercial Kitchen Laboratory">🍳 Culinary Arts / Commercial Kitchen Laboratory</option>
+                            <option value="Nursing / Health Simulation Room">🏥 Nursing / Health Simulation & Skills Ward</option>
+                            <option value="Engineering / CAD / Drafting Studio">📐 Engineering / CAD / Drafting Studio</option>
+                            <option value="Electronics / Robotics Laboratory">⚡ Electronics / Robotics / Circuit Lab</option>
+                            <option value="Hotel & Hospitality Mock Suite">🏨 Hotel & Hospitality Mock Suite / Front Desk</option>
+                            <option value="General Multi-Purpose Laboratory">🧪 General Multi-Purpose Laboratory Facility</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Engine Behavior Notice */}
+                    <div className="p-3 bg-purple-100/70 rounded-xl border border-purple-200 flex items-start gap-2.5">
+                      <span className="text-base">🔄</span>
+                      <div className="text-[10px] text-purple-900 leading-relaxed">
+                        {parseInt(formData.lab_units, 10) > 0 ? (
+                          <>
+                            <strong className="font-extrabold uppercase">Dual-Task Scheduler Execution:</strong> Hahatiin ng system ang subject sa <strong>2 magkahiwalay na scheduling tasks</strong>: (1) Maghahanap ng regular classroom para sa lecture slots, at (2) Maglalaan ng <strong>{formData.lab_type || 'Laboratory Facility'}</strong> para sa tuloy-tuloy na 3-hour practical session.
+                          </>
+                        ) : (
+                          <>
+                            <strong className="font-extrabold uppercase">Pure Lecture Allocation:</strong> Maghahanap ang scheduler ng 1 bakanteng regular classroom at available professor para sa lingguhang lecture sessions.
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="p-8 border-t border-slate-100 bg-slate-50 flex justify-end gap-4">
-              <button type="button" onClick={() => setShowModal(false)} className="px-8 py-4 rounded-2xl font-black text-slate-400 uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
-              <button type="submit" disabled={saveLoading} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all flex items-center gap-2 hover:bg-blue-700">
-                {saveLoading ? <RefreshCw className="animate-spin" size={18}/> : <><CheckCircle size={18}/> Register Subject</>}
+            <div className="px-8 py-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 rounded-xl font-black text-slate-400 uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
+              <button type="submit" disabled={saveLoading} className="bg-blue-600 text-white px-8 py-3.5 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg active:scale-95 transition-all flex items-center gap-2 hover:bg-blue-700">
+                {saveLoading ? <RefreshCw className="animate-spin" size={16}/> : <><CheckCircle size={16}/> Register Subject</>}
               </button>
             </div>
           </form>

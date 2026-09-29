@@ -4,6 +4,7 @@ import setupPassword from './setupPassword.js';
 import checkEmail from './checkEmail.js';
 import forgotPassword from './forgotPassword.js';
 import resetPassword from './resetPassword.js';
+import checkUniqueness from '../registrar/checkUniqueness.js';
 
 const router = express.Router();
 
@@ -11,7 +12,9 @@ const router = express.Router();
 router.post('/login', login);
 router.post('/login.php', login); // Legacy alias — browser cache compatibility
 
-// Email check routes
+// Uniqueness & Email check routes
+router.get('/check-uniqueness', checkUniqueness);
+router.post('/check-uniqueness', checkUniqueness);
 router.get('/check-email', checkEmail);
 router.get('/check_email.php', checkEmail);
 router.post('/check_email', checkEmail);

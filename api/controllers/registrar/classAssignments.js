@@ -12,34 +12,53 @@ export const getClassAssignData = async (req, res) => {
         (
           SELECT e.department 
           FROM employees e 
-          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
           LIMIT 1
         ) AS department,
         (
           SELECT e.position 
           FROM employees e 
-          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
           LIMIT 1
         ) AS position,
         (
           SELECT e.assigned_levels 
           FROM employees e 
-          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
           LIMIT 1
         ) AS assigned_levels,
         (
           SELECT e.assigned_roles 
           FROM employees e 
-          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
           LIMIT 1
-        ) AS assigned_roles
+        ) AS assigned_roles,
+        (
+          SELECT e.assignments_json 
+          FROM employees e 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS assignments_json,
+        (
+          SELECT e.employee_type 
+          FROM employees e 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS employee_type
       FROM users u
       WHERE (
-        u.role IN ('teacher', 'Teacher', 'Faculty', 'faculty')
+        u.role IN ('teacher', 'Teacher', 'Faculty', 'faculty', 'instructor', 'Instructor', 'professor', 'Professor')
         OR EXISTS (
           SELECT 1 FROM employees e 
-          WHERE (e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))))
-          AND (e.department = 'Faculty' OR e.position LIKE '%Teacher%')
+          WHERE ((u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))))
+          AND (e.department LIKE '%Faculty%' OR e.position LIKE '%Teacher%' OR e.position LIKE '%Instructor%' OR e.position LIKE '%Professor%' OR e.position LIKE '%Faculty%')
         )
       ) AND (u.status = 'Active' OR u.status IS NULL)
       ORDER BY u.last_name ASC, u.first_name ASC
@@ -66,6 +85,9 @@ export const getClassAssignData = async (req, res) => {
         ca.end_time,
         ca.schedule, 
         ca.school_year,
+        ca.delivery_mode,
+        ca.meeting_link,
+        ca.online_platform,
         u.full_name as teacher_name, 
         sub.subject_description as subject_name,
         sub.subject_code,
@@ -106,10 +128,25 @@ const buildDayQueryPart = (days) => {
 };
 
 export const addClassAssign = async (req, res) => {
-  const { teacher_id, subject_id, section_id, start_time, end_time, days, room_id, school_year, schedule } = req.body;
+  const { 
+    teacher_id, 
+    subject_id, 
+    section_id, 
+    start_time, 
+    end_time, 
+    days, 
+    room_id, 
+    school_year, 
+    schedule,
+    delivery_mode = 'Face-to-Face',
+    meeting_link = null,
+    online_platform = 'Google Meet'
+  } = req.body;
 
-  if (!teacher_id || !subject_id || !section_id || !start_time || !days || !room_id) {
-    return res.status(400).json({ success: false, message: "Please complete all schedule details including the Room." });
+  const isOnline = delivery_mode === 'Online';
+
+  if (!teacher_id || !subject_id || !section_id || !start_time || !days || (!isOnline && !room_id)) {
+    return res.status(400).json({ success: false, message: isOnline ? "Please complete teacher and schedule details." : "Please complete all schedule details including the Room." });
   }
 
   // Time Validation
@@ -140,14 +177,15 @@ export const addClassAssign = async (req, res) => {
       WHERE ca.is_active = 1 
       AND ${dayQueryPart} 
       AND (? < ca.end_time AND ? > ca.start_time)
-      AND (ca.teacher_id = ? OR ca.room_id = ? OR ca.section_id = ?)
+      AND (ca.teacher_id = ? OR (? > 0 AND ca.room_id = ?) OR ca.section_id = ?)
     `;
 
     const [conflicts] = await connection.query(check_sql, [
       start_time,
       end_time,
       parseInt(teacher_id, 10),
-      parseInt(room_id, 10),
+      isOnline ? 0 : parseInt(room_id, 10),
+      isOnline ? 0 : parseInt(room_id, 10),
       parseInt(section_id, 10)
     ]);
 
@@ -156,7 +194,7 @@ export const addClassAssign = async (req, res) => {
       let reason = "";
       if (conflict.teacher_id === parseInt(teacher_id, 10)) {
         reason = "Teacher " + conflict.teacher + " is already busy.";
-      } else if (conflict.room_id === parseInt(room_id, 10)) {
+      } else if (!isOnline && conflict.room_id === parseInt(room_id, 10)) {
         reason = "Room " + (conflict.room_name || 'Selected Room') + " is already occupied.";
       } else if (conflict.section_id === parseInt(section_id, 10)) {
         reason = "Section " + conflict.section_name + " already has a class.";
@@ -176,21 +214,24 @@ export const addClassAssign = async (req, res) => {
     // 3. Save assignment
     const insert_sql = `
       INSERT INTO class_assignments 
-        (id, teacher_id, subject_id, section_id, room_id, schedule, days, start_time, end_time, school_year) 
+        (id, teacher_id, subject_id, section_id, room_id, schedule, days, start_time, end_time, school_year, delivery_mode, meeting_link, online_platform) 
       VALUES 
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     await connection.query(insert_sql, [
       nextId,
       parseInt(teacher_id, 10),
       parseInt(subject_id, 10),
       parseInt(section_id, 10),
-      parseInt(room_id, 10),
+      isOnline ? null : (parseInt(room_id, 10) || null),
       schedule,
       days,
       start_time,
       end_time,
-      school_year
+      school_year,
+      delivery_mode,
+      meeting_link || null,
+      online_platform || 'Google Meet'
     ]);
 
     await connection.commit();
@@ -198,7 +239,7 @@ export const addClassAssign = async (req, res) => {
       req.user?.id || 1,
       req.user?.role || 'Registrar',
       "ADD_CLASS_ASSIGNMENT",
-      `Created class assignment for subject ID: ${subject_id}, section ID: ${section_id}`,
+      `Created class assignment (${delivery_mode}) for subject ID: ${subject_id}, section ID: ${section_id}`,
       req
     );
     return res.status(201).json({ success: true, message: "Class assignment saved successfully!" });
@@ -212,9 +253,24 @@ export const addClassAssign = async (req, res) => {
 };
 
 export const updateClassAssign = async (req, res) => {
-  const { id, teacher_id, subject_id, section_id, room_id, schedule, days, start_time, end_time } = req.body;
+  const { 
+    id, 
+    teacher_id, 
+    subject_id, 
+    section_id, 
+    room_id, 
+    schedule, 
+    days, 
+    start_time, 
+    end_time,
+    delivery_mode = 'Face-to-Face',
+    meeting_link = null,
+    online_platform = 'Google Meet'
+  } = req.body;
 
-  if (!id || !teacher_id || !subject_id || !section_id || !room_id) {
+  const isOnline = delivery_mode === 'Online';
+
+  if (!id || !teacher_id || !subject_id || !section_id || (!isOnline && !room_id)) {
     return res.status(400).json({ success: false, message: "Missing required fields." });
   }
 
@@ -228,18 +284,24 @@ export const updateClassAssign = async (req, res) => {
         schedule = ?, 
         days = ?, 
         start_time = ?, 
-        end_time = ? 
+        end_time = ?,
+        delivery_mode = ?,
+        meeting_link = ?,
+        online_platform = ?
       WHERE id = ?
     `;
     await pool.query(sql, [
       parseInt(teacher_id, 10),
       parseInt(subject_id, 10),
       parseInt(section_id, 10),
-      parseInt(room_id, 10),
+      isOnline ? null : (parseInt(room_id, 10) || null),
       schedule,
       days,
       start_time,
       end_time,
+      delivery_mode,
+      meeting_link || null,
+      online_platform || 'Google Meet',
       parseInt(id, 10)
     ]);
 
@@ -247,7 +309,7 @@ export const updateClassAssign = async (req, res) => {
       req.user?.id || 1,
       req.user?.role || 'Registrar',
       "UPDATE_CLASS_ASSIGNMENT",
-      `Updated class assignment ID: ${id} (Subject ID: ${subject_id}, Section ID: ${section_id})`,
+      `Updated class assignment ID: ${id} (${delivery_mode})`,
       req
     );
     return res.status(200).json({ success: true, message: "Class assignment updated successfully." });
@@ -312,8 +374,20 @@ export const bulkAddClassAssign = async (req, res) => {
     await connection.beginTransaction();
 
     for (const draft of drafts) {
-      const { teacher_id, room_id, subject_id, subject_code, days: days_arr, start_time, end_time } = draft;
+      const { 
+        teacher_id, 
+        room_id, 
+        subject_id, 
+        subject_code, 
+        days: days_arr, 
+        start_time, 
+        end_time,
+        delivery_mode = 'Face-to-Face',
+        meeting_link = null,
+        online_platform = 'Google Meet'
+      } = draft;
 
+      const isOnline = delivery_mode === 'Online';
       const days = days_arr.join(',');
       const display_days = days_arr.join('');
 
@@ -334,7 +408,7 @@ export const bulkAddClassAssign = async (req, res) => {
       const schedule_str = `${display_days} ${formatTimeAmPm(start_time)} - ${formatTimeAmPm(end_time)}`;
       const dayQueryPart = buildDayQueryPart(days_arr);
 
-      // Conflict Check
+      // Conflict Check (Only check room conflict if NOT pure online)
       const check_sql = `
         SELECT ca.*, u.full_name as teacher, r.room_name 
         FROM class_assignments ca
@@ -343,14 +417,15 @@ export const bulkAddClassAssign = async (req, res) => {
         WHERE ca.is_active = 1 
         AND ${dayQueryPart} 
         AND (? < ca.end_time AND ? > ca.start_time)
-        AND (ca.teacher_id = ? OR ca.room_id = ? OR ca.section_id = ?)
+        AND (ca.teacher_id = ? OR (? > 0 AND ca.room_id = ?) OR ca.section_id = ?)
       `;
 
       const [conflicts] = await connection.query(check_sql, [
         start_time,
         end_time,
         parseInt(teacher_id, 10),
-        parseInt(room_id, 10),
+        isOnline ? 0 : (parseInt(room_id, 10) || 0),
+        isOnline ? 0 : (parseInt(room_id, 10) || 0),
         parseInt(section_id, 10)
       ]);
 
@@ -360,7 +435,7 @@ export const bulkAddClassAssign = async (req, res) => {
         let reason = "";
         if (conflict.teacher_id === parseInt(teacher_id, 10)) {
           reason = "Teacher " + conflict.teacher + " is busy.";
-        } else if (conflict.room_id === parseInt(room_id, 10)) {
+        } else if (!isOnline && conflict.room_id === parseInt(room_id, 10)) {
           reason = "Room " + (conflict.room_name || 'Selected Room') + " is occupied.";
         } else if (conflict.section_id === parseInt(section_id, 10)) {
           reason = "This section already has a class.";
@@ -378,21 +453,24 @@ export const bulkAddClassAssign = async (req, res) => {
 
       const sql_insert = `
         INSERT INTO class_assignments 
-          (id, teacher_id, subject_id, section_id, room_id, schedule, days, start_time, end_time, school_year) 
+          (id, teacher_id, subject_id, section_id, room_id, schedule, days, start_time, end_time, school_year, delivery_mode, meeting_link, online_platform) 
         VALUES 
-          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       await connection.query(sql_insert, [
         nextId,
         parseInt(teacher_id, 10),
         parseInt(subject_id, 10),
         parseInt(section_id, 10),
-        parseInt(room_id, 10),
+        isOnline ? null : (parseInt(room_id, 10) || null),
         schedule_str,
         days,
         start_time,
         end_time,
-        school_year
+        school_year,
+        delivery_mode,
+        meeting_link || null,
+        online_platform || 'Google Meet'
       ]);
     }
 

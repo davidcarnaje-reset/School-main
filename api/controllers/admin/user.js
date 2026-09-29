@@ -78,7 +78,7 @@ export const createUser = async (req, res) => {
     const staffPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_staff) ? settingsRows[0].prefix_staff : 'SA';
 
     // 2. Determine prefix by role (Teacher/Faculty vs general staff)
-    const isFaculty = role.toLowerCase() === 'teacher';
+    const isFaculty = role.toLowerCase() === 'teacher' || role.toLowerCase() === 'faculty';
     const customPrefix = isFaculty ? facultyPrefix : staffPrefix;
 
     const currentYear = new Date().getFullYear();
@@ -86,7 +86,7 @@ export const createUser = async (req, res) => {
 
     // 3. Query the latest employee_id matching this prefix and year in employees table
     const [lastEmployeeRows] = await pool.query(
-      "SELECT employee_id FROM employees WHERE employee_id LIKE ? ORDER BY id DESC LIMIT 1",
+      "SELECT employee_id FROM employees WHERE employee_id LIKE ? ORDER BY employee_id DESC, id DESC LIMIT 1",
       [`${idPrefix}%`]
     );
 
@@ -100,7 +100,6 @@ export const createUser = async (req, res) => {
     }
     const employeeNumber = `${idPrefix}${newNum}`;
 
-
     const [result] = await pool.query(
       `INSERT INTO users (id, username, password, first_name, middle_name, last_name, full_name, email, phone_number, birthday, role, status, is_verified, verification_token, school_id) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', 0, ?, ?)`,
@@ -109,20 +108,30 @@ export const createUser = async (req, res) => {
 
     // Sync into employees table for payroll with official Employee Number
     try {
-      const [maxEmpIdRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
-      const nextEmpId = maxEmpIdRows[0].maxId + 1;
-      await pool.query(
-        `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status)
-         VALUES (?, ?, ?, ?, ?, ?, 25000, 'Active')`,
-        [
-          nextEmpId,
-          employeeNumber,
-          first_name,
-          last_name,
-          role.toUpperCase() + ' STAFF',
-          'Administration'
-        ]
+      const [empExists] = await pool.query(
+        "SELECT id FROM employees WHERE email = ? OR (TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?)))",
+        [email, first_name, last_name]
       );
+      if (empExists.length === 0) {
+        const [maxEmpIdRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
+        const nextEmpId = maxEmpIdRows[0].maxId + 1;
+        await pool.query(
+          `INSERT INTO employees (id, employee_id, first_name, middle_name, last_name, position, department, basic_salary, status, email, phone_number, employee_type)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 25000, 'Active', ?, ?, ?)`,
+          [
+            nextEmpId,
+            employeeNumber,
+            first_name,
+            middle_name || null,
+            last_name,
+            isFaculty ? 'Subject Teacher' : (role.toUpperCase() + ' STAFF'),
+            isFaculty ? 'Faculty (Academic)' : 'Administration',
+            email,
+            phone_number || null,
+            isFaculty ? 'Teaching' : 'Non-Teaching'
+          ]
+        );
+      }
     } catch (empErr) {
       console.warn("Sync new staff to employees table notice:", empErr.message);
     }

@@ -3,6 +3,82 @@ import { logAuditTrail } from '../../utils/auditLogger.js';
 import bcrypt from 'bcryptjs';
 import { sendStaffInvitationEmail } from '../../utils/emailEngine.js';
 
+// Helper to detect if role/position/department/employee_type corresponds to Faculty
+export const checkIsFaculty = ({ role, position, department, employee_type } = {}) => {
+  const r = (role || '').toLowerCase();
+  const p = (position || '').toLowerCase();
+  const d = (department || '').toLowerCase();
+  const et = (employee_type || '').toLowerCase();
+
+  if (r === 'teacher' || r === 'faculty' || r === 'professor' || r === 'instructor') return true;
+  if (et === 'teaching') return true;
+  if (p.includes('teacher') || p.includes('faculty') || p.includes('professor') || p.includes('instructor') || p.includes('adviser')) return true;
+  if (d.includes('faculty') || d.includes('academic') || d.includes('elementary') || d.includes('high school') || d.includes('senior high') || d.includes('basic ed') || d.includes('college') || d.includes('kinder')) return true;
+
+  return false;
+};
+
+// Helper to generate next sequential employee ID (e.g., SF2026-0001 or SA2026-0001)
+export const generateNextEmployeeId = async (schoolId = 1, isFaculty = false) => {
+  const [settingsRows] = await pool.query(
+    "SELECT prefix_faculty, prefix_staff FROM school_settings WHERE id = ?",
+    [schoolId || 1]
+  );
+  const facultyPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_faculty) ? settingsRows[0].prefix_faculty : 'SF';
+  const staffPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_staff) ? settingsRows[0].prefix_staff : 'SA';
+  const customPrefix = isFaculty ? facultyPrefix : staffPrefix;
+  const currentYear = new Date().getFullYear();
+  const idPrefix = `${customPrefix}${currentYear}-`;
+
+  const [lastEmployeeRows] = await pool.query(
+    "SELECT employee_id FROM employees WHERE employee_id LIKE ? ORDER BY employee_id DESC, id DESC LIMIT 1",
+    [`${idPrefix}%`]
+  );
+
+  let newNum = "0001";
+  if (lastEmployeeRows.length > 0) {
+    const lastEmployeeId = lastEmployeeRows[0].employee_id;
+    const lastNum = parseInt(lastEmployeeId.substring(idPrefix.length), 10);
+    if (!isNaN(lastNum)) {
+      newNum = String(lastNum + 1).padStart(4, '0');
+    }
+  }
+  return `${idPrefix}${newNum}`;
+};
+
+// Helper to generate unique username from first_name and last_name (e.g. firstname.lastname)
+export const generateUsername = async (firstName, lastName) => {
+  const cleanFirst = String(firstName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  const cleanLast = String(lastName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+  let baseUsername = `${cleanFirst}.${cleanLast}`;
+  if (!cleanFirst && !cleanLast) {
+    baseUsername = 'employee';
+  } else if (!cleanFirst) {
+    baseUsername = cleanLast;
+  } else if (!cleanLast) {
+    baseUsername = cleanFirst;
+  }
+
+  let username = baseUsername;
+  let counter = 1;
+
+  while (true) {
+    const [rows] = await pool.query("SELECT id FROM users WHERE username = ?", [username]);
+    if (rows.length === 0) {
+      return username;
+    }
+    username = `${baseUsername}${counter}`;
+    counter++;
+  }
+};
+
 // Helper to get or create employee ID corresponding to user identifier
 const getOrCreateEmployeeId = async (identifier) => {
   if (!identifier) return null;
@@ -18,15 +94,15 @@ const getOrCreateEmployeeId = async (identifier) => {
 
   // 2. Try matching user in `users` table by email, username, or id
   const [users] = await pool.query(
-    "SELECT id, first_name, last_name, role, status FROM users WHERE email = ? OR username = ? OR id = ?",
+    "SELECT id, first_name, last_name, role, status, email, phone_number, school_id FROM users WHERE email = ? OR username = ? OR id = ?",
     [identifier, identifier, identifier]
   );
 
   if (users.length > 0) {
     const u = users[0];
     const [empCheck] = await pool.query(
-      "SELECT id FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))",
-      [u.first_name, u.last_name]
+      "SELECT id FROM employees WHERE (email = ? AND email IS NOT NULL AND email != '') OR (TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?)))",
+      [u.email, u.first_name, u.last_name]
     );
     if (empCheck.length > 0) {
       return empCheck[0].id;
@@ -34,19 +110,23 @@ const getOrCreateEmployeeId = async (identifier) => {
 
     const [maxIdRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
     const nextId = maxIdRows[0].maxId + 1;
-    const currentYear = new Date().getFullYear();
-    const empId = `EMP-${currentYear}-${String(u.id).padStart(4, '0')}`;
+    const isFaculty = checkIsFaculty({ role: u.role });
+    const empId = await generateNextEmployeeId(u.school_id || 1, isFaculty);
 
     await pool.query(
-      `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status) 
-       VALUES (?, ?, ?, ?, ?, 'Administration', 25000, ?)`,
+      `INSERT INTO employees (id, employee_id, first_name, last_name, position, department, basic_salary, status, email, phone_number, employee_type) 
+       VALUES (?, ?, ?, ?, ?, ?, 25000, ?, ?, ?, ?)`,
       [
         nextId,
         empId,
         u.first_name,
         u.last_name,
-        u.role.toUpperCase() + ' STAFF',
-        u.status === 'Inactive' ? 'Inactive' : 'Active'
+        isFaculty ? 'Subject Teacher' : (u.role.toUpperCase() + ' STAFF'),
+        isFaculty ? 'Faculty (Academic)' : 'Administration',
+        u.status === 'Inactive' ? 'Inactive' : 'Active',
+        u.email || null,
+        u.phone_number || null,
+        isFaculty ? 'Teaching' : 'Non-Teaching'
       ]
     );
     return nextId;
@@ -587,6 +667,9 @@ export const hireEmployee = async (req, res) => {
     employment_history,
     employment_status,
     salary_type,
+    employee_type,
+    assignments,
+    assignments_json,
     assigned_levels,
     assigned_roles,
 
@@ -633,7 +716,7 @@ export const hireEmployee = async (req, res) => {
     const fullName = `${first_name.trim()} ${middleInitial} ${last_name.trim()}${suffixStr}`.replace(/\s+/g, ' ');
     const mappedRole = (position || '').toLowerCase().includes('teacher') || (position || '').toLowerCase().includes('professor') || (position || '').toLowerCase().includes('instructor') ? 'teacher' : (position || '').toLowerCase().split(' ')[0] || 'staff';
 
-    // 1. Check if employee already exists by ID, employee_id, or Name
+    // 1. Check if employee already exists by ID, employee_id, Email, or Full Name
     let existingEmp = null;
     if (id) {
       const [empById] = await pool.query("SELECT * FROM employees WHERE id = ?", [id]);
@@ -643,6 +726,13 @@ export const hireEmployee = async (req, res) => {
       const [empByEmpId] = await pool.query("SELECT * FROM employees WHERE employee_id = ?", [employee_id]);
       if (empByEmpId.length > 0) existingEmp = empByEmpId[0];
     }
+    if (!existingEmp && email) {
+      const [empByEmail] = await pool.query(
+        "SELECT * FROM employees WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))",
+        [email.trim()]
+      );
+      if (empByEmail.length > 0) existingEmp = empByEmail[0];
+    }
     if (!existingEmp && first_name && last_name) {
       const [empByName] = await pool.query(
         "SELECT * FROM employees WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(last_name)) = TRIM(LOWER(?))",
@@ -650,6 +740,10 @@ export const hireEmployee = async (req, res) => {
       );
       if (empByName.length > 0) existingEmp = empByName[0];
     }
+
+    const finalAssignmentsJson = assignments_json 
+      ? (typeof assignments_json === 'string' ? assignments_json : JSON.stringify(assignments_json))
+      : (assignments ? JSON.stringify(assignments) : null);
 
     if (existingEmp) {
       // ===============================================
@@ -669,7 +763,7 @@ export const hireEmployee = async (req, res) => {
           psa_status = ?, psa_file = ?, coe_status = ?, coe_file = ?, nbi_status = ?, nbi_file = ?,
           sss_doc_status = ?, sss_doc_file = ?, philhealth_doc_status = ?, philhealth_doc_file = ?,
           pagibig_doc_status = ?, pagibig_doc_file = ?, tin_doc_status = ?, tin_doc_file = ?, employment_history = ?,
-          employment_status = ?, salary_type = ?
+          employment_status = ?, salary_type = ?, employee_type = ?, assignments_json = ?
          WHERE id = ?`,
         [
           first_name.trim(), middle_name || null, last_name.trim(), suffix || null, email.trim(),
@@ -681,6 +775,8 @@ export const hireEmployee = async (req, res) => {
           pagibig_doc_status || 'Pending', pagibig_doc_file || null, tin_doc_status || 'Pending', tin_doc_file || null, employment_history || 'Updated Profile',
           employment_status || 'Probationary',
           salary_type || 'Monthly',
+          employee_type || 'Teaching',
+          finalAssignmentsJson,
           empDbId
         ]
       );
@@ -711,15 +807,19 @@ export const hireEmployee = async (req, res) => {
       // ===============================================
       // REGISTER NEW EMPLOYEE & USER ACCOUNT
       // ===============================================
+      const isFaculty = checkIsFaculty({ role: mappedRole, position, department, employee_type });
       let employeeNumber = employee_id;
+      if (!employeeNumber) {
+        employeeNumber = await generateNextEmployeeId(schoolId, isFaculty);
+      }
 
       // 1. Check if user already exists in users table
-      const [userRows] = await pool.query("SELECT id, role FROM users WHERE email = ?", [email]);
+      const [userRows] = await pool.query("SELECT id, role FROM users WHERE email = ?", [email.trim()]);
       let nextUserId;
 
       if (userRows.length === 0) {
-        // Create user account
-        const username = email.split('@')[0];
+        // Create user account with firstname.lastname username
+        const username = await generateUsername(first_name, last_name);
         const tempPassword = 'Temp_' + Math.random().toString(36).substring(2, 10) + '!';
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
         const verificationToken = 'token_' + Math.random().toString(36).substring(2, 15);
@@ -733,35 +833,9 @@ export const hireEmployee = async (req, res) => {
           [nextUserId, username, hashedPassword, first_name.trim(), middle_name || null, last_name.trim(), suffix || null, fullName, email.trim(), phone_number || null, mappedRole, status || 'Active', verificationToken, schoolId]
         );
 
-        // Get Prefix & generate employee number
-        const [settingsRows] = await pool.query("SELECT prefix_faculty, prefix_staff FROM school_settings WHERE id = ?", [schoolId]);
-        const facultyPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_faculty) ? settingsRows[0].prefix_faculty : 'SF';
-        const staffPrefix = (settingsRows.length > 0 && settingsRows[0].prefix_staff) ? settingsRows[0].prefix_staff : 'SA';
-        const isFaculty = (position || '').toLowerCase().includes('teacher') || (position || '').toLowerCase().includes('professor') || (position || '').toLowerCase().includes('instructor');
-        const customPrefix = isFaculty ? facultyPrefix : staffPrefix;
-        const currentYear = new Date().getFullYear();
-        const idPrefix = `${customPrefix}${currentYear}-`;
-
-        const [lastEmployeeRows] = await pool.query(
-          "SELECT employee_id FROM employees WHERE employee_id LIKE ? ORDER BY id DESC LIMIT 1",
-          [`${idPrefix}%`]
-        );
-
-        let newNum = "0001";
-        if (lastEmployeeRows.length > 0) {
-          const lastEmployeeId = lastEmployeeRows[0].employee_id;
-          const lastNum = parseInt(lastEmployeeId.substring(idPrefix.length), 10);
-          if (!isNaN(lastNum)) {
-            newNum = String(lastNum + 1).padStart(4, '0');
-          }
-        }
-        if (!employeeNumber) {
-          employeeNumber = `${idPrefix}${newNum}`;
-        }
-
         // Send the invitation / credentials email
         try {
-          await sendStaffInvitationEmail(email, fullName, mappedRole, verificationToken, username, req);
+          await sendStaffInvitationEmail(email.trim(), fullName, mappedRole, verificationToken, username, req);
         } catch (emailErr) {
           console.error("Email send failed for new EIS hire:", emailErr.message);
         }
@@ -773,10 +847,6 @@ export const hireEmployee = async (req, res) => {
         );
       }
 
-      if (!employeeNumber) {
-        const currentYear = new Date().getFullYear();
-        employeeNumber = `EMP-${currentYear}-${String(nextUserId).padStart(4, '0')}`;
-      }
       const [maxEmpRows] = await pool.query("SELECT COALESCE(MAX(id), 0) AS maxId FROM employees");
       const nextEmpId = maxEmpRows[0].maxId + 1;
 
@@ -791,8 +861,8 @@ export const hireEmployee = async (req, res) => {
           psa_status, psa_file, coe_status, coe_file, nbi_status, nbi_file,
           sss_doc_status, sss_doc_file, philhealth_doc_status, philhealth_doc_file,
           pagibig_doc_status, pagibig_doc_file, tin_doc_status, tin_doc_file, employment_history, employment_status,
-          salary_type
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          salary_type, employee_type, assignments_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           nextEmpId, employeeNumber, first_name.trim(), middle_name || null, last_name.trim(), suffix || null, position, department, parseFloat(basic_salary) || 0, status || 'Active', phone_number || null, email.trim(),
           levelsStr, rolesStr,
@@ -801,7 +871,9 @@ export const hireEmployee = async (req, res) => {
           sss_doc_status || 'Pending', sss_doc_file || null, philhealth_doc_status || 'Pending', philhealth_doc_file || null,
           pagibig_doc_status || 'Pending', pagibig_doc_file || null, tin_doc_status || 'Pending', tin_doc_file || null, employment_history || 'Hired Active',
           employment_status || 'Probationary',
-          salary_type || 'Monthly'
+          salary_type || 'Monthly',
+          employee_type || (isFaculty ? 'Teaching' : 'Non-Teaching'),
+          finalAssignmentsJson
         ]
       );
 
@@ -809,11 +881,11 @@ export const hireEmployee = async (req, res) => {
         req.user?.id || 1,
         req.user?.role || 'Admin',
         "EIS_HIRE",
-        `Hired/Registered employee: ${fullName} (${position})`,
+        `Hired/Registered employee: ${fullName} (${position}, ID: ${employeeNumber})`,
         req
       );
 
-      return res.status(200).json({ success: true, message: "Employee registered and user account credentials dispatched." });
+      return res.status(200).json({ success: true, message: `Employee successfully registered with ID ${employeeNumber}.` });
     }
   } catch (error) {
     console.error("hireEmployee error:", error);

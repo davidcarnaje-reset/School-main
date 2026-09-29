@@ -41,10 +41,16 @@ export const addSubject = async (req, res) => {
     level_category, 
     subject_type = 'None',
     units = 0, 
+    lec_units = 3,
+    lab_units = 0,
+    lab_type = null,
+    day_pattern = null,
     grade_level_applicable, 
     program_id = null, 
     semester = 'N/A',
-    curriculum_year = '2024-2025'
+    curriculum_year = '2025-2026',
+    minutes_per_session = 60,
+    frequency_per_week = 5
   } = req.body;
 
   if (!subject_code || !subject_description || !level_category) {
@@ -65,12 +71,22 @@ export const addSubject = async (req, res) => {
     }
     const finalSemester = (level_category === 'K-10') ? 'N/A' : (semester || '1st');
     const finalSubjectType = (level_category === 'K-10') ? 'None' : (subject_type || 'None');
+    const finalMinutes = parseInt(minutes_per_session, 10) > 0 ? parseInt(minutes_per_session, 10) : 60;
+    const finalFrequency = parseInt(frequency_per_week, 10) > 0 ? parseInt(frequency_per_week, 10) : 5;
+
+    // Units breakdown
+    const isCollege = level_category === 'College';
+    const finalLecUnits = isCollege ? (parseInt(lec_units, 10) >= 0 ? parseInt(lec_units, 10) : 3) : 0;
+    const finalLabUnits = isCollege ? (parseInt(lab_units, 10) >= 0 ? parseInt(lab_units, 10) : 0) : 0;
+    const finalTotalUnits = isCollege ? (finalLecUnits + finalLabUnits) : 0;
+    const finalLabType = (isCollege && finalLabUnits > 0) ? (lab_type || 'Computer Laboratory') : null;
+    const finalDayPattern = day_pattern || null;
 
     const sql = `
       INSERT INTO subjects 
-        (id, level_category, subject_type, subject_code, subject_description, units, grade_level_applicable, program_id, semester, curriculum_year) 
+        (id, level_category, subject_type, subject_code, subject_description, units, lec_units, lab_units, lab_type, day_pattern, grade_level_applicable, program_id, semester, curriculum_year, minutes_per_session, frequency_per_week) 
       VALUES 
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await connection.query(sql, [
@@ -79,11 +95,17 @@ export const addSubject = async (req, res) => {
       finalSubjectType,
       subject_code.toUpperCase().trim(),
       subject_description.trim(),
-      parseInt(units, 10),
+      finalTotalUnits,
+      finalLecUnits,
+      finalLabUnits,
+      finalLabType,
+      finalDayPattern,
       grade_level_applicable,
       finalProgramId,
       finalSemester,
-      curriculum_year.trim()
+      (curriculum_year || '2025-2026').trim(),
+      finalMinutes,
+      finalFrequency
     ]);
 
     await connection.commit();
@@ -230,12 +252,15 @@ export const bulkImportSubjects = async (req, res) => {
         continue;
       }
 
+      const mins = parseInt(sub.minutes_per_session || sub['Minutes Per Session'] || sub['Duration (mins)'] || (cleanCat === 'College' ? 90 : 60), 10) || 60;
+      const freq = parseInt(sub.frequency_per_week || sub.frequency || sub['Frequency'] || sub['Sessions / Week'] || (cleanCat === 'College' ? 2 : (cleanCat === 'SHS' ? 4 : 5)), 10) || 5;
+
       try {
         const sql = `
           INSERT INTO subjects 
-            (id, level_category, subject_type, subject_code, subject_description, units, grade_level_applicable, program_id, semester, curriculum_year) 
+            (id, level_category, subject_type, subject_code, subject_description, units, grade_level_applicable, program_id, semester, curriculum_year, minutes_per_session, frequency_per_week) 
           VALUES 
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         await connection.query(sql, [
           currentNextId++,
@@ -247,7 +272,9 @@ export const bulkImportSubjects = async (req, res) => {
           gradeLevel,
           finalProgramId,
           semester,
-          cleanCurrYear
+          cleanCurrYear,
+          mins,
+          freq
         ]);
 
         insertedCount++;

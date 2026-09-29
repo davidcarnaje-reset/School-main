@@ -49,6 +49,9 @@ const ClassAssignments = () => {
     section_id: '', 
     grade_level: '', 
     room_id: '',    
+    delivery_mode: 'Face-to-Face',
+    online_platform: 'Google Meet',
+    meeting_link: '',
     schedule: '',
     days: '',       
     start_time: '', 
@@ -185,13 +188,16 @@ const handleCloseModal = () => {
                   sectionGrade === subjectGrade;
         });
 
-      // Gagawa tayo ng "Draft List" para sa bawat subject
+      // Gagawa tayo ng "Draft List" para sa bawat subject na may Modality Support
       const newDrafts = eligibleSubjects.map(sub => ({
           subject_id: sub.id,
           subject_code: sub.subject_code,
           subject_description: sub.subject_description,
           teacher_id: '',
           room_id: '',
+          delivery_mode: 'Face-to-Face',
+          online_platform: 'Google Meet',
+          meeting_link: '',
           days: [], // Array muna para madaling i-toggle sa UI
           start_time: '08:00',
           end_time: '09:00'
@@ -221,13 +227,16 @@ const handleCloseModal = () => {
 const handleBulkSave = async (e) => {
       e.preventDefault();
       
-      // 1. Validation: Siguraduhing walang nakalimutan sagutan si Registrar
-      const hasEmptyFields = bulkDrafts.some(draft => 
-          !draft.teacher_id || !draft.room_id || draft.days.length === 0 || !draft.start_time || !draft.end_time
-      );
+      // 1. Validation: Siguraduhing may teacher, schedule, at room (kung hindi pure Online)
+      const hasEmptyFields = bulkDrafts.some(draft => {
+          const isOnline = draft.delivery_mode === 'Online';
+          if (!draft.teacher_id || draft.days.length === 0 || !draft.start_time || !draft.end_time) return true;
+          if (!isOnline && !draft.room_id) return true;
+          return false;
+      });
 
       if (hasEmptyFields) {
-          showAlert('error', 'Missing Information', 'Please complete all fields (Teacher, Room, Days, Time) for every subject before saving.');
+          showAlert('error', 'Missing Information', 'Please complete all required fields (Teacher, Room/Platform, Days, Time) for every subject before saving.');
           return;
       }
       
@@ -404,13 +413,25 @@ return (
                   </div>
                 </td>
                 <td className="p-6">
-                  <div className="space-y-2">
-                    <span className="px-3 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-lg text-[10px] font-black uppercase flex items-center gap-2 w-max">
+                  <div className="space-y-1.5">
+                    <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 w-max">
                       <Clock size={12}/> {item.schedule}
                     </span>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 tracking-widest">
-                      <MapPin size={14} className="text-emerald-500"/> {item.room || 'No Room Assigned'}
-                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {item.delivery_mode === 'Online' ? (
+                        <span className="text-[10px] font-black uppercase text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          🌐 Online ({item.online_platform || 'Virtual'})
+                        </span>
+                      ) : item.delivery_mode === 'Hybrid' ? (
+                        <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          🔄 Hybrid ({item.room || 'Venue TBA'} / {item.online_platform || 'Online'})
+                        </span>
+                      ) : (
+                        <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 tracking-wider">
+                          <MapPin size={13} className="text-emerald-500 shrink-0"/> {item.room || 'No Room Assigned'}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td className="p-6 text-center">
@@ -501,28 +522,80 @@ return (
                     </select>
                 </div>
 
-                {/* 4. ROOM SELECT (ARCHITECT FIX: DROPDOWN NA!) */}
+                {/* MODALITY SELECTOR */}
                 <div className="col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Room / Venue</label>
-                  <select 
-                    required 
-                    value={formData.room_id} 
-                    onChange={e=>setFormData({...formData, room_id: e.target.value})} 
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500"
-                  >
-                    <option value="">-- Select Academic Venue --</option>
-                    {rooms.map(r => {
-                        const roomLabel = (r.room_name?.trim().toLowerCase() === 'room' && r.room_number)
-                          ? `Room ${r.room_number}`
-                          : `${r.room_name}${r.room_number ? ` (${r.room_number})` : ''}`;
-                        return (
-                          <option key={r.id} value={r.id}>
-                              {roomLabel} ({r.room_type} | Capacity: {r.capacity})
-                          </option>
-                        );
-                    })}
-                  </select>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Class Delivery Mode (Modality)</label>
+                  <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, delivery_mode: 'Face-to-Face' })}
+                      className={`py-3 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                        formData.delivery_mode === 'Face-to-Face' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <span>🏫</span> Face-to-Face
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, delivery_mode: 'Online' })}
+                      className={`py-3 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                        formData.delivery_mode === 'Online' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <span>🌐</span> Online Class
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, delivery_mode: 'Hybrid' })}
+                      className={`py-3 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                        formData.delivery_mode === 'Hybrid' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <span>🔄</span> Hybrid
+                    </button>
+                  </div>
                 </div>
+
+                {/* 4. ROOM SELECT OR VIRTUAL PLATFORM */}
+                {formData.delivery_mode === 'Online' ? (
+                  <div className="col-span-2 space-y-2 animate-in fade-in">
+                    <label className="text-[10px] font-black text-cyan-600 uppercase tracking-widest ml-1">Online Platform</label>
+                    <select 
+                      value={formData.online_platform || 'Google Meet'} 
+                      onChange={e=>setFormData({...formData, online_platform: e.target.value})} 
+                      className="w-full p-4 bg-cyan-50 border border-cyan-200 text-cyan-900 rounded-2xl font-bold outline-none focus:border-cyan-500"
+                    >
+                      <option value="Google Meet">Google Meet</option>
+                      <option value="Zoom">Zoom Meeting</option>
+                      <option value="Microsoft Teams">Microsoft Teams</option>
+                      <option value="School LMS / Canvas">School LMS / Canvas</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div className="col-span-2 space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {formData.delivery_mode === 'Hybrid' ? 'Physical Room / Venue (Hybrid Duty)' : 'Room / Venue'}
+                    </label>
+                    <select 
+                      required={formData.delivery_mode !== 'Online'}
+                      value={formData.room_id} 
+                      onChange={e=>setFormData({...formData, room_id: e.target.value})} 
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500"
+                    >
+                      <option value="">-- Select Academic Venue --</option>
+                      {rooms.map(r => {
+                          const roomLabel = (r.room_name?.trim().toLowerCase() === 'room' && r.room_number)
+                            ? `Room ${r.room_number}`
+                            : `${r.room_name}${r.room_number ? ` (${r.room_number})` : ''}`;
+                          return (
+                            <option key={r.id} value={r.id}>
+                                {roomLabel} ({r.room_type} | Capacity: {r.capacity})
+                            </option>
+                          );
+                      })}
+                    </select>
+                  </div>
+                )}
 
                 {/* SCHEDULE BUILDER */}
                 <div className="col-span-2 bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100 space-y-4">
@@ -578,7 +651,7 @@ return (
                 </select>
             </div>
 
-            <div className="p-8 overflow-y-auto bg-slate-50 flex-1">
+            <div className="p-6 md:p-8 overflow-y-auto bg-slate-50/80 flex-1">
                 {bulkDrafts.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-slate-300 space-y-4 py-20">
                         <ListChecks size={64} className="opacity-20"/>
@@ -587,45 +660,165 @@ return (
                 ) : (
                     <div className="space-y-4">
                         {bulkDrafts.map((draft, index) => (
-                            <div key={index} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col xl:flex-row gap-4 items-start xl:items-center">
-                                
-                                {/* SUBJECT NAME */}
-                                <div className="w-full xl:w-1/4">
-                                    <p className="font-black text-slate-800 uppercase text-sm">{draft.subject_code}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase truncate">{draft.subject_description}</p>
-                                </div>
-
-                                {/* TEACHER */}
-                                <select required value={draft.teacher_id} onChange={e => handleDraftChange(index, 'teacher_id', e.target.value)} className="w-full xl:w-1/4 p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none">
-                                    <option value="">-- Assign Teacher --</option>
-                                    {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-                                </select>
-
-                                {/* ROOM */}
-                                <select required value={draft.room_id} onChange={e => handleDraftChange(index, 'room_id', e.target.value)} className="w-full xl:w-1/4 p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none">
-                                    <option value="">-- Assign Room --</option>
-                                    {rooms.map(r => {
-                                        const roomLabel = (r.room_name?.trim().toLowerCase() === 'room' && r.room_number)
-                                          ? `Room ${r.room_number}`
-                                          : `${r.room_name}${r.room_number ? ` (${r.room_number})` : ''}`;
-                                        return <option key={r.id} value={r.id}>{roomLabel}</option>;
-                                    })}
-                                </select>
-
-                                {/* TIME & DAYS */}
-                                <div className="w-full xl:w-auto flex items-center gap-2">
-                                    <div className="flex gap-1">
-                                        {DAYS_MAPPING.map(day => (
-                                            <button key={day.label} type="button" onClick={() => toggleBulkDay(index, day.label)} className={`w-8 h-8 rounded-lg font-black text-[10px] transition-all border ${draft.days.includes(day.label) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-200'}`}>
-                                                {day.label}
-                                            </button>
-                                        ))}
+                            <div 
+                                key={index} 
+                                className="bg-white p-5 md:p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4"
+                            >
+                                {/* 1. TOP HEADER: SUBJECT INFO & MODALITY PILL */}
+                                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                                    <div className="flex items-center gap-3">
+                                        <span className="px-3 py-1 bg-blue-50 text-blue-700 font-mono font-black text-xs rounded-xl border border-blue-200/60 shadow-xs shrink-0">
+                                            {draft.subject_code}
+                                        </span>
+                                        <h4 className="text-sm font-black text-slate-800 tracking-tight leading-snug">
+                                            {draft.subject_description}
+                                        </h4>
                                     </div>
-                                    <input required type="time" value={draft.start_time} onChange={e => handleDraftChange(index, 'start_time', e.target.value)} className="p-2 bg-slate-50 border border-slate-100 rounded-lg font-bold text-xs outline-none" />
-                                    <span className="text-slate-300 font-bold">-</span>
-                                    <input required type="time" value={draft.end_time} onChange={e => handleDraftChange(index, 'end_time', e.target.value)} className="p-2 bg-slate-50 border border-slate-100 rounded-lg font-bold text-xs outline-none" />
+
+                                    {/* MODALITY SELECTOR CHIPS */}
+                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDraftChange(index, 'delivery_mode', 'Face-to-Face')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                                                draft.delivery_mode === 'Face-to-Face' 
+                                                    ? 'bg-white text-blue-700 shadow-xs border border-slate-200/60' 
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                        >
+                                            <span>🏫</span> F2F
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDraftChange(index, 'delivery_mode', 'Online')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                                                draft.delivery_mode === 'Online' 
+                                                    ? 'bg-cyan-600 text-white shadow-xs' 
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                        >
+                                            <span>🌐</span> Online
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDraftChange(index, 'delivery_mode', 'Hybrid')}
+                                            className={`px-3 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                                                draft.delivery_mode === 'Hybrid' 
+                                                    ? 'bg-purple-600 text-white shadow-xs' 
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                        >
+                                            <span>🔄</span> Hybrid
+                                        </button>
+                                    </div>
                                 </div>
 
+                                {/* 2. BOTTOM CONTROLS GRID: 4 BALANCED, DEDICATED COLUMNS */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-end">
+                                    {/* COL 1: ASSIGN TEACHER */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                                            👨‍🏫 Faculty Teacher
+                                        </label>
+                                        <select 
+                                            required 
+                                            value={draft.teacher_id} 
+                                            onChange={e => handleDraftChange(index, 'teacher_id', e.target.value)} 
+                                            className="w-full h-[46px] px-3.5 bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-blue-500 rounded-2xl font-bold text-xs text-slate-800 outline-none transition-all cursor-pointer truncate"
+                                        >
+                                            <option value="">-- Choose Faculty --</option>
+                                            {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                                        </select>
+                                    </div>
+
+                                    {/* COL 2: VENUE / ONLINE PLATFORM (DYNAMIC BASE SA MODALITY) */}
+                                    {draft.delivery_mode === 'Online' ? (
+                                        <div className="space-y-1.5 animate-in fade-in">
+                                            <label className="text-[10px] font-black text-cyan-600 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                                                🌐 Virtual Platform
+                                            </label>
+                                            <select 
+                                                value={draft.online_platform || 'Google Meet'} 
+                                                onChange={e => handleDraftChange(index, 'online_platform', e.target.value)} 
+                                                className="w-full h-[46px] px-3.5 bg-cyan-50 border border-cyan-200 hover:border-cyan-300 text-cyan-900 focus:border-cyan-500 rounded-2xl font-bold text-xs outline-none transition-all cursor-pointer"
+                                            >
+                                                <option value="Google Meet">Google Meet</option>
+                                                <option value="Zoom">Zoom Meeting</option>
+                                                <option value="Microsoft Teams">Microsoft Teams</option>
+                                                <option value="School LMS / Canvas">School LMS / Canvas</option>
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                                                {draft.delivery_mode === 'Hybrid' ? '🔄 Physical Room (Hybrid)' : '🏫 Room / Venue'}
+                                            </label>
+                                            <select 
+                                                required={draft.delivery_mode !== 'Online'} 
+                                                value={draft.room_id} 
+                                                onChange={e => handleDraftChange(index, 'room_id', e.target.value)} 
+                                                className="w-full h-[46px] px-3.5 bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-blue-500 rounded-2xl font-bold text-xs text-slate-800 outline-none transition-all cursor-pointer truncate"
+                                            >
+                                                <option value="">-- Choose Venue --</option>
+                                                {rooms.map(r => {
+                                                    const roomLabel = (r.room_name?.trim().toLowerCase() === 'room' && r.room_number)
+                                                      ? `Room ${r.room_number}`
+                                                      : `${r.room_name}${r.room_number ? ` (${r.room_number})` : ''}`;
+                                                    return <option key={r.id} value={r.id}>{roomLabel}</option>;
+                                                })}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* COL 3: CLASS DAYS CHIPS */}
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between ml-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                                🗓️ Class Days
+                                            </label>
+                                            <span className="text-[9px] font-bold text-blue-600 lowercase">{draft.days.length} selected</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-1 bg-slate-50 border border-slate-200 rounded-2xl h-[46px]">
+                                            {DAYS_MAPPING.map(day => (
+                                                <button 
+                                                    key={day.label} 
+                                                    type="button" 
+                                                    onClick={() => toggleBulkDay(index, day.label)} 
+                                                    className={`flex-1 h-8 mx-0.5 rounded-xl font-black text-[10px] transition-all border ${
+                                                        draft.days.includes(day.label) 
+                                                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                                                            : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'
+                                                    }`}
+                                                >
+                                                    {day.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* COL 4: TIME SCHEDULE */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 ml-1">
+                                            ⏰ Time (Start - End)
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2 h-[46px]">
+                                            <input 
+                                                required 
+                                                type="time" 
+                                                value={draft.start_time} 
+                                                onChange={e => handleDraftChange(index, 'start_time', e.target.value)} 
+                                                className="w-full h-full px-2 bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-blue-500 rounded-2xl font-bold text-xs outline-none text-slate-700 transition-all text-center cursor-pointer" 
+                                            />
+                                            <input 
+                                                required 
+                                                type="time" 
+                                                value={draft.end_time} 
+                                                onChange={e => handleDraftChange(index, 'end_time', e.target.value)} 
+                                                className="w-full h-full px-2 bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-blue-500 rounded-2xl font-bold text-xs outline-none text-slate-700 transition-all text-center cursor-pointer" 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>

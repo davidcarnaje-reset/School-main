@@ -33,34 +33,53 @@ export const getSections = async (req, res) => {
         (
           SELECT e.department 
           FROM employees e 
-          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
           LIMIT 1
         ) AS department,
         (
           SELECT e.position 
           FROM employees e 
-          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
           LIMIT 1
         ) AS position,
         (
           SELECT e.assigned_levels 
           FROM employees e 
-          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
           LIMIT 1
         ) AS assigned_levels,
         (
           SELECT e.assigned_roles 
           FROM employees e 
-          WHERE e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
           LIMIT 1
-        ) AS assigned_roles
+        ) AS assigned_roles,
+        (
+          SELECT e.assignments_json 
+          FROM employees e 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS assignments_json,
+        (
+          SELECT e.employee_type 
+          FROM employees e 
+          WHERE (u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))) 
+          LIMIT 1
+        ) AS employee_type
       FROM users u 
       WHERE (
         u.role IN ('teacher', 'Teacher', 'Faculty', 'faculty', 'instructor', 'Instructor', 'professor', 'Professor')
         OR EXISTS (
           SELECT 1 FROM employees e 
-          WHERE (e.id = u.id OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))))
-          AND (e.department = 'Faculty' OR e.position LIKE '%Teacher%' OR e.position LIKE '%Faculty%')
+          WHERE ((u.email IS NOT NULL AND e.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(e.email)))
+             OR (LOWER(TRIM(u.first_name)) = LOWER(TRIM(e.first_name)) AND LOWER(TRIM(u.last_name)) = LOWER(TRIM(e.last_name))))
+          AND (e.department LIKE '%Faculty%' OR e.position LIKE '%Teacher%' OR e.position LIKE '%Instructor%' OR e.position LIKE '%Professor%' OR e.position LIKE '%Faculty%')
         )
       ) AND (u.status = 'Active' OR u.status IS NULL)
       ORDER BY u.last_name ASC, u.first_name ASC

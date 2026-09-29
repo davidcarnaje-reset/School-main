@@ -74,17 +74,31 @@ const SectionManagement = () => {
   const isTeacherEligibleForDept = (teacher, targetDept) => {
     if (!teacher) return false;
 
-    // 1. Suriin ang assigned_levels na in-tag ng HR
+    // 1. Suriin ang dynamic assignments_json at assigned_levels na in-tag ng HR
     let levels = [];
+
+    // Parse assignments_json kung mayroon
+    if (teacher.assignments_json) {
+      try {
+        const parsed = typeof teacher.assignments_json === 'string' ? JSON.parse(teacher.assignments_json) : teacher.assignments_json;
+        if (Array.isArray(parsed)) {
+          parsed.forEach(a => {
+            if (a.division) levels.push(a.division);
+            if (a.position) levels.push(a.position);
+          });
+        }
+      } catch (e) {}
+    }
+
     if (Array.isArray(teacher.assigned_levels)) {
-      levels = teacher.assigned_levels;
+      levels = [...levels, ...teacher.assigned_levels];
     } else if (typeof teacher.assigned_levels === 'string' && teacher.assigned_levels.trim() !== '') {
-      levels = teacher.assigned_levels.split(',').map(s => s.trim());
+      levels = [...levels, ...teacher.assigned_levels.split(',').map(s => s.trim())];
     }
 
     if (levels.length > 0) {
       if (targetDept === 'K-10' || targetDept === 'Basic Ed' || targetDept === 'Basic Education') {
-        return levels.some(lvl => /basic|elem|kinder|jhs|k-10|k10/i.test(lvl));
+        return levels.some(lvl => /basic|elem|kinder|jhs|k-10|k10|elementary|junior/i.test(lvl));
       }
       if (targetDept === 'SHS' || targetDept === 'Senior High') {
         return levels.some(lvl => /shs|senior/i.test(lvl));
@@ -101,22 +115,22 @@ const SectionManagement = () => {
 
     if (targetDept === 'K-10') {
       if (deptStr.includes('college') || posStr.includes('college') || deptStr.includes('dean') || posStr.includes('dean') || posStr.includes('professor')) {
-        return false; // College faculty lamang
+        return false;
       }
       if (deptStr.includes('shs') || deptStr.includes('senior high') || posStr.includes('shs')) {
-        return false; // SHS faculty lamang
+        return false;
       }
-      return true; // Pwede sa Basic Ed
+      return true;
     }
 
     if (targetDept === 'SHS') {
       if (deptStr.includes('college') && !deptStr.includes('shs')) {
-        return false; // College faculty lamang
+        return false;
       }
       if ((deptStr.includes('elem') || deptStr.includes('kinder') || deptStr.includes('basic ed')) && !deptStr.includes('shs')) {
-        return false; // Elementary / Kinder faculty lamang
+        return false;
       }
-      return true; // Pwede sa SHS
+      return true;
     }
 
     return false;

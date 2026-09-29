@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Users, Search, UserPlus, Shield, Mail, Edit, Phone, Download,
-  Award, X, FileText, CheckCircle, AlertCircle, Upload, Building2
+  Award, X, FileText, CheckCircle, AlertCircle, Upload, Building2, Loader2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { download201FormPDF } from '../../utils/employee201FormGenerator';
@@ -17,10 +17,66 @@ const HrEmployees = () => {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingEmp, setEditingEmp] = useState(null);
+  const [showAdvancedAssignment, setShowAdvancedAssignment] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Field error states for validation
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+
+  // Division Configuration Catalog for Dynamic Dual-Load Architecture
+  const DIVISION_CONFIG = {
+    'College': {
+      label: 'College / Higher Ed',
+      icon: '🎓',
+      badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+      positions: [
+        'College Instructor',
+        'Assistant Professor',
+        'Associate Professor',
+        'Full Professor',
+        'Program Head / Chair',
+        'College Dean'
+      ],
+      defaultDept: 'Faculty - College of Computer Studies'
+    },
+    'Senior High School': {
+      label: 'Senior High School (SHS)',
+      icon: '🏫',
+      badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
+      positions: [
+        'SHS Faculty Teacher',
+        'Strand Track Lead',
+        'SHS Principal / Coordinator'
+      ],
+      defaultDept: 'Senior High School - STEM Track'
+    },
+    'Basic Education': {
+      label: 'Basic Education (K-12)',
+      icon: '🎒',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      positions: [
+        'Subject Teacher / Class Adviser',
+        'Grade Level Coordinator',
+        'Basic Ed Principal'
+      ],
+      defaultDept: 'Basic Education - Elementary Dept'
+    },
+    'Administrative & Operations': {
+      label: 'Administrative & Operations',
+      icon: '⚙️',
+      badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
+      positions: [
+        'Administrative Officer',
+        'IT Support Staff',
+        'Finance Cashier',
+        'Registrar Officer',
+        'Clinic Nurse',
+        'Facilities Custodian'
+      ],
+      defaultDept: 'Administration'
+    }
+  };
   
   // Helper to validate email format
   const isValidEmail = (email) => {
@@ -70,12 +126,22 @@ const HrEmployees = () => {
     academic_category: 'College',
     position: 'College Instructor',
     department: 'Faculty - College of Computer Studies',
+    employee_type: 'Teaching',
+    assignments: [
+      {
+        id: 1,
+        division: 'College',
+        role: 'College Instructor',
+        load_type: 'Primary Load'
+      }
+    ],
     assigned_levels: ['College'],
     assigned_roles: ['Academic Faculty'],
     basic_salary: 25000,
     status: 'Active',
     phone_number: '',
     employment_history: 'Hired Active',
+    employment_status: 'Probationary',
     salary_type: 'Monthly',
 
     // Government Statutory IDs
@@ -169,14 +235,102 @@ const HrEmployees = () => {
       return;
     }
 
+    if (name === 'tin_number') {
+      setFormData(prev => ({ ...prev, tin_number: formatTIN(value) }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
   };
 
+  // Helper to synchronize assignments into levels, roles, employee_type, and primary position
+  const updateAssignmentsSync = (newAssignments) => {
+    // 1. Determine assigned_levels
+    const divisions = newAssignments.map(a => a.division);
+    const academicLevels = divisions.filter(d => d !== 'Administrative & Operations');
+    const assigned_levels = academicLevels.length > 0 ? Array.from(new Set(academicLevels)) : ['Non-Teaching Operations'];
+
+    // 2. Determine assigned_roles
+    const rolesSet = new Set();
+    newAssignments.forEach(a => {
+      const posLow = (a.role || '').toLowerCase();
+      if (posLow.includes('dean') || posLow.includes('principal') || posLow.includes('head') || posLow.includes('chair') || posLow.includes('lead') || posLow.includes('coordinator')) {
+        rolesSet.add('Academic Management (Dean/Head)');
+      }
+      if (a.division !== 'Administrative & Operations') {
+        rolesSet.add('Academic Faculty');
+      }
+      if (posLow.includes('it support') || posLow.includes('it staff')) {
+        rolesSet.add('IT Support');
+      }
+      if (a.division === 'Administrative & Operations' || posLow.includes('admin') || posLow.includes('cashier') || posLow.includes('registrar') || posLow.includes('nurse') || posLow.includes('custodian') || posLow.includes('officer') || posLow.includes('staff')) {
+        rolesSet.add('Administrative / Operations');
+      }
+    });
+    const assigned_roles = Array.from(rolesSet);
+
+    // 3. Determine employee_type
+    const hasTeaching = newAssignments.some(a => a.division !== 'Administrative & Operations');
+    const hasAdmin = newAssignments.some(a => a.division === 'Administrative & Operations');
+    const employee_type = (hasTeaching && hasAdmin) ? 'Dual-Role' : hasAdmin ? 'Non-Teaching' : 'Teaching';
+
+    // 4. Primary position
+    const primary = newAssignments.find(a => a.load_type === 'Primary Load') || newAssignments[0] || {};
+    const position = primary.role || 'College Instructor';
+
+    setFormData(prev => ({
+      ...prev,
+      assignments: newAssignments,
+      assigned_levels,
+      assigned_roles,
+      employee_type,
+      position
+    }));
+  };
+
+  const handleAddAssignment = () => {
+    const nextId = Date.now();
+    const newAssignment = {
+      id: nextId,
+      division: 'Senior High School',
+      role: 'SHS Faculty Teacher',
+      load_type: formData.assignments.length === 0 ? 'Primary Load' : 'Secondary / Concurrent'
+    };
+    const updated = [...(formData.assignments || []), newAssignment];
+    updateAssignmentsSync(updated);
+  };
+
+  const handleRemoveAssignment = (index) => {
+    if ((formData.assignments || []).length <= 1) {
+      alert("At least one role assignment is required.");
+      return;
+    }
+    const updated = formData.assignments.filter((_, i) => i !== index);
+    if (!updated.some(a => a.load_type === 'Primary Load') && updated.length > 0) {
+      updated[0].load_type = 'Primary Load';
+    }
+    updateAssignmentsSync(updated);
+  };
+
+  const handleAssignmentChange = (index, field, val) => {
+    const updated = (formData.assignments || []).map((item, i) => {
+      if (i !== index) return item;
+      const copy = { ...item, [field]: val };
+      if (field === 'division') {
+        const defaultPositions = DIVISION_CONFIG[val]?.positions || [];
+        copy.role = defaultPositions[0] || '';
+      }
+      return copy;
+    });
+    updateAssignmentsSync(updated);
+  };
+
   const handleHireSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     // 1. Email Validation Checker
     if (!formData.email || !isValidEmail(formData.email)) {
@@ -187,12 +341,13 @@ const HrEmployees = () => {
 
     // 2. PH Phone Number 11 Digits Validation
     if (formData.phone_number) {
-      if (formData.phone_number.length !== 11) {
+      const clean = formData.phone_number.replace(/\D/g, '');
+      if (clean.length !== 11) {
         setPhoneError('Phone contact must be exactly 11 digits (PH standard: 09XXXXXXXXX)');
         alert('Invalid Phone Contact: Philippine standard phone numbers must be exactly 11 digits (e.g. 09171234567).');
         return;
       }
-      if (!formData.phone_number.startsWith('09') && !formData.phone_number.startsWith('0')) {
+      if (!clean.startsWith('09') && !clean.startsWith('0')) {
         setPhoneError('Phone contact must start with 09 (e.g. 09171234567)');
         alert('Invalid PH Phone Number: Mobile contact must start with 09 (e.g. 09171234567).');
         return;
@@ -201,9 +356,11 @@ const HrEmployees = () => {
 
     const payload = {
       ...formData,
+      assignments_json: JSON.stringify(formData.assignments || []),
       ...(editingEmp ? { id: editingEmp.id, employee_id: editingEmp.employee_id } : {})
     };
 
+    setIsSubmitting(true);
     try {
       const res = await axios.post(`${API_BASE_URL}/employee-portal/hire`, payload);
       if (res.data?.success) {
@@ -218,10 +375,13 @@ const HrEmployees = () => {
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.message || "Error submitting EIS form.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const resetForm = () => {
+    setShowAdvancedAssignment(false);
     setEmailError('');
     setPhoneError('');
     setFormData({
@@ -232,6 +392,15 @@ const HrEmployees = () => {
       academic_category: 'College',
       position: 'College Instructor',
       department: 'Faculty - College of Computer Studies',
+      employee_type: 'Teaching',
+      assignments: [
+        {
+          id: 1,
+          division: 'College',
+          role: 'College Instructor',
+          load_type: 'Primary Load'
+        }
+      ],
       assigned_levels: ['College'],
       assigned_roles: ['Academic Faculty'],
       basic_salary: 25000,
@@ -267,83 +436,103 @@ const HrEmployees = () => {
 
   const handleEditClick = (emp) => {
     setEditingEmp(emp);
+    setShowAdvancedAssignment(false);
     setEmailError('');
     setPhoneError('');
     
-    // Helper to parse multi-select levels & roles
-    const parseLevels = () => {
-      if (Array.isArray(emp.assigned_levels)) return emp.assigned_levels;
-      if (typeof emp.assigned_levels === 'string' && emp.assigned_levels.trim()) {
-        return emp.assigned_levels.split(',').map(s => s.trim()).filter(Boolean);
+    // Parse assignments from assignments_json or legacy fields
+    const parseAssignments = () => {
+      if (emp.assignments_json) {
+        try {
+          const parsed = typeof emp.assignments_json === 'string' ? JSON.parse(emp.assignments_json) : emp.assignments_json;
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
       }
+
+      const initial = [];
       const dept = emp.department || '';
-      const lvls = [];
-      if (dept.includes('College') || dept.includes('Faculty') || emp.position?.includes('Professor') || emp.position?.includes('Dean') || emp.position?.includes('Instructor')) lvls.push('College');
-      if (dept.includes('Senior High') || dept.includes('SHS') || emp.position?.includes('SHS')) lvls.push('Senior High School');
-      if (dept.includes('Basic Education') || dept.includes('Elementary') || dept.includes('Junior High') || dept.includes('Kinder')) lvls.push('Basic Education');
-      return lvls.length ? lvls : ['College'];
+      const pos = emp.position || 'College Instructor';
+      
+      let primaryDiv = 'College';
+      if (dept.includes('Senior High') || dept.includes('SHS') || pos.includes('SHS')) primaryDiv = 'Senior High School';
+      else if (dept.includes('Basic Education') || dept.includes('Elementary') || dept.includes('Junior High') || dept.includes('Kinder') || pos.includes('Subject Teacher') || pos.includes('Grade Level')) primaryDiv = 'Basic Education';
+      else if (dept.includes('Administration') || dept.includes('IT') || dept.includes('Cashier') || dept.includes('Registrar') || dept.includes('Clinic') || dept.includes('Facilities') || pos.includes('OFFICER') || pos.includes('STAFF')) primaryDiv = 'Administrative & Operations';
+
+      initial.push({
+        id: 1,
+        division: primaryDiv,
+        role: pos,
+        load_type: 'Primary Load'
+      });
+
+      const rawLevels = Array.isArray(emp.assigned_levels) 
+        ? emp.assigned_levels 
+        : typeof emp.assigned_levels === 'string' 
+        ? emp.assigned_levels.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
+      rawLevels.forEach((lvl, idx) => {
+        const divKey = lvl.includes('Senior') || lvl.includes('SHS') ? 'Senior High School' : lvl.includes('Basic') || lvl.includes('Elem') ? 'Basic Education' : lvl.includes('College') ? 'College' : null;
+        if (divKey && divKey !== primaryDiv && !initial.some(a => a.division === divKey)) {
+          const defaultPos = DIVISION_CONFIG[divKey]?.positions[0] || 'Faculty';
+          initial.push({
+            id: idx + 2,
+            division: divKey,
+            role: defaultPos,
+            load_type: 'Secondary / Concurrent'
+          });
+        }
+      });
+
+      return initial;
     };
 
-    const parseRoles = () => {
-      if (Array.isArray(emp.assigned_roles)) return emp.assigned_roles;
-      if (typeof emp.assigned_roles === 'string' && emp.assigned_roles.trim()) {
-        return emp.assigned_roles.split(',').map(s => s.trim()).filter(Boolean);
-      }
-      const pos = emp.position || '';
-      const roles = [];
-      if (pos.includes('Dean') || pos.includes('Principal') || pos.includes('Head') || pos.includes('Lead') || pos.includes('Chair')) roles.push('Academic Management (Dean/Head)');
-      if (pos.includes('Professor') || pos.includes('Instructor') || pos.includes('Teacher') || pos.includes('Faculty')) roles.push('Academic Faculty');
-      if (pos.includes('STAFF') || pos.includes('OFFICER') || pos.includes('CASHIER') || pos.includes('REGISTRAR') || pos.includes('ADMIN')) roles.push('Administrative / Operations');
-      if (pos.includes('IT')) roles.push('IT Support');
-      return roles.length ? roles : ['Academic Faculty'];
-    };
+    const parsedAssignments = parseAssignments();
+    const hasTeaching = parsedAssignments.some(a => a.division !== 'Administrative & Operations');
+    const hasAdmin = parsedAssignments.some(a => a.division === 'Administrative & Operations');
+    const computedEmpType = emp.employee_type || ((hasTeaching && hasAdmin) ? 'Dual-Role' : hasAdmin ? 'Non-Teaching' : 'Teaching');
 
-    // Parse mock statutory data if none exists
     setFormData({
       first_name: emp.first_name || '',
       middle_name: emp.middle_name || '',
       last_name: emp.last_name || '',
       suffix: emp.suffix || '',
       email: emp.email || '',
-      academic_category: (emp.department || '').includes('Basic Education') || (emp.department || '').includes('Elementary') || (emp.department || '').includes('Junior High') 
-        ? 'Basic Education' 
-        : (emp.department || '').includes('Senior High') || (emp.department || '').includes('SHS')
-        ? 'Senior High School'
-        : (emp.department || '').includes('Administration') || (emp.department || '').includes('IT System') || (emp.department || '').includes('Cashier') || (emp.department || '').includes('Registrar')
-        ? 'Non-Teaching Operations'
-        : 'College',
+      academic_category: emp.academic_category || 'College',
       position: emp.position || 'College Instructor',
       department: emp.department || 'Faculty - College of Computer Studies',
-      assigned_levels: parseLevels(),
-      assigned_roles: parseRoles(),
+      employee_type: computedEmpType,
+      assignments: parsedAssignments,
+      assigned_levels: Array.isArray(emp.assigned_levels) ? emp.assigned_levels : typeof emp.assigned_levels === 'string' && emp.assigned_levels.trim() ? emp.assigned_levels.split(',').map(s => s.trim()) : ['College'],
+      assigned_roles: Array.isArray(emp.assigned_roles) ? emp.assigned_roles : typeof emp.assigned_roles === 'string' && emp.assigned_roles.trim() ? emp.assigned_roles.split(',').map(s => s.trim()) : ['Academic Faculty'],
       basic_salary: emp.basic_salary || 25000,
       status: emp.status || 'Active',
       phone_number: emp.phone_number || '',
-      employment_history: emp.employment_history || 'Promoted',
+      employment_history: emp.employment_history || 'Hired Active',
       employment_status: emp.employment_status || 'Probationary',
       salary_type: emp.salary_type || 'Monthly',
 
-      sss_number: formatSSS(emp.sss_number || '03-9384729-1'),
-      philhealth_number: formatPhilHealth(emp.philhealth_number || '12-094837264-9'),
-      pagibig_number: formatPagIBIG(emp.pagibig_number || '1210-9483-9284'),
-      tin_number: formatTIN(emp.tin_number || '321-094-837-000'),
-      hmo_covered: emp.hmo_covered || 'Yes',
-      hmo_details: emp.hmo_details || 'Maxicare Premium Plan',
+      sss_number: formatSSS(emp.sss_number || ''),
+      philhealth_number: formatPhilHealth(emp.philhealth_number || ''),
+      pagibig_number: formatPagIBIG(emp.pagibig_number || ''),
+      tin_number: formatTIN(emp.tin_number || ''),
+      hmo_covered: emp.hmo_covered || 'No',
+      hmo_details: emp.hmo_details || '',
 
-      psa_status: emp.psa_status || 'Submitted',
-      psa_file: emp.psa_file || 'psa_cert_copy.pdf',
-      coe_status: emp.coe_status || 'Submitted',
-      coe_file: emp.coe_file || 'coe_previous_company.pdf',
+      psa_status: emp.psa_status || 'Pending',
+      psa_file: emp.psa_file || '',
+      coe_status: emp.coe_status || 'Pending',
+      coe_file: emp.coe_file || '',
       nbi_status: emp.nbi_status || 'Pending',
       nbi_file: emp.nbi_file || '',
-      sss_doc_status: emp.sss_doc_status || 'Submitted',
-      sss_doc_file: emp.sss_doc_file || 'sss_static_card.jpg',
-      philhealth_doc_status: emp.philhealth_doc_status || 'Submitted',
-      philhealth_doc_file: emp.philhealth_doc_file || 'philhealth_mdrf.pdf',
+      sss_doc_status: emp.sss_doc_status || 'Pending',
+      sss_doc_file: emp.sss_doc_file || '',
+      philhealth_doc_status: emp.philhealth_doc_status || 'Pending',
+      philhealth_doc_file: emp.philhealth_doc_file || '',
       pagibig_doc_status: emp.pagibig_doc_status || 'Pending',
       pagibig_doc_file: emp.pagibig_doc_file || '',
-      tin_doc_status: emp.tin_doc_status || 'Submitted',
-      tin_doc_file: emp.tin_doc_file || 'tin_id_scan.png'
+      tin_doc_status: emp.tin_doc_status || 'Pending',
+      tin_doc_file: emp.tin_doc_file || ''
     });
     setShowModal(true);
   };
@@ -454,18 +643,38 @@ const HrEmployees = () => {
                     </td>
                     <td className="py-4 pr-4">
                       <div className="space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className={`inline-block text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
                             (emp.position || '').includes('Dean') || (emp.position || '').includes('Principal')
                               ? 'bg-amber-50 text-amber-700 border-amber-200'
                               : (emp.position || '').includes('Head') || (emp.position || '').includes('Lead') || (emp.position || '').includes('Chair')
                               ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : (emp.position || '').includes('Professor') || (emp.position || '').includes('Instructor') || (emp.position || '').includes('Faculty')
+                              : (emp.position || '').includes('Professor') || (emp.position || '').includes('Instructor') || (emp.position || '').includes('Faculty') || (emp.position || '').includes('Teacher')
                               ? 'bg-blue-50 text-blue-700 border-blue-200'
                               : 'bg-slate-50 text-slate-700 border-slate-200'
                           }`}>
-                            {emp.position || 'Academic Faculty'}
+                            {emp.position || 'Employee'}
                           </span>
+
+                          {/* Employee Type Tag */}
+                          {emp.employee_type === 'Dual-Role' ? (
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-100 to-indigo-100 text-indigo-800 border border-indigo-200">
+                              🔄 Dual-Role ({(() => {
+                                try {
+                                  const parsed = typeof emp.assignments_json === 'string' ? JSON.parse(emp.assignments_json) : (emp.assignments_json || []);
+                                  return Array.isArray(parsed) ? `${parsed.length} Roles` : 'Dual';
+                                } catch(e) { return 'Dual'; }
+                              })()})
+                            </span>
+                          ) : emp.employee_type === 'Non-Teaching' ? (
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                              💼 Staff
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              🎓 Faculty
+                            </span>
+                          )}
                         </div>
 
                         {/* Multi-tag Level Badges */}
@@ -570,27 +779,49 @@ const HrEmployees = () => {
             {/* Modal Body (Scrollable content with 3 columns/categories) */}
             <form onSubmit={handleHireSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 text-xs font-semibold text-slate-700">
               
-              {/* GROUP 1: BASIC & JOB DETAILS */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-450 border-b border-slate-100 pb-2">1. Basic & Job Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
+              {/* GROUP 1: BASE EMPLOYMENT & DYNAMIC DUAL-LOAD ASSIGNMENTS */}
+              <div className="space-y-6">
+                <div className="border-b border-slate-100 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-700 flex items-center gap-1.5">
+                      <span>👤</span> 1. Primary Employment & Dynamic Role Loads
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Dual-load architecture supporting concurrent faculty & administrative duties</p>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border w-fit ${
+                    formData.employee_type === 'Dual-Role' 
+                      ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                      : formData.employee_type === 'Non-Teaching' 
+                      ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                  }`}>
+                    {formData.employee_type === 'Dual-Role' ? '🔄 Dual-Role Profile' : formData.employee_type === 'Non-Teaching' ? '⚙️ Non-Teaching Staff' : '🧑‍🏫 Teaching Faculty'}
+                  </span>
+                </div>
+
+                {/* 1A. Name Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">First Name *</label>
-                    <input type="text" name="first_name" value={formData.first_name} onChange={handleInputChange} required placeholder="e.g. Jobel" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                    <input type="text" name="first_name" value={formData.first_name} onChange={handleInputChange} required placeholder="e.g. Jobel" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">Middle Name</label>
-                    <input type="text" name="middle_name" value={formData.middle_name || ''} onChange={handleInputChange} placeholder="e.g. Fernando" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                    <input type="text" name="middle_name" value={formData.middle_name || ''} onChange={handleInputChange} placeholder="e.g. Fernando" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">Last Name *</label>
-                    <input type="text" name="last_name" value={formData.last_name} onChange={handleInputChange} required placeholder="e.g. Jobert" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                    <input type="text" name="last_name" value={formData.last_name} onChange={handleInputChange} required placeholder="e.g. Jobert" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Suffix (if any)</label>
-                    <input type="text" name="suffix" value={formData.suffix || ''} onChange={handleInputChange} placeholder="e.g. Jr., III" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Suffix</label>
+                    <input type="text" name="suffix" value={formData.suffix || ''} onChange={handleInputChange} placeholder="e.g. Jr., III" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
                   </div>
-                  <div className="space-y-1.5">
+                </div>
+
+                {/* 1B. Contact & Home Department Details */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">Email Address *</label>
                     <input 
                       type="email" 
@@ -599,8 +830,8 @@ const HrEmployees = () => {
                       onChange={handleInputChange} 
                       required 
                       placeholder="e.g. jobel@school.edu" 
-                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none transition-all ${
-                        emailError ? 'border-red-400 bg-red-50/50 text-red-900 focus:border-red-500' : 'border-slate-150 text-slate-700 focus:border-blue-500'
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none transition-all ${
+                        emailError ? 'border-red-400 bg-red-50/50 text-red-900 focus:border-red-500' : 'border-slate-200 text-slate-700 focus:border-blue-500'
                       }`} 
                     />
                     {emailError && (
@@ -609,11 +840,11 @@ const HrEmployees = () => {
                       </p>
                     )}
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <div className="flex justify-between items-center">
                       <label className="text-[10px] font-black uppercase text-slate-400">Phone Contact</label>
                       <span className={`text-[9px] font-bold ${formData.phone_number?.length === 11 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        {formData.phone_number?.length || 0}/11 digits
+                        {formData.phone_number?.length || 0}/11
                       </span>
                     </div>
                     <input 
@@ -623,116 +854,19 @@ const HrEmployees = () => {
                       onChange={handleInputChange} 
                       maxLength={11}
                       placeholder="e.g. 09171234567" 
-                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none transition-all ${
-                        phoneError ? 'border-red-400 bg-red-50/50 text-red-900 focus:border-red-500' : 'border-slate-150 text-slate-700 focus:border-blue-500'
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none transition-all ${
+                        phoneError ? 'border-red-400 bg-red-50/50 text-red-900 focus:border-red-500' : 'border-slate-200 text-slate-700 focus:border-blue-500'
                       }`} 
                     />
-                    {phoneError ? (
+                    {phoneError && (
                       <p className="text-[10px] text-red-500 font-bold flex items-center gap-1 animate-in fade-in">
                         <span>⚠️</span> {phoneError}
                       </p>
-                    ) : (
-                      <p className="text-[9px] text-slate-400 font-semibold">Standard PH 11-digit mobile (e.g. 09171234567)</p>
                     )}
                   </div>
-                  {/* MULTI-SELECT ASSIGNED ACADEMIC LEVELS */}
-                  <div className="space-y-2 md:col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                        <span>🎓</span> Assigned Academic Levels Taught (Multi-Select)
-                      </label>
-                      <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                        {(formData.assigned_levels || []).length} Level(s) Selected
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-semibold mb-2">Check all academic divisions handled by this employee:</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {[
-                        { id: 'College', label: 'College / Higher Ed', icon: '🎓' },
-                        { id: 'Senior High School', label: 'Senior High School (SHS)', icon: '🏫' },
-                        { id: 'Basic Education', label: 'Basic Ed (Kinder / Elem / JHS)', icon: '🎒' }
-                      ].map(lvl => {
-                        const isChecked = (formData.assigned_levels || []).includes(lvl.id);
-                        return (
-                          <div 
-                            key={lvl.id} 
-                            onClick={() => {
-                              const current = formData.assigned_levels || [];
-                              const updated = current.includes(lvl.id)
-                                ? current.filter(l => l !== lvl.id)
-                                : [...current, lvl.id];
-                              setFormData(prev => ({ ...prev, assigned_levels: updated.length ? updated : [lvl.id] }));
-                            }}
-                            className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold cursor-pointer select-none transition-all active:scale-[0.98] ${
-                              isChecked 
-                                ? 'bg-blue-50/90 border-blue-300 text-blue-800 shadow-sm ring-1 ring-blue-300/50' 
-                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100/80 hover:border-slate-300'
-                            }`}
-                          >
-                            <input 
-                              type="checkbox" 
-                              checked={isChecked} 
-                              readOnly
-                              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none" 
-                            />
-                            <span>{lvl.icon} {lvl.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* MULTI-SELECT CROSS-FUNCTIONAL ROLES */}
-                  <div className="space-y-2 md:col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                        <span>💼</span> Cross-Functional Roles & Responsibilities (Multi-Select)
-                      </label>
-                      <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                        {(formData.assigned_roles || []).length} Role(s) Selected
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-semibold mb-2">Check all dual responsibilities held (e.g. Faculty + Dean/Head + Admin Operations):</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {[
-                        { id: 'Academic Faculty', label: 'Academic Faculty / Teaching Staff', icon: '🧑‍🏫' },
-                        { id: 'Academic Management (Dean/Head)', label: 'Academic Management (Dean / Chair / Principal)', icon: '👑' },
-                        { id: 'Administrative / Operations', label: 'Administrative / Operations Officer', icon: '⚙️' },
-                        { id: 'IT Support', label: 'IT System Support Staff', icon: '💻' }
-                      ].map(roleItem => {
-                        const isChecked = (formData.assigned_roles || []).includes(roleItem.id);
-                        return (
-                          <div 
-                            key={roleItem.id} 
-                            onClick={() => {
-                              const current = formData.assigned_roles || [];
-                              const updated = current.includes(roleItem.id)
-                                ? current.filter(r => r !== roleItem.id)
-                                : [...current, roleItem.id];
-                              setFormData(prev => ({ ...prev, assigned_roles: updated.length ? updated : [roleItem.id] }));
-                            }}
-                            className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold cursor-pointer select-none transition-all active:scale-[0.98] ${
-                              isChecked 
-                                ? 'bg-indigo-50/90 border-indigo-300 text-indigo-800 shadow-sm ring-1 ring-indigo-300/50' 
-                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100/80 hover:border-slate-300'
-                            }`}
-                          >
-                            <input 
-                              type="checkbox" 
-                              checked={isChecked} 
-                              readOnly
-                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer pointer-events-none" 
-                            />
-                            <span>{roleItem.icon} {roleItem.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Primary Department / Unit</label>
-                    <select name="department" value={formData.department} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Primary Home Department *</label>
+                    <select name="department" value={formData.department} onChange={handleInputChange} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer">
                       <optgroup label="College / Higher Education">
                         <option value="Faculty - College of Computer Studies">College of Computer Studies</option>
                         <option value="Faculty - College of Business & Accountancy">College of Business & Accountancy</option>
@@ -742,14 +876,14 @@ const HrEmployees = () => {
                         <option value="Faculty - College of Nursing & Allied Health">College of Nursing & Allied Health</option>
                       </optgroup>
                       <optgroup label="Senior High School (SHS)">
-                        <option value="Senior High School - STEM Track">SHS - STEM Track Department</option>
-                        <option value="Senior High School - ABM Track">SHS - ABM Track Department</option>
-                        <option value="Senior High School - HUMSS Track">SHS - HUMSS Track Department</option>
-                        <option value="Senior High School - TVL Track">SHS - TVL Track Department</option>
+                        <option value="Senior High School - STEM Track">SHS - STEM Track</option>
+                        <option value="Senior High School - ABM Track">SHS - ABM Track</option>
+                        <option value="Senior High School - HUMSS Track">SHS - HUMSS Track</option>
+                        <option value="Senior High School - TVL Track">SHS - TVL Track</option>
                       </optgroup>
                       <optgroup label="Basic Education (Kinder / Elem / JHS)">
                         <option value="Basic Education - Elementary Dept">Elementary Department</option>
-                        <option value="Basic Education - Junior High Dept">Junior High School (JHS) Dept</option>
+                        <option value="Basic Education - Junior High Dept">Junior High School (JHS)</option>
                         <option value="Basic Education - Kindergarten Dept">Kindergarten Department</option>
                       </optgroup>
                       <optgroup label="Operations & Administration">
@@ -762,73 +896,164 @@ const HrEmployees = () => {
                       </optgroup>
                     </select>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Position / Academic Rank</label>
-                    <select name="position" value={formData.position} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer">
-                      <optgroup label="College Academic Positions">
-                        <option value="College Dean">College Dean (Academic Department Head)</option>
-                        <option value="Program Head / Chair">Program Head / Department Chair</option>
-                        <option value="Full Professor">Full Professor</option>
-                        <option value="Associate Professor">Associate Professor</option>
-                        <option value="Assistant Professor">Assistant Professor</option>
-                        <option value="College Instructor">College Instructor</option>
-                      </optgroup>
-                      <optgroup label="Senior High School Positions">
-                        <option value="SHS Principal / Coordinator">SHS Principal / Academic Coordinator</option>
-                        <option value="Strand Track Lead">Strand Track Lead / Coordinator</option>
-                        <option value="SHS Faculty">SHS Faculty Teacher</option>
-                      </optgroup>
-                      <optgroup label="Basic Education Positions">
-                        <option value="Basic Ed Principal">Basic Ed Principal</option>
-                        <option value="Grade Level Coordinator">Grade Level Coordinator</option>
-                        <option value="Subject Teacher">Subject Teacher / Class Adviser</option>
-                      </optgroup>
-                      <optgroup label="Operations & Support Roles">
-                        <option value="ADMIN OFFICER">Administrative Officer</option>
-                        <option value="IT STAFF">IT Support Staff</option>
-                        <option value="REGISTRAR STAFF">Registrar Officer</option>
-                        <option value="CASHIER STAFF">Finance Cashier</option>
-                        <option value="CUSTODIAN STAFF">Facilities Custodian</option>
-                        <option value="NURSE STAFF">Clinic Nurse</option>
-                      </optgroup>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">Employment Status</label>
-                    <select name="employment_status" value={formData.employment_status} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+                    <select name="employment_status" value={formData.employment_status} onChange={handleInputChange} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer">
                       <option value="Probationary">Probationary</option>
                       <option value="Regular">Regular / Permanent</option>
                       <option value="Contractual">Contractual</option>
                       <option value="Part-time">Part-time</option>
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Basic Monthly Pay (₱) *</label>
-                    <input type="number" name="basic_salary" value={formData.basic_salary} onChange={handleInputChange} required className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                </div>
+
+                {/* 1C. DYNAMIC DUAL-LOAD ASSIGNMENTS TABLE */}
+                <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <span>📋</span> Role & Load Assignments ({formData.assignments.length})
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                        Add single or concurrent teaching divisions and administrative duties
+                      </p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={handleAddAssignment} 
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+                      style={{ backgroundColor: themeColor }}
+                    >
+                      <UserPlus size={13} />
+                      Add Role / Assignment
+                    </button>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Payment Releasing Schedule</label>
-                    <select name="salary_type" value={formData.salary_type || 'Monthly'} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
-                      <option value="Monthly">Monthly Release (Every 30th)</option>
-                      <option value="Semi-Monthly">Semi-Monthly Release (15th & 30th)</option>
-                      <option value="Weekly">Weekly Release (Every Friday)</option>
-                      <option value="Daily">Daily Release (Daily Wage)</option>
+
+                  {/* Dynamic Assignment Rows */}
+                  <div className="space-y-2.5">
+                    {formData.assignments.map((assign, idx) => {
+                      const divConfig = DIVISION_CONFIG[assign.division] || DIVISION_CONFIG['College'];
+                      return (
+                        <div 
+                          key={assign.id || idx} 
+                          className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center gap-3 transition-all hover:border-blue-300"
+                        >
+                          {/* Row Indicator */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-black text-[10px]">
+                              {idx + 1}
+                            </span>
+                          </div>
+
+                          {/* 1. Division / Category */}
+                          <div className="flex-1 min-w-[170px]">
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Division / Sector</label>
+                            <select
+                              value={assign.division}
+                              onChange={(e) => handleAssignmentChange(idx, 'division', e.target.value)}
+                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+                            >
+                              <option value="College">🎓 College / Higher Ed</option>
+                              <option value="Senior High School">🏫 Senior High School (SHS)</option>
+                              <option value="Basic Education">🎒 Basic Education (K-12)</option>
+                              <option value="Administrative & Operations">⚙️ Administrative & Operations</option>
+                            </select>
+                          </div>
+
+                          {/* 2. Position / Role Filtered strictly by chosen Division */}
+                          <div className="flex-[1.5] min-w-[200px]">
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Role / Position Title</label>
+                            <select
+                              value={assign.role}
+                              onChange={(e) => handleAssignmentChange(idx, 'role', e.target.value)}
+                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+                            >
+                              {divConfig.positions.map((posName) => (
+                                <option key={posName} value={posName}>{posName}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* 3. Load Type */}
+                          <div className="flex-1 min-w-[150px]">
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Role Load Type</label>
+                            <select
+                              value={assign.load_type}
+                              onChange={(e) => handleAssignmentChange(idx, 'load_type', e.target.value)}
+                              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+                            >
+                              <option value="Primary Load">Primary Load</option>
+                              <option value="Secondary / Concurrent">Secondary / Concurrent</option>
+                              <option value="Special / Honorarium Duty">Honorarium Duty</option>
+                            </select>
+                          </div>
+
+                          {/* 4. Remove Action */}
+                          <div className="flex items-end justify-end pt-1 md:pt-4">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAssignment(idx)}
+                              disabled={formData.assignments.length <= 1}
+                              title={formData.assignments.length <= 1 ? "At least 1 assignment required" : "Remove this assignment row"}
+                              className={`p-2 rounded-lg transition-all ${
+                                formData.assignments.length <= 1 
+                                  ? 'text-slate-300 cursor-not-allowed' 
+                                  : 'text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer'
+                              }`}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Auto-inferred summary tags bar */}
+                  <div className="pt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-slate-500 border-t border-slate-200/60 mt-2">
+                    <span className="font-black uppercase tracking-wider text-slate-400 mr-1">Auto-detected:</span>
+                    {(formData.assigned_levels || []).map((lvl, i) => (
+                      <span key={'l'+i} className="bg-blue-50 text-blue-700 border border-blue-200/80 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                        🎓 {lvl}
+                      </span>
+                    ))}
+                    {(formData.assigned_roles || []).map((role, i) => (
+                      <span key={'r'+i} className="bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                        💼 {role}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 1D. Compensation, Releasing & Uptime Status */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Basic Monthly Pay (₱) *</label>
+                    <input type="number" name="basic_salary" value={formData.basic_salary} onChange={handleInputChange} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Payment Releasing</label>
+                    <select name="salary_type" value={formData.salary_type || 'Monthly'} onChange={handleInputChange} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer">
+                      <option value="Monthly">Monthly Release</option>
+                      <option value="Semi-Monthly">Semi-Monthly (15th/30th)</option>
+                      <option value="Weekly">Weekly (Every Friday)</option>
+                      <option value="Daily">Daily Wage</option>
                     </select>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">Uptime Status</label>
-                    <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+                    <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer">
                       <option value="Active">Active Duty</option>
                       <option value="Suspended">Suspended</option>
                       <option value="Inactive">Terminated / Inactive</option>
                     </select>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-400">Employment Log History</label>
-                    <input type="text" name="employment_history" value={formData.employment_history} onChange={handleInputChange} placeholder="e.g. Hired on probation, Promoted" className="w-full px-4 py-3 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500" />
+                    <input type="text" name="employment_history" value={formData.employment_history} onChange={handleInputChange} placeholder="e.g. Regularized, Promoted" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500" />
                   </div>
                 </div>
+
               </div>
 
               {/* GROUP 2: GOVERNMENT IDs & STATUTORY NUMBERS */}
@@ -1015,8 +1240,31 @@ const HrEmployees = () => {
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-                <button type="button" onClick={() => { setShowModal(false); setEditingEmp(null); }} className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-all">Cancel</button>
-                <button type="submit" className="px-6 py-3.5 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-xl transition-all" style={{ backgroundColor: themeColor }}>Save Profile</button>
+                <button 
+                  type="button" 
+                  disabled={isSubmitting}
+                  onClick={() => { setShowModal(false); setEditingEmp(null); }} 
+                  className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className={`px-6 py-3.5 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2 min-w-[140px] ${
+                    isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-95 active:scale-95'
+                  }`} 
+                  style={{ backgroundColor: themeColor }}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={15} />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>{editingEmp ? 'Update Profile' : 'Save Profile'}</span>
+                  )}
+                </button>
               </div>
 
             </form>

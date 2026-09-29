@@ -49,11 +49,16 @@ const LandingPage = () => {
   const [formData, setFormData] = useState(initialFormState);
   const [profileImage, setProfileImage] = useState(null);
   const [successData, setSuccessData] = useState(null);
+  const [uniquenessErrors, setUniquenessErrors] = useState({ email: null, mobile_no: null, lrn: null });
+  const [checkingUniqueness, setCheckingUniqueness] = useState(false);
   
   const fillDemoData = () => {
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    const demoTimestamp = Date.now().toString().slice(-4);
+    setUniquenessErrors({ email: null, mobile_no: null, lrn: null });
     setFormData({
       ...initialFormState,
-      lrn: '123456789012',
+      lrn: `123456${randomSuffix}`,
       first_name: 'Maria',
       middle_name: 'Santos',
       last_name: 'Dela Cruz',
@@ -63,7 +68,7 @@ const LandingPage = () => {
       place_of_birth: 'Manila City',
       nationality: 'Filipino',
       religion: 'Roman Catholic',
-      email: `maria.${Math.floor(Math.random()*1000)}@example.com`,
+      email: `maria.delacruz.${demoTimestamp}@example.com`,
       mobile_no: '+639181234567',
       address_house: '#456 Mabini St.',
       address_brgy: 'Poblacion',
@@ -102,6 +107,58 @@ const LandingPage = () => {
   const [captchaChallenge, setCaptchaChallenge] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaError, setCaptchaError] = useState(false);
+
+  // --- DAGDAG: UNIQUENESS PRE-FLIGHT CHECK ---
+  const checkStepUniqueness = async (step) => {
+    if (step === 1 && formData.lrn && formData.lrn.length === 12) {
+      try {
+        setCheckingUniqueness(true);
+        const res = await axios.get(`${API_BASE_URL}/auth/check-uniqueness?lrn=${encodeURIComponent(formData.lrn)}`);
+        setCheckingUniqueness(false);
+        if (res.data.lrn_taken) {
+          setUniquenessErrors(prev => ({ ...prev, lrn: res.data.lrn_message }));
+          return false;
+        } else {
+          setUniquenessErrors(prev => ({ ...prev, lrn: null }));
+        }
+      } catch (e) {
+        setCheckingUniqueness(false);
+        console.error("LRN Uniqueness check error:", e);
+      }
+    }
+
+    if (step === 2) {
+      try {
+        setCheckingUniqueness(true);
+        const res = await axios.get(`${API_BASE_URL}/auth/check-uniqueness?email=${encodeURIComponent(formData.email)}&mobile_no=${encodeURIComponent(formData.mobile_no)}`);
+        setCheckingUniqueness(false);
+        let hasError = false;
+        const newErrors = { ...uniquenessErrors };
+
+        if (res.data.email_taken) {
+          newErrors.email = res.data.email_message;
+          hasError = true;
+        } else {
+          newErrors.email = null;
+        }
+
+        if (res.data.mobile_taken) {
+          newErrors.mobile_no = res.data.mobile_message;
+          hasError = true;
+        } else {
+          newErrors.mobile_no = null;
+        }
+
+        setUniquenessErrors(newErrors);
+        return !hasError;
+      } catch (e) {
+        setCheckingUniqueness(false);
+        console.error("Contact Uniqueness check error:", e);
+        return true;
+      }
+    }
+    return true;
+  };
 
 
 
@@ -259,6 +316,7 @@ const LandingPage = () => {
     if (currentStep === 1) {
       const { first_name, last_name, dob, gender, lrn } = formData;
       const isLrnValid = !lrn || lrn.length === 12; 
+      if (uniquenessErrors.lrn) return false;
       return first_name && last_name && dob && gender && isLrnValid;
     }
     if (currentStep === 2) {
@@ -266,6 +324,7 @@ const LandingPage = () => {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const isEmailValid = emailRegex.test(email);
       const isPhoneValid = mobile_no && mobile_no.length === 13;
+      if (uniquenessErrors.email || uniquenessErrors.mobile_no) return false;
       return isEmailValid && isPhoneValid && address_city && address_province && address_zip && address_house && address_brgy;
     }
     if (currentStep === 3) {
@@ -291,12 +350,15 @@ const LandingPage = () => {
     return true;
   };
 
-  const nextStep = () => {
-    if (isStepValid()) {
-      setCurrentStep(prev => prev + 1);
-      if (currentStep === 5) {
-        generateCaptcha();
-      }
+  const nextStep = async () => {
+    if (!isStepValid() || checkingUniqueness) return;
+    if (currentStep === 1 || currentStep === 2) {
+      const isUnique = await checkStepUniqueness(currentStep);
+      if (!isUnique) return;
+    }
+    setCurrentStep(prev => prev + 1);
+    if (currentStep === 5) {
+      generateCaptcha();
     }
   };
   const prevStep = () => setCurrentStep(prev => prev - 1);
@@ -914,7 +976,17 @@ const LandingPage = () => {
                     />
                   </div>
                   <div className="md:col-span-1">
-                    <Input label="LRN (12 Digits)" value={formData.lrn} onChange={v => handleNumberOnly(v, 'lrn', 12)} placeholder="Ex. 123456789012" maxLength="12"/>
+                    <Input 
+                      label="LRN (12 Digits)" 
+                      value={formData.lrn} 
+                      onChange={v => {
+                        handleNumberOnly(v, 'lrn', 12);
+                        if (uniquenessErrors.lrn) setUniquenessErrors(prev => ({ ...prev, lrn: null }));
+                      }} 
+                      placeholder="Ex. 123456789012" 
+                      maxLength="12"
+                      error={uniquenessErrors.lrn}
+                    />
                   </div>
                   <div className="md:col-span-2"></div>
                   <Input label="First Name" value={formData.first_name} onChange={v=>setFormData({...formData, first_name:v})} placeholder="Ex. Juan / Maria" required/>
@@ -934,8 +1006,29 @@ const LandingPage = () => {
               {/* STEP 2: CONTACT & ADDRESS */}
               {currentStep === 2 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-right-4 duration-300">
-                  <Input label="Email Address" type="email" value={formData.email} onChange={v=>setFormData({...formData, email:v})} placeholder="Ex. juan.delacruz@email.com" required/>
-                  <Input label="Mobile Number" value={formData.mobile_no} onChange={v => handlePhoneInput(v, 'mobile_no')} placeholder="Ex. 09123456789 or +639123456789" required/>
+                  <Input 
+                    label="Email Address" 
+                    type="email" 
+                    value={formData.email} 
+                    onChange={v => {
+                      setFormData(prev => ({ ...prev, email: v }));
+                      if (uniquenessErrors.email) setUniquenessErrors(prev => ({ ...prev, email: null }));
+                    }} 
+                    placeholder="Ex. juan.delacruz@email.com" 
+                    required
+                    error={uniquenessErrors.email}
+                  />
+                  <Input 
+                    label="Mobile Number" 
+                    value={formData.mobile_no} 
+                    onChange={v => {
+                      handlePhoneInput(v, 'mobile_no');
+                      if (uniquenessErrors.mobile_no) setUniquenessErrors(prev => ({ ...prev, mobile_no: null }));
+                    }} 
+                    placeholder="Ex. 09123456789 or +639123456789" 
+                    required
+                    error={uniquenessErrors.mobile_no}
+                  />
                   <div className="md:col-span-2"><Input label="House No. / Street" value={formData.address_house} onChange={v=>setFormData({...formData, address_house:v})} placeholder="Ex. #123 Rizal Street, Subd. Phase 1" required/></div>
 
                   {/* PROVINCE */}
@@ -998,7 +1091,12 @@ const LandingPage = () => {
                           checked={formData.elem_name === 'N/A'} 
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setFormData({ ...formData, elem_name: 'N/A', elem_year: 'N/A', elem_address: 'N/A' });
+                              setFormData({ 
+                                ...formData, 
+                                elem_name: 'N/A', elem_year: 'N/A', elem_address: 'N/A',
+                                jhs_name: 'N/A', jhs_year: 'N/A', jhs_address: 'N/A',
+                                shs_name: 'N/A', shs_year: 'N/A', shs_address: 'N/A', shs_strand: 'N/A'
+                              });
                             } else {
                               setFormData({ ...formData, elem_name: '', elem_year: '', elem_address: '' });
                             }
@@ -1049,7 +1147,11 @@ const LandingPage = () => {
                           checked={formData.jhs_name === 'N/A'} 
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setFormData({ ...formData, jhs_name: 'N/A', jhs_year: 'N/A', jhs_address: 'N/A' });
+                              setFormData({ 
+                                ...formData, 
+                                jhs_name: 'N/A', jhs_year: 'N/A', jhs_address: 'N/A',
+                                shs_name: 'N/A', shs_year: 'N/A', shs_address: 'N/A', shs_strand: 'N/A'
+                              });
                             } else {
                               setFormData({ ...formData, jhs_name: '', jhs_year: '', jhs_address: '' });
                             }
@@ -1385,11 +1487,15 @@ const LandingPage = () => {
               {currentStep < 6 ? (
                 <button 
                   onClick={nextStep} 
-                  disabled={!isStepValid()}
-                  className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${isStepValid() ? 'active:scale-95' : 'opacity-50 grayscale cursor-not-allowed'}`} 
+                  disabled={!isStepValid() || checkingUniqueness}
+                  className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${isStepValid() && !checkingUniqueness ? 'active:scale-95' : 'opacity-50 grayscale cursor-not-allowed'}`} 
                   style={{backgroundColor: branding.theme_color || '#2563eb'}}
                 >
-                  Next Step <ChevronRight size={20}/>
+                  {checkingUniqueness ? (
+                    <><RefreshCw size={18} className="animate-spin" /> Checking...</>
+                  ) : (
+                    <>Next Step <ChevronRight size={20}/></>
+                  )}
                 </button>
               ) : (
                 <button 
@@ -1453,11 +1559,28 @@ const LandingPage = () => {
 };
 
 // Reusable Components WITH SUPPORT FOR MAX AND MAXLENGTH
-const Input = ({ label, type="text", value, onChange, placeholder, required=false, max, maxLength, disabled=false }) => (
+const Input = ({ label, type="text", value, onChange, placeholder, required=false, max, maxLength, disabled=false, error=null, helperText=null }) => (
   <div className="space-y-1.5">
-    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">{label} {required && '*'}</label>
-    <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required} max={max} maxLength={maxLength} disabled={disabled}
-           className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold text-slate-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" />
+    <div className="flex justify-between items-center ml-1">
+      <label className={`text-[10px] font-black uppercase tracking-widest ${error ? 'text-rose-500' : 'text-slate-400'}`}>{label} {required && '*'}</label>
+      {error && <span className="text-[10px] font-bold text-rose-500 animate-in fade-in">{error}</span>}
+    </div>
+    <input 
+      type={type} 
+      value={value} 
+      onChange={e=>onChange(e.target.value)} 
+      placeholder={placeholder} 
+      required={required} 
+      max={max} 
+      maxLength={maxLength} 
+      disabled={disabled}
+      className={`w-full p-4 bg-slate-50 border rounded-2xl outline-none transition-all text-sm font-bold text-slate-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+        error 
+          ? 'border-rose-400 bg-rose-50/40 focus:border-rose-500 focus:bg-white' 
+          : 'border-slate-100 focus:border-blue-500 focus:bg-white'
+      }`} 
+    />
+    {helperText && !error && <span className="text-[10px] font-bold text-slate-400 ml-1">{helperText}</span>}
   </div>
 );
 

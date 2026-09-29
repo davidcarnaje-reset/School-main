@@ -186,13 +186,43 @@ pool.on('error', (err) => {
       // Ignore
     }
 
-    // 4. Add assigned_levels and assigned_roles to employees table if missing
-    try {
-      await pool.query("ALTER TABLE employees ADD COLUMN assigned_levels TEXT NULL");
-    } catch (e) {}
-    try {
-      await pool.query("ALTER TABLE employees ADD COLUMN assigned_roles TEXT NULL");
-    } catch (e) {}
+    // 4. Add assigned_levels, assigned_roles, email, and statutory columns to employees table if missing
+    const employeeCols = [
+      "email VARCHAR(255) NULL",
+      "phone_number VARCHAR(50) NULL",
+      "assigned_levels TEXT NULL",
+      "assigned_roles TEXT NULL",
+      "sss_number VARCHAR(50) NULL",
+      "philhealth_number VARCHAR(50) NULL",
+      "pagibig_number VARCHAR(50) NULL",
+      "tin_number VARCHAR(50) NULL",
+      "hmo_covered VARCHAR(20) DEFAULT 'No'",
+      "hmo_details VARCHAR(255) NULL",
+      "psa_status VARCHAR(50) DEFAULT 'Pending'",
+      "psa_file VARCHAR(255) NULL",
+      "coe_status VARCHAR(50) DEFAULT 'Pending'",
+      "coe_file VARCHAR(255) NULL",
+      "nbi_status VARCHAR(50) DEFAULT 'Pending'",
+      "nbi_file VARCHAR(255) NULL",
+      "sss_doc_status VARCHAR(50) DEFAULT 'Pending'",
+      "sss_doc_file VARCHAR(255) NULL",
+      "philhealth_doc_status VARCHAR(50) DEFAULT 'Pending'",
+      "philhealth_doc_file VARCHAR(255) NULL",
+      "pagibig_doc_status VARCHAR(50) DEFAULT 'Pending'",
+      "pagibig_doc_file VARCHAR(255) NULL",
+      "tin_doc_status VARCHAR(50) DEFAULT 'Pending'",
+      "tin_doc_file VARCHAR(255) NULL",
+      "employment_history TEXT NULL",
+      "employment_status VARCHAR(50) DEFAULT 'Probationary'",
+      "salary_type VARCHAR(50) DEFAULT 'Monthly'",
+      "employee_type VARCHAR(50) DEFAULT 'Teaching'",
+      "assignments_json JSON NULL"
+    ];
+    for (const colDef of employeeCols) {
+      try {
+        await pool.query(`ALTER TABLE employees ADD COLUMN ${colDef}`);
+      } catch (e) {}
+    }
 
     // 5. Add adviser_id and adviser_name to sections table if missing
     try {
@@ -200,6 +230,20 @@ pool.on('error', (err) => {
     } catch (e) {}
     try {
       await pool.query("ALTER TABLE sections ADD COLUMN adviser_name VARCHAR(255) NULL");
+    } catch (e) {}
+
+    // 6. Auto-patch class_assignments for modality (Face-to-Face, Online, Hybrid)
+    try {
+      await pool.query("ALTER TABLE class_assignments ADD COLUMN delivery_mode VARCHAR(50) NOT NULL DEFAULT 'Face-to-Face'");
+    } catch (e) {}
+    try {
+      await pool.query("ALTER TABLE class_assignments ADD COLUMN meeting_link VARCHAR(255) NULL");
+    } catch (e) {}
+    try {
+      await pool.query("ALTER TABLE class_assignments ADD COLUMN online_platform VARCHAR(100) NULL DEFAULT 'Google Meet'");
+    } catch (e) {}
+    try {
+      await pool.query("ALTER TABLE class_assignments MODIFY COLUMN room_id INT NULL");
     } catch (e) {}
   } catch (err) {
     console.error("Failed to patch schema columns:", err.message);
