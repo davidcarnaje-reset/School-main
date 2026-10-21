@@ -245,6 +245,9 @@ pool.on('error', (err) => {
     try {
       await pool.query("ALTER TABLE class_assignments MODIFY COLUMN room_id INT NULL");
     } catch (e) {}
+    try {
+      await pool.query("ALTER TABLE class_assignments MODIFY COLUMN teacher_id INT NULL");
+    } catch (e) {}
   } catch (err) {
     console.error("Failed to patch schema columns:", err.message);
   }

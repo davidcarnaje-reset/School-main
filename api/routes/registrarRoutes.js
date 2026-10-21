@@ -12,7 +12,7 @@ import checkUniqueness from '../controllers/registrar/checkUniqueness.js';
 // Newly migrated controllers
 import { getAcademicPrograms, addAcademicProgram, updateAcademicProgram, deleteAcademicProgram, bulkImportAcademicPrograms } from '../controllers/registrar/academicPrograms.js';
 import { getSubjectDetails, addSubject, deleteSubject, bulkImportSubjects } from '../controllers/registrar/subjectManagement.js';
-import { getClassAssignData, addClassAssign, updateClassAssign, deleteClassAssign, bulkAddClassAssign, deleteAssignment } from '../controllers/registrar/classAssignments.js';
+import { getClassAssignData, addClassAssign, updateClassAssign, deleteClassAssign, bulkAddClassAssign, deleteAssignment, autoScheduleGradeLevel } from '../controllers/registrar/classAssignments.js';
 import { getSections, createSection, getSectionDetails, getSectionsForEnrollment, updateSection, deleteSection } from '../controllers/registrar/sectionsManagement.js';
 import { getRegistrarRequests, getFeesCatalog, searchStudents, addRequest, cancelRequest } from '../controllers/registrar/studentRequests.js';
 import { getStudentRecords, getStudentDocuments, unlockGrades } from '../controllers/registrar/studentRecords.js';
@@ -72,6 +72,7 @@ router.post('/class-assignments', addClassAssign);
 router.put('/class-assignments', updateClassAssign);
 router.delete('/class-assignments', deleteClassAssign);
 router.post('/class-assignments/bulk', bulkAddClassAssign);
+router.post('/class-assignments/auto-schedule', autoScheduleGradeLevel);
 router.post('/class-assignments/deactivate', deleteAssignment);
 
 router.get('/sections', getSections);
@@ -139,6 +140,7 @@ router.post('/add_class_assign.php', addClassAssign);
 router.post('/update_class_assign.php', updateClassAssign);
 router.post('/delete_class_assign.php', deleteClassAssign);
 router.post('/bulk_add_class_assign.php', bulkAddClassAssign);
+router.post('/auto_schedule.php', autoScheduleGradeLevel);
 router.post('/delete_assignment.php', deleteAssignment);
 
 router.get('/manage_sections.php', getSections);

@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { 
   Layers, Plus, Search, BookOpen, Clock, 
-  MapPin, Users, Edit, Trash2, X, CheckCircle, RefreshCw, AlertTriangle, Presentation, ListChecks, Filter
+  MapPin, Users, Edit, Trash2, X, CheckCircle, RefreshCw, AlertTriangle, Presentation, ListChecks, Filter,
+  LayoutGrid, List, Sparkles, ChevronRight, ArrowLeft, Calendar, School, UserCheck, AlertCircle, Award, Check
 } from 'lucide-react';
-import EditClassAssignModal from '../../components/registrar/EditClassAssignModal'; // 🛑 NEW IMPORT
+import EditClassAssignModal from '../../components/registrar/EditClassAssignModal';
+import AutoScheduleModal from '../../components/registrar/AutoScheduleModal';
 import { useAuth } from '../../context/AuthContext';
-import CustomAlert from '../../components/shared/CustomAlert'; // Siguraduhin na tama ang path
+import CustomAlert from '../../components/shared/CustomAlert';
 
 const DAYS_MAPPING = [
   { label: 'M', full: 'Monday' }, { label: 'T', full: 'Tuesday' },
@@ -19,13 +21,21 @@ const ClassAssignments = () => {
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  // 🛑 ARCHITECT ADDITION: Filter State
   const [categoryFilter, setCategoryFilter] = useState('All');
+
+  // VIEW MODE: 'cards' (Default) vs 'list'
+  const [viewMode, setViewMode] = useState('cards');
   
+  // LEVEL DRILLDOWN: null (all level cards) or group object (drilled into e.g. Grade 1)
+  const [activeLevelGroup, setActiveLevelGroup] = useState(null);
+  const [activeSectionTab, setActiveSectionTab] = useState('ALL');
+
   // Modals
   const [showModal, setShowModal] = useState(false);
-  const [showBulkModal, setShowBulkModal] = useState(false); // ARCHITECT: New Bulk Modal State
-  // Ilagay ito sa ilalim ng existing states mo (e.g., sa ilalim ng showBulkModal)
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
+  const [autoScheduleGroup, setAutoScheduleGroup] = useState(null);
+
   const [editModalConfig, setEditModalConfig] = useState({ show: false, data: null });
   const [deleteModalConfig, setDeleteModalConfig] = useState({ show: false, data: null });
   const [isDeleting, setIsDeleting] = useState(false);
@@ -284,14 +294,71 @@ const handleBulkSave = async (e) => {
       }
   };
 
-  // --- FILTER DISPLAY ---
-// --- SMART FILTER DISPLAY ---
+  // --- FILTER DISPLAY  // Group sections by Academic Level / Course & Year
+  const levelGroups = useMemo(() => {
+    const groups = {};
+
+    sections.forEach(sec => {
+      const isCollege = sec.department === 'College' || ['1st Year', '2nd Year', '3rd Year', '4th Year'].includes(sec.grade_level);
+      
+      let key = '';
+      let displayTitle = '';
+      let subTitle = '';
+      let dept = sec.department || 'K-10';
+      let programCode = sec.program_code || null;
+      let programId = sec.program_id || null;
+
+      if (isCollege) {
+        dept = 'College';
+        const progStr = sec.program_code ? sec.program_code : 'General College';
+        key = `college_${sec.program_id || 'gen'}_${sec.grade_level}`;
+        displayTitle = `${progStr} - ${sec.grade_level}`;
+        subTitle = sec.program_description || 'College Degree Curriculum';
+      } else {
+        key = `level_${dept}_${sec.grade_level}`;
+        displayTitle = sec.grade_level;
+        subTitle = dept === 'SHS' 
+          ? (sec.program_code ? `${sec.program_code} Strand` : 'Senior High School')
+          : `${dept} Basic Education`;
+      }
+
+      if (!groups[key]) {
+        groups[key] = {
+          key,
+          grade_level: sec.grade_level,
+          department: dept,
+          program_id: programId,
+          program_code: programCode,
+          title: displayTitle,
+          subtitle: subTitle,
+          sections: []
+        };
+      }
+      groups[key].sections.push(sec);
+    });
+
+    return Object.values(groups);
+  }, [sections]);
+
+  // Filter level groups based on category filter and search
+  const filteredLevelGroups = useMemo(() => {
+    return levelGroups.filter(grp => {
+      const matchesCategory = categoryFilter === 'All' || grp.department === categoryFilter;
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || 
+        grp.title.toLowerCase().includes(searchLower) ||
+        grp.subtitle.toLowerCase().includes(searchLower) ||
+        grp.sections.some(s => s.section_name.toLowerCase().includes(searchLower));
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [levelGroups, categoryFilter, searchQuery]);
+
+  // --- FILTER DISPLAY FOR LIST VIEW ---
   const filteredAssignments = assignments.filter(a => {
-      // 1. Text Search
-      const searchString = `${a.teacher_name} ${a.subject_code} ${a.subject_name} ${a.section_name} ${a.room}`;
+      const searchString = `${a.teacher_name || 'Waiting for Teacher'} ${a.subject_code || ''} ${a.subject_name || ''} ${a.section_name || ''} ${a.room || ''}`;
       const matchesSearch = searchString.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // 2. Department Category Mapping (Inaalam niya kung K-10, SHS, o College base sa Grade Level)
       let department = 'K-10';
       const gl = String(a.grade_level).toLowerCase();
       if (gl.includes('year') || gl.includes('college')) {
@@ -300,7 +367,6 @@ const handleBulkSave = async (e) => {
           department = 'SHS';
       }
 
-      // 3. Category Check
       const matchesCategory = categoryFilter === 'All' || department === categoryFilter;
 
       return matchesSearch && matchesCategory;
@@ -322,133 +388,622 @@ const handleBulkSave = async (e) => {
       finally { setIsDeleting(false); }
   };
 
-return (
+  return (
     <div className="space-y-6 text-left max-w-7xl mx-auto">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <div>
-          <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3 tracking-tighter uppercase">
-            <Presentation className="text-blue-600" size={36} /> Class Assignments
-          </h1>
-          <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1 italic">Conflict-Aware Scheduling System</p>
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl flex items-center justify-center font-black shadow-lg shadow-blue-500/20">
+            <Presentation size={28} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">
+              Class Assignments
+            </h1>
+            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-0.5">
+              Conflict-Aware Scheduling & Auto-Scheduler System
+            </p>
+          </div>
         </div>
-        <div className="flex gap-3">
-            <button onClick={() => setShowBulkModal(true)} className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-6 py-4 rounded-2xl flex items-center gap-2 font-black uppercase text-xs tracking-widest hover:bg-emerald-100 transition-all">
-                <ListChecks size={20} /> Bulk Assign
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* VIEW SWITCHER: Card View vs List View */}
+          <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+            <button
+              onClick={() => {
+                setViewMode('cards');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                viewMode === 'cards'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <LayoutGrid size={15} /> Card View
             </button>
-            <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-6 py-4 rounded-2xl flex items-center gap-2 shadow-xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 transition-all active:scale-95">
-                <Plus size={20} /> Single Class
+            <button
+              onClick={() => {
+                setViewMode('list');
+                setActiveLevelGroup(null);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <List size={15} /> List View
             </button>
+          </div>
+
+          {/* ACTION BUTTONS */}
+          <button 
+            onClick={() => {
+              if (activeLevelGroup) {
+                setAutoScheduleGroup(activeLevelGroup);
+              } else if (filteredLevelGroups.length > 0) {
+                setAutoScheduleGroup(filteredLevelGroups[0]);
+              }
+              setShowAutoScheduleModal(true);
+            }} 
+            className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white px-5 py-3.5 rounded-2xl flex items-center gap-2 font-black uppercase text-xs tracking-wider shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+          >
+            <Sparkles size={16} className="text-amber-300" /> Auto Schedule
+          </button>
+          <button onClick={() => setShowBulkModal(true)} className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-5 py-3.5 rounded-2xl flex items-center gap-2 font-black uppercase text-xs tracking-wider hover:bg-emerald-100 transition-all cursor-pointer">
+            <ListChecks size={18} /> Bulk Assign
+          </button>
+          <button onClick={() => {
+            if (activeLevelGroup) {
+              setFormData({ ...initialForm, grade_level: activeLevelGroup.grade_level });
+            }
+            setShowModal(true);
+          }} className="bg-blue-600 text-white px-5 py-3.5 rounded-2xl flex items-center gap-2 shadow-md font-black uppercase text-xs tracking-wider hover:bg-blue-700 transition-all active:scale-95 cursor-pointer">
+            <Plus size={18} /> Single Class
+          </button>
         </div>
       </div>
 
-      {/* SEARCH */}
-{/* 🛑 ARCHITECT FIX: SEARCH & FILTER BAR */}
-      <div className="flex flex-col md:flex-row gap-4 mb-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-             type="text" 
-             placeholder="Search by teacher, subject code, section, or room..." 
-             value={searchQuery} 
-             onChange={(e) => setSearchQuery(e.target.value)} 
-             className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all" 
-          />
-        </div>
-        
-        {/* NEW FILTER DROPDOWN */}
-        <div className="relative w-full md:w-72">
-           <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-           <select 
-              value={categoryFilter} 
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all appearance-none cursor-pointer"
-           >
-              <option value="All">All Departments</option>
-              <option value="College">College</option>
-              <option value="SHS">Senior High (SHS)</option>
-              <option value="K-10">K-10 (Kinder - Gr.10)</option>
-           </select>
-        </div>
-      </div>
-
-      {/* TABLE */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
-        <table className="w-full">
-          <thead className="bg-slate-50/50 border-b border-slate-100">
-            <tr>
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-10 text-left">Teacher & Load</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left">Target Section</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left">Schedule & Venue</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {loading ? (
-              <tr><td colSpan="4" className="p-20 text-center text-slate-300 font-black uppercase animate-pulse">Synchronizing Data...</td></tr>
-            ) : filteredAssignments.length === 0 ? (
-              <tr><td colSpan="4" className="p-20 text-center text-slate-300 font-black uppercase">No records found.</td></tr>
-            ) : filteredAssignments.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/50 transition-all group">
-                <td className="p-6 pl-10">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black text-lg border-2 border-white shadow-sm">
-                      {item.teacher_name?.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-black text-slate-800 text-sm uppercase">{item.teacher_name}</p>
-                      <p className="text-[10px] font-bold text-blue-500 uppercase flex items-center gap-1 mt-1">
-                        <BookOpen size={12}/> {item.subject_code}: {item.subject_name}
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-6">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-slate-100 rounded-lg text-slate-500"><Users size={16}/></div>
-                    <div>
-                      <p className="font-black text-slate-700 text-sm uppercase">{item.section_name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">{item.grade_level}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-6">
-                  <div className="space-y-1.5">
-                    <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 w-max">
-                      <Clock size={12}/> {item.schedule}
-                    </span>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {item.delivery_mode === 'Online' ? (
-                        <span className="text-[10px] font-black uppercase text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                          🌐 Online ({item.online_platform || 'Virtual'})
+      {/* ========================================================================= */}
+      {/* 1. CARD VIEW (DEFAULT) */}
+      {/* ========================================================================= */}
+      {viewMode === 'cards' && (
+        <>
+          {/* A. LEVEL DRILLDOWN VIEW (WHEN A LEVEL CARD IS CLICKED) */}
+          {activeLevelGroup ? (
+            <div className="space-y-6">
+              {/* BREADCRUMB & LEVEL ACTION BAR */}
+              <div className="bg-white p-6 px-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => {
+                      setActiveLevelGroup(null);
+                      setActiveSectionTab('ALL');
+                    }}
+                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-all flex items-center gap-1.5 text-xs font-black uppercase cursor-pointer"
+                  >
+                    <ArrowLeft size={16} /> Back to Levels
+                  </button>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black uppercase">
+                        {activeLevelGroup.department}
+                      </span>
+                      {activeLevelGroup.program_code && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black uppercase">
+                          {activeLevelGroup.program_code}
                         </span>
-                      ) : item.delivery_mode === 'Hybrid' ? (
-                        <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                          🔄 Hybrid ({item.room || 'Venue TBA'} / {item.online_platform || 'Online'})
-                        </span>
-                      ) : (
-                        <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 tracking-wider">
-                          <MapPin size={13} className="text-emerald-500 shrink-0"/> {item.room || 'No Room Assigned'}
-                        </p>
                       )}
+                      <span className="text-slate-400 text-xs font-semibold">
+                        {activeLevelGroup.sections.length} Active {activeLevelGroup.sections.length === 1 ? 'Section' : 'Sections'}
+                      </span>
                     </div>
+                    <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800">
+                      {activeLevelGroup.title} Overview & Schedules
+                    </h2>
                   </div>
-                </td>
-                <td className="p-6 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => setEditModalConfig({ show: true, data: item })} className="p-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all">
-                            <Edit size={18}/>
-                        </button>
-                        <button onClick={() => setDeleteModalConfig({ show: true, data: item })} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                            <Trash2 size={18}/>
-                        </button>
-                    </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setAutoScheduleGroup(activeLevelGroup);
+                      setShowAutoScheduleModal(true);
+                    }}
+                    className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles size={16} className="text-amber-300" /> Auto Schedule {activeLevelGroup.grade_level}
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION TABS (WHEN MULTIPLE SECTIONS EXIST) */}
+              {activeLevelGroup.sections.length > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <button
+                    onClick={() => setActiveSectionTab('ALL')}
+                    className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      activeSectionTab === 'ALL'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300'
+                    }`}
+                  >
+                    All Sections ({activeLevelGroup.sections.length})
+                  </button>
+                  {activeLevelGroup.sections.map(sec => (
+                    <button
+                      key={sec.id}
+                      onClick={() => setActiveSectionTab(sec.id)}
+                      className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        activeSectionTab === sec.id
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300'
+                      }`}
+                    >
+                      Section {sec.section_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* SECTION DETAILS CARDS & TIMETABLES */}
+              <div className="space-y-6">
+                {activeLevelGroup.sections
+                  .filter(sec => activeSectionTab === 'ALL' || activeSectionTab === sec.id)
+                  .map(sec => {
+                    const secAssignments = assignments.filter(a => a.section_id === sec.id);
+                    const waitingCount = secAssignments.filter(a => !a.teacher_id).length;
+                    const assignedCount = secAssignments.filter(a => a.teacher_id).length;
+
+                    return (
+                      <div key={sec.id} className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
+                        {/* SECTION HEADER BAR */}
+                        <div className="p-6 px-8 bg-slate-50/70 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-black text-lg border-2 border-white shadow-sm">
+                              {sec.section_name.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100">
+                                  {sec.grade_level}
+                                </span>
+                                {sec.adviser_name && (
+                                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100 flex items-center gap-1">
+                                    <UserCheck size={11} /> Adviser: {sec.adviser_name}
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="text-xl font-black uppercase tracking-tight text-slate-800">
+                                Section {sec.section_name}
+                              </h3>
+                            </div>
+                          </div>
+
+                          {/* Status pills & add button */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-black uppercase tracking-wider">
+                              Cap: {sec.max_capacity || 40}
+                            </span>
+                            {secAssignments.length > 0 ? (
+                              <>
+                                <span className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                                  <CheckCircle size={14} /> {assignedCount} Scheduled
+                                </span>
+                                {waitingCount > 0 && (
+                                  <span className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+                                    <Clock size={14} /> {waitingCount} Waiting For Teacher
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-black uppercase tracking-wider">
+                                No Schedule Yet
+                              </span>
+                            )}
+                            <button
+                              onClick={() => {
+                                setFormData({ ...initialForm, section_id: sec.id, grade_level: sec.grade_level });
+                                setShowModal(true);
+                              }}
+                              className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Plus size={14} /> Add Class
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* SECTION TIMETABLE TABLE */}
+                        {secAssignments.length === 0 ? (
+                          <div className="p-16 text-center bg-slate-50/30">
+                            <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mx-auto mb-4 border-2 border-white shadow-sm">
+                              <Clock size={28} />
+                            </div>
+                            <h4 className="text-base font-black text-slate-700 uppercase tracking-tight">
+                              No Classes Scheduled for Section {sec.section_name}
+                            </h4>
+                            <p className="text-xs text-slate-400 font-semibold max-w-md mx-auto mt-1 mb-5">
+                              Generate timetables automatically using our conflict-aware scheduler with teacher tagging.
+                            </p>
+                            <button
+                              onClick={() => {
+                                setAutoScheduleGroup(activeLevelGroup);
+                                setShowAutoScheduleModal(true);
+                              }}
+                              className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all inline-flex items-center gap-2 cursor-pointer"
+                            >
+                              <Sparkles size={14} className="text-amber-300" /> Auto Schedule Now
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-slate-50/50 border-b border-slate-100">
+                                <tr>
+                                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-8 text-left">Subject & Load</th>
+                                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left">Schedule & Time</th>
+                                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left">Teacher Assigned</th>
+                                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left">Venue / Modality</th>
+                                  <th className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-50">
+                                {secAssignments.map(item => (
+                                  <tr key={item.id} className="hover:bg-slate-50/50 transition-all">
+                                    <td className="p-5 pl-8">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-black text-xs">
+                                          <BookOpen size={16} />
+                                        </div>
+                                        <div>
+                                          <p className="font-black text-slate-800 text-sm uppercase">{item.subject_code}</p>
+                                          <p className="text-xs text-slate-500 font-semibold truncate max-w-xs">{item.subject_name}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="p-5">
+                                      <span className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 w-max">
+                                        <Clock size={13} className="text-blue-500" /> {item.schedule}
+                                      </span>
+                                    </td>
+                                    <td className="p-5">
+                                      {item.teacher_name ? (
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-9 h-9 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center font-black text-xs border border-purple-100">
+                                            {item.teacher_name.charAt(0)}
+                                          </div>
+                                          <div>
+                                            <p className="font-black text-slate-800 text-xs uppercase">{item.teacher_name}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase">Assigned Faculty</p>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 w-max animate-pulse">
+                                          <Clock size={13} /> Waiting For Teacher
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-5">
+                                      <div className="flex items-center gap-2">
+                                        {item.delivery_mode === 'Online' ? (
+                                          <span className="text-[10px] font-black uppercase text-cyan-700 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                                            🌐 Online ({item.online_platform || 'Google Meet'})
+                                          </span>
+                                        ) : item.delivery_mode === 'Hybrid' ? (
+                                          <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                                            🔄 Hybrid ({item.room || 'TBA'})
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs font-bold text-slate-600 uppercase flex items-center gap-1.5">
+                                            <MapPin size={14} className="text-emerald-500 shrink-0" /> {item.room || 'Room TBA'}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-5 text-center">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <button
+                                          onClick={() => setEditModalConfig({ show: true, data: item })}
+                                          className="p-2.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all cursor-pointer"
+                                          title="Edit Schedule & Assign Teacher"
+                                        >
+                                          <Edit size={16} />
+                                        </button>
+                                        <button
+                                          onClick={() => setDeleteModalConfig({ show: true, data: item })}
+                                          className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                                          title="Delete Class Schedule"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          ) : (
+            /* B. LEVEL CARDS GRID (MAIN CARD VIEW) */
+            <div className="space-y-6">
+              {/* SEARCH & CATEGORY FILTER BAR */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="Filter by grade level, course, or section name..." 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all text-sm" 
+                  />
+                </div>
+
+                {/* DEPARTMENT FILTER TABS */}
+                <div className="flex items-center bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
+                  {['All', 'K-10', 'SHS', 'College'].map(dept => (
+                    <button
+                      key={dept}
+                      onClick={() => setCategoryFilter(dept)}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+                        categoryFilter === dept
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      {dept === 'All' ? 'All Departments' : dept === 'K-10' ? 'K-10 Basic Ed' : dept === 'SHS' ? 'Senior High (SHS)' : 'College Blocks'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* GRID OF LEVEL CARDS */}
+              {loading ? (
+                <div className="p-20 text-center font-black text-slate-300 uppercase tracking-widest animate-pulse">
+                  Loading Academic Levels...
+                </div>
+              ) : filteredLevelGroups.length === 0 ? (
+                <div className="bg-white rounded-[2.5rem] p-16 text-center border border-slate-100 shadow-sm">
+                  <School size={48} className="mx-auto text-slate-300 mb-3" />
+                  <h3 className="text-lg font-black text-slate-700 uppercase">No Academic Levels Found</h3>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    No active sections match your current filter. Create sections in Section Management first.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredLevelGroups.map(group => {
+                    const groupSectionIds = group.sections.map(s => s.id);
+                    const groupAssignments = assignments.filter(a => groupSectionIds.includes(a.section_id));
+                    const totalScheduled = groupAssignments.length;
+                    const waitingCount = groupAssignments.filter(a => !a.teacher_id).length;
+                    const assignedCount = groupAssignments.filter(a => a.teacher_id).length;
+
+                    return (
+                      <div
+                        key={group.key}
+                        onClick={() => {
+                          setActiveLevelGroup(group);
+                          setActiveSectionTab('ALL');
+                        }}
+                        className="group bg-white rounded-[2.5rem] p-7 border-2 border-slate-100 hover:border-blue-500/60 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col justify-between cursor-pointer text-left relative overflow-hidden"
+                      >
+                        {/* TOP ACCENT STRIP */}
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                        <div>
+                          {/* BADGES ROW */}
+                          <div className="flex items-center justify-between gap-2 mb-4">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                              group.department === 'College' 
+                                ? 'bg-blue-100 text-blue-700' 
+                                : group.department === 'SHS'
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {group.department}
+                            </span>
+
+                            <span className="text-[11px] font-bold text-slate-400">
+                              {group.sections.length} {group.sections.length === 1 ? 'Section' : 'Sections'}
+                            </span>
+                          </div>
+
+                          {/* TITLE & SUBTITLE */}
+                          <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors">
+                            {group.title}
+                          </h3>
+                          <p className="text-xs text-slate-400 font-semibold mt-1">
+                            {group.subtitle}
+                          </p>
+
+                          {/* SECTIONS PILLS */}
+                          <div className="mt-5 pt-4 border-t border-slate-100">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                              Included Sections:
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {group.sections.map(s => (
+                                <span 
+                                  key={s.id} 
+                                  className="px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-700 text-xs font-bold uppercase"
+                                >
+                                  {s.section_name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* STATUS & CALL TO ACTION */}
+                        <div className="mt-6 pt-4 border-t border-slate-100">
+                          <div className="flex items-center justify-between mb-4">
+                            {totalScheduled === 0 ? (
+                              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                                <Clock size={13} /> Not Yet Scheduled
+                              </span>
+                            ) : waitingCount > 0 ? (
+                              <span className="text-[11px] font-black text-amber-600 flex items-center gap-1.5 animate-pulse">
+                                <Clock size={13} /> {waitingCount} Waiting For Teacher
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-black text-emerald-600 flex items-center gap-1.5">
+                                <CheckCircle size={13} /> {totalScheduled} Classes Scheduled
+                              </span>
+                            )}
+
+                            <span className="text-xs font-bold text-blue-600 group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                              View <ChevronRight size={14} />
+                            </span>
+                          </div>
+
+                          {/* QUICK ACTION BUTTON */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAutoScheduleGroup(group);
+                              setShowAutoScheduleModal(true);
+                            }}
+                            className="w-full py-3 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <Sparkles size={14} className="text-amber-500" /> Auto-Schedule {group.grade_level}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. LIST VIEW (CLASSIC TABLE VIEW) */}
+      {/* ========================================================================= */}
+      {viewMode === 'list' && (
+        <div className="space-y-4">
+          {/* SEARCH & FILTER BAR */}
+          <div className="flex flex-col md:flex-row gap-4 mb-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="Search by teacher, subject code, section, or room..." 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all" 
+              />
+            </div>
+            
+            <div className="relative w-full md:w-72">
+              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <select 
+                value={categoryFilter} 
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-slate-700 shadow-sm transition-all appearance-none cursor-pointer"
+              >
+                <option value="All">All Departments</option>
+                <option value="College">College</option>
+                <option value="SHS">Senior High (SHS)</option>
+                <option value="K-10">K-10 (Kinder - Gr.10)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* TABLE */}
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
+            <table className="w-full">
+              <thead className="bg-slate-50/50 border-b border-slate-100">
+                <tr>
+                  <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-10 text-left">Teacher & Load</th>
+                  <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left">Target Section</th>
+                  <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left">Schedule & Venue</th>
+                  <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {loading ? (
+                  <tr><td colSpan="4" className="p-20 text-center text-slate-300 font-black uppercase animate-pulse">Synchronizing Data...</td></tr>
+                ) : filteredAssignments.length === 0 ? (
+                  <tr><td colSpan="4" className="p-20 text-center text-slate-300 font-black uppercase">No records found.</td></tr>
+                ) : filteredAssignments.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/50 transition-all group">
+                    <td className="p-6 pl-10">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black text-lg border-2 border-white shadow-sm">
+                          {(item.teacher_name || 'W').charAt(0)}
+                        </div>
+                        <div>
+                          {item.teacher_name ? (
+                            <p className="font-black text-slate-800 text-sm uppercase">{item.teacher_name}</p>
+                          ) : (
+                            <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-[10px] font-black uppercase flex items-center gap-1 w-max">
+                              <Clock size={11} /> Waiting For Teacher
+                            </span>
+                          )}
+                          <p className="text-[10px] font-bold text-blue-500 uppercase flex items-center gap-1 mt-1">
+                            <BookOpen size={12}/> {item.subject_code}: {item.subject_name}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-6">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-slate-100 rounded-lg text-slate-500"><Users size={16}/></div>
+                        <div>
+                          <p className="font-black text-slate-700 text-sm uppercase">{item.section_name}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">{item.grade_level}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-6">
+                      <div className="space-y-1.5">
+                        <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 w-max">
+                          <Clock size={12}/> {item.schedule}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {item.delivery_mode === 'Online' ? (
+                            <span className="text-[10px] font-black uppercase text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              🌐 Online ({item.online_platform || 'Virtual'})
+                            </span>
+                          ) : item.delivery_mode === 'Hybrid' ? (
+                            <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              🔄 Hybrid ({item.room || 'Venue TBA'} / {item.online_platform || 'Online'})
+                            </span>
+                          ) : (
+                            <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 tracking-wider">
+                              <MapPin size={13} className="text-emerald-500 shrink-0"/> {item.room || 'No Room Assigned'}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-6 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            <button onClick={() => setEditModalConfig({ show: true, data: item })} className="p-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all">
+                                <Edit size={18}/>
+                            </button>
+                            <button onClick={() => setDeleteModalConfig({ show: true, data: item })} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                                <Trash2 size={18}/>
+                            </button>
+                        </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* CREATE MODAL */}
       {showModal && (
@@ -468,8 +1023,8 @@ return (
                 {/* 1. TEACHER SELECT */}
                 <div className="col-span-2 space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assign Teacher</label>
-                  <select required value={formData.teacher_id} onChange={e=>setFormData({...formData, teacher_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500">
-                    <option value="">-- Select Faculty Member --</option>
+                  <select value={formData.teacher_id} onChange={e=>setFormData({...formData, teacher_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500">
+                    <option value="">⏳ Waiting For Teacher (Unassigned)</option>
                     {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
                   </select>
                 </div>
@@ -841,6 +1396,18 @@ return (
         title={alertConfig.title}
         message={alertConfig.message}
         onClose={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* 🛑 AUTO SCHEDULE MODAL 🛑 */}
+      <AutoScheduleModal 
+        isOpen={showAutoScheduleModal}
+        onClose={() => setShowAutoScheduleModal(false)}
+        targetGroup={autoScheduleGroup}
+        teachers={teachers}
+        subjects={subjects}
+        rooms={rooms}
+        onSuccess={fetchAssignmentData}
+        showAlert={showAlert}
       />
 
       {/* 🛑 EDIT MODAL 🛑 */}

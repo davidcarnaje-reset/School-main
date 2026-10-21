@@ -220,8 +220,8 @@ const EditClassAssignModal = ({ isOpen, onClose, assignmentData, teachers, subje
                         {/* TEACHER */}
                         <div className="col-span-2 space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assign Teacher</label>
-                            <select required value={formData.teacher_id} onChange={e=>setFormData({...formData, teacher_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 text-sm">
-                                <option value="">-- Select Faculty Member --</option>
+                            <select value={formData.teacher_id} onChange={e=>setFormData({...formData, teacher_id: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 text-sm">
+                                <option value="">⏳ Waiting For Teacher (Unassigned)</option>
                                 {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
                             </select>
                         </div>
