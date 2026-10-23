@@ -33,7 +33,11 @@ const StudentLayout = () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/student/get_students.php`);
       const studentsList = res.data.students || [];
-      const myData = studentsList.find(s => s.email === user.email);
+      const myId = user?.student_id || user?.username || user?.id;
+      const myData = studentsList.find(s => 
+        (myId && String(s.student_id).toLowerCase() === String(myId).toLowerCase()) || 
+        (user?.email && String(s.email).toLowerCase() === String(user.email).toLowerCase())
+      ) || (studentsList.length > 0 ? studentsList[0] : null);
 
       if (myData) {
         setStudentData(myData);
@@ -46,7 +50,7 @@ const StudentLayout = () => {
     } catch (err) {
       console.error("Fetch error:", err);
     }
-  }, [user.email, API_BASE_URL]);
+  }, [user, API_BASE_URL]);
 
   // FETCH NOTIFICATIONS
   const fetchNotifications = async () => {
@@ -57,8 +61,8 @@ const StudentLayout = () => {
         `${API_BASE_URL}/notifications/get_notifications.php?user_id=${currentId}&role=student`
       );
       if (response.data.success) {
-        setNotifications(response.data.notifications);
-        setUnreadCount(response.data.unread_count);
+        setNotifications(response.data.notifications || []);
+        setUnreadCount(response.data.unread_count || 0);
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -66,11 +70,11 @@ const StudentLayout = () => {
   };
 
   useEffect(() => {
-    if (user?.email) {
+    if (user) {
       fetchData();
       fetchNotifications();
     }
-  }, [user?.email, fetchData]);
+  }, [user, fetchData]);
 
   // ====================================================
   // 📌 DITO NATIN DINAGDAG ANG GRADES SA SIDEBAR

@@ -4,7 +4,7 @@ import axios from 'axios';
 import { 
   FileText, Video, CheckSquare, Award, Clock, MoreVertical, 
   MessageCircle, FileDown, PieChart as PieChartIcon, 
-  LayoutGrid, List as ListIcon, CheckCircle, Loader2
+  LayoutGrid, List as ListIcon, CheckCircle, Loader2, User
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -98,9 +98,12 @@ const LmsSingleSubject = () => {
             <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight leading-tight max-w-2xl drop-shadow-sm">
               {courseInfo.title || 'Loading Subject...'}
             </h1>
-            <p className="font-bold text-white/80 flex items-center gap-2">
-              Teacher: {courseInfo.teacher || 'TBA'}
-            </p>
+            <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-white/90 mt-2">
+              <span className="flex items-center gap-1.5"><User size={14} /> Teacher: {courseInfo.teacher || 'TBA'}</span>
+              {courseInfo.section_name && <span className="flex items-center gap-1.5 opacity-80">• Section: {courseInfo.section_name}</span>}
+              {courseInfo.schedule && <span className="flex items-center gap-1.5 opacity-80"><Clock size={13} /> {courseInfo.schedule}</span>}
+              {courseInfo.room && courseInfo.room !== 'TBA' && <span className="flex items-center gap-1.5 opacity-80">• Room: {courseInfo.room}</span>}
+            </div>
          </div>
 
          {/* PIE CHART (Dynamic Standing) */}

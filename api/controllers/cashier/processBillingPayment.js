@@ -1,6 +1,7 @@
 import pool from '../../config/db.js';
 import { logAuditTrail } from '../../utils/auditLogger.js';
 import { sendOfficialEnrollmentSuccessEmail } from '../../utils/emailEngine.js';
+import { syncStudentEnrolledClasses } from '../../utils/lmsSync.js';
 
 const processBillingPayment = async (req, res) => {
   const { student_id, allocations, mark_as_enrolled } = req.body;
@@ -68,7 +69,7 @@ const processBillingPayment = async (req, res) => {
     const new_balance = new_total_amount - new_paid_amount;
     
     // Status logic
-    const new_status = (new_balance <= 0) ? 'Fully Paid' : 'Partially Paid';
+    const new_status = (new_balance <= 0) ? 'Fully Paid' : 'Partial';
 
     // 4. I-UPDATE NA ANG SUMMARY TABLE (student_billing)
     await connection.query(
@@ -82,6 +83,11 @@ const processBillingPayment = async (req, res) => {
         "UPDATE enrollments SET status = 'Enrolled' WHERE student_id = ? AND status = 'Assessed'",
         [student_id]
       );
+
+      // Auto-sync LMS enrolled classes
+      syncStudentEnrolledClasses(student_id).catch(err => {
+        console.error("LMS auto-sync non-fatal error:", err.message);
+      });
 
       // Fetch student details for official enrollment email notification
       const [studentInfoRows] = await connection.query(

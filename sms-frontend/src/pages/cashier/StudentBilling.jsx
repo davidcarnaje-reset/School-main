@@ -50,6 +50,9 @@ const StudentBilling = () => {
   const [selectedGrant, setSelectedGrant] = useState(null); // Para sa modal data
   const [processing, setProcessing] = useState(false); // Loading state ng modal button
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
+
   const fetchBillingList = async (query = searchId, status = statusFilter) => {
     setListLoading(true);
     try {
@@ -66,9 +69,14 @@ const StudentBilling = () => {
     }
   };
 
+  // Debounced search on input/filter change
   useEffect(() => {
-    fetchBillingList(searchId, statusFilter);
-  }, [statusFilter]);
+    const timer = setTimeout(() => {
+      fetchBillingList(searchId, statusFilter);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchId, statusFilter]);
 
   // --- LOGIC FUNCTIONS ---
   const handleSearch = async (targetId = null) => {
@@ -391,11 +399,7 @@ const StudentBilling = () => {
             placeholder="Search Student Name or ID..."
             className="w-full md:w-[400px] pl-14 pr-4 py-4 bg-white border-2 border-slate-100 rounded-[2rem] font-bold text-xs shadow-sm outline-none focus:border-indigo-500 transition-all group-hover:border-slate-300"
             value={searchId}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSearchId(val);
-              fetchBillingList(val, statusFilter);
-            }}
+            onChange={(e) => setSearchId(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && handleSearch()}
           />
           <Search
@@ -480,69 +484,99 @@ const StudentBilling = () => {
                       </td>
                     </tr>
                   ) : (
-                    studentList.map((item) => {
-                      const statusUpper = (item.payment_status || "UNPAID").toUpperCase();
-                      const statusColor =
-                        statusUpper === "PAID"
-                          ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                          : statusUpper === "PARTIAL"
-                          ? "bg-amber-50 text-amber-600 border-amber-100"
-                          : "bg-rose-50 text-rose-600 border-rose-100";
+                    studentList
+                      .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                      .map((item) => {
+                        const statusUpper = (item.payment_status || "UNPAID").toUpperCase();
+                        const statusColor =
+                          statusUpper === "PAID"
+                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                            : statusUpper === "PARTIAL"
+                            ? "bg-amber-50 text-amber-600 border-amber-100"
+                            : "bg-rose-50 text-rose-600 border-rose-100";
 
-                      return (
-                        <tr
-                          key={item.billing_id}
-                          className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
-                          onClick={() => handleSelectStudent(item.student_id)}
-                        >
-                          <td className="py-4 px-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black text-xs">
-                                <User size={20} />
+                        return (
+                          <tr
+                            key={item.billing_id}
+                            className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                            onClick={() => handleSelectStudent(item.student_id)}
+                          >
+                            <td className="py-4 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black text-xs">
+                                  <User size={20} />
+                                </div>
+                                <div>
+                                  <h4 className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">
+                                    {item.first_name} {item.last_name}
+                                  </h4>
+                                  <span className="text-[10px] font-bold text-slate-400 tracking-wider">
+                                    {item.student_id}
+                                  </span>
+                                </div>
                               </div>
-                              <div>
-                                <h4 className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">
-                                  {item.first_name} {item.last_name}
-                                </h4>
-                                <span className="text-[10px] font-bold text-slate-400 tracking-wider">
-                                  {item.student_id}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 px-4 font-bold text-xs text-slate-600">
-                            {item.program_code || item.grade_level || "Active Student"}
-                          </td>
-                          <td className="py-4 px-4 text-right font-black text-xs text-slate-800">
-                            ₱{parseFloat(item.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-4 px-4 text-right font-bold text-xs text-emerald-600">
-                            ₱{parseFloat(item.paid_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-4 px-4 text-right font-black text-xs text-rose-600">
-                            ₱{parseFloat(item.balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-4 px-4 text-center">
-                            <span className={`px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest ${statusColor}`}>
-                              {statusUpper}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => handleSelectStudent(item.student_id)}
-                              className="inline-flex items-center gap-1 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-wider transition-all"
-                            >
-                              <span>View</span>
-                              <ChevronRight size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
+                            </td>
+                            <td className="py-4 px-4 font-bold text-xs text-slate-600">
+                              {item.program_code || item.grade_level || "Active Student"}
+                            </td>
+                            <td className="py-4 px-4 text-right font-black text-xs text-slate-800">
+                              ₱{parseFloat(item.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-4 px-4 text-right font-bold text-xs text-emerald-600">
+                              ₱{parseFloat(item.paid_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-4 px-4 text-right font-black text-xs text-rose-600">
+                              ₱{parseFloat(item.balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <span className={`px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest ${statusColor}`}>
+                                {statusUpper}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => handleSelectStudent(item.student_id)}
+                                className="inline-flex items-center gap-1 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-wider transition-all"
+                              >
+                                <span>View</span>
+                                <ChevronRight size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {studentList.length > itemsPerPage && (
+              <div className="flex items-center justify-between pt-6 mt-4 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-400">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, studentList.length)} of {studentList.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs font-black text-slate-700 px-2">
+                    {currentPage} / {Math.ceil(studentList.length / itemsPerPage)}
+                  </span>
+                  <button
+                    disabled={currentPage >= Math.ceil(studentList.length / itemsPerPage)}
+                    onClick={() => setCurrentPage((p) => Math.min(Math.ceil(studentList.length / itemsPerPage), p + 1))}
+                    className="px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : (

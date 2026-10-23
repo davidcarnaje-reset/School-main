@@ -23,6 +23,14 @@ import {
 } from '../controllers/cashier/paymentsController.js';
 
 import { manageFees } from '../controllers/cashier/feesController.js';
+import {
+  getProcessPaymentStudents,
+  getStudentPayableDetails,
+  processUnifiedPayment,
+  getPromissoryNotes,
+  savePromissoryNote,
+  settlePromissoryNote
+} from '../controllers/cashier/unifiedPaymentsController.js';
 
 import { 
   getEmployees, 
@@ -112,5 +120,20 @@ router.get('/payroll/employee-timesheet', getEmployeePayrollTimesheet);
 router.get('/get_employee_payroll_timesheet.php', getEmployeePayrollTimesheet);
 router.get('/get_payroll_settings.php', getPayrollSettings);
 router.post('/save_payroll_settings.php', updatePayrollSettings);
+
+// Unified Payments, Enrollment Billing & Promissory Notes
+router.get('/process-payment-students', getProcessPaymentStudents);
+router.get('/get_process_payment_students.php', getProcessPaymentStudents);
+router.get('/student-payable-details', getStudentPayableDetails);
+router.get('/get_student_payable_details.php', getStudentPayableDetails);
+router.post('/process-unified-payment', processUnifiedPayment);
+router.post('/process_unified_payment.php', processUnifiedPayment);
+
+router.get('/promissory-notes', getPromissoryNotes);
+router.get('/get_promissory_notes.php', getPromissoryNotes);
+router.post('/save-promissory-note', savePromissoryNote);
+router.post('/save_promissory_note.php', savePromissoryNote);
+router.post('/settle-promissory-note', settlePromissoryNote);
+router.post('/settle_promissory_note.php', settlePromissoryNote);
 
 export default router;

@@ -42,10 +42,11 @@ const LmsDashboard = () => {
     if (user) fetchDashboardData();
   }, [user, API_BASE_URL]);
 
-  // THEME SELECTOR LOGIC
+  // THEME & VIEW SELECTOR LOGIC (Cache first, then Grade Level fallback)
   const gradeLevelStr = user?.grade_level || 'Grade 10'; 
   const gradeLevelNum = parseInt(gradeLevelStr.replace(/\D/g, '')) || 10;
-  const isKidsView = gradeLevelNum <= 6;
+  const cachedKiddie = localStorage.getItem('lms_kiddie_mode');
+  const isKidsView = cachedKiddie !== null ? cachedKiddie === '1' : gradeLevelNum <= 6;
 
   if (loading) {
     return (

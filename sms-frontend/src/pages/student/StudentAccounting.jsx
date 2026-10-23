@@ -29,7 +29,11 @@ const StudentAccounting = () => {
       const res = await axios.get(`${API_BASE_URL}/student/get_students.php`);
       const allStudents = res.data.students || []; 
       const allItems = res.data.billing_items || [];
-      const myData = allStudents.find(s => s.email === user.email);
+      const myId = user?.student_id || user?.username || user?.id;
+      const myData = allStudents.find(s => 
+        (myId && String(s.student_id).toLowerCase() === String(myId).toLowerCase()) || 
+        (user?.email && String(s.email).toLowerCase() === String(user.email).toLowerCase())
+      ) || (allStudents.length > 0 ? allStudents[0] : null);
       
       if (myData) {
         // Kunin lahat ng items (kahit paid na) para sa detailed breakdown
@@ -69,8 +73,13 @@ const StudentAccounting = () => {
   };
 
   useEffect(() => {
-    if (user?.email) fetchData();
-  }, [user.email]);
+    if (user) {
+      fetchData();
+    } else {
+      const timer = setTimeout(() => setLoading(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   const handlePrint = () => {
     printCertificateOfRegistration(studentData, branding);

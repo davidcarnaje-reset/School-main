@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import axios from "axios";
 import {
@@ -30,6 +30,7 @@ import ReadNotificationModal from "../components/shared/ReadNotificationModal";
 
 const CashierLayout = () => {
   const { logout, user, branding, activePermissions, API_BASE_URL, getLogoUrl } = useAuth();
+  const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return JSON.parse(localStorage.getItem('cashierSidebarCollapsed')) ?? false;
@@ -47,7 +48,6 @@ const CashierLayout = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [selectedNotif, setSelectedNotif] = useState(null);
-  const location = useLocation();
   const notifRef = useRef(null);
 
   useEffect(() => {
@@ -131,29 +131,29 @@ const CashierLayout = () => {
     return perm ? perm.is_enabled === 1 : false;
   };
 
-  const isCurrentPortalEnabled = () => {
+  const portalEnabled = useMemo(() => {
     if (activePermissions === null) return true; // Wait for load
     const rolePerms = activePermissions.filter(p => p.role.toLowerCase() === 'cashier');
     if (rolePerms.length === 0) return false;
     return rolePerms.some(p => p.is_enabled === 1);
-  };
+  }, [activePermissions]);
 
-  const portalEnabled = isCurrentPortalEnabled();
+  const finalMenuItems = useMemo(() => {
+    if (!portalEnabled) return [];
+    const filtered = menuItems.filter(item => {
+      if (item.type === 'header') return true;
+      if (!item.module) return true;
+      return isModuleEnabled("cashier", item.module);
+    });
 
-  const filteredMenuItems = !portalEnabled ? [] : menuItems.filter(item => {
-    if (item.type === 'header') return true;
-    if (!item.module) return true;
-    return isModuleEnabled("cashier", item.module);
-  });
-
-  // Clean trailing/duplicate headers
-  const finalMenuItems = filteredMenuItems.filter((item, idx, arr) => {
-    if (item.type === 'header') {
-      const nextItem = arr[idx + 1];
-      return nextItem && nextItem.type !== 'header';
-    }
-    return true;
-  });
+    return filtered.filter((item, idx, arr) => {
+      if (item.type === 'header') {
+        const nextItem = arr[idx + 1];
+        return nextItem && nextItem.type !== 'header';
+      }
+      return true;
+    });
+  }, [portalEnabled, activePermissions]);
 
   return (
     <div

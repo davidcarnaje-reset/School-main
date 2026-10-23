@@ -43,7 +43,8 @@ const StudentScholarship = () => {
 
   const fetchMyApplications = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/student/get_student_applications.php?email=${user.email}`);
+      const emailQuery = user?.email || user?.student_id || '';
+      const res = await axios.get(`${API_BASE_URL}/student/get_student_applications.php?email=${emailQuery}`);
       if (res.data.status === 'success') {
         setMyApplications(res.data.data);
       }

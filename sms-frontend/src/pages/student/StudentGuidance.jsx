@@ -134,7 +134,11 @@ const StudentGuidance = () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/student/get_students.php`);
       const studentsList = res.data.students || [];
-      const myData = studentsList.find(s => s.email === user.email);
+      const myId = user?.student_id || user?.username || user?.id;
+      const myData = studentsList.find(s => 
+        (myId && String(s.student_id).toLowerCase() === String(myId).toLowerCase()) || 
+        (user?.email && String(s.email).toLowerCase() === String(user.email).toLowerCase())
+      ) || (studentsList.length > 0 ? studentsList[0] : null);
       if (myData) {
         setStudentData(myData);
         fetchAppointments(myData.student_id);
@@ -145,7 +149,7 @@ const StudentGuidance = () => {
     } finally {
       setLoading(false);
     }
-  }, [user.email, API_BASE_URL]);
+  }, [user, API_BASE_URL]);
 
   const fetchAppointments = async (studentId) => {
     try {

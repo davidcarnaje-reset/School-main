@@ -15,7 +15,7 @@ import {
 // ==========================================
 // 1. REVENUE ANALYTICS CHART
 // ==========================================
-export const RevenueAnalytics = ({ data = [] }) => {
+export const RevenueAnalytics = React.memo(({ data = [] }) => {
   const displayData = data.length > 0 ? data : [
     { day: "Mon", amount: 0 },
     { day: "Tue", amount: 0 },
@@ -27,7 +27,7 @@ export const RevenueAnalytics = ({ data = [] }) => {
   ];
 
   return (
-    <div className="bg-white p-5 rounded-[2rem] border-2 border-slate-200 shadow-sm hover:border-slate-400 transition-all duration-300">
+    <div className="bg-white p-5 rounded-[2rem] border-2 border-slate-200 shadow-sm hover:border-slate-300 transition-colors duration-200">
       <div className="flex justify-between items-center mb-4">
         <div>
           <h2 className="text-[11px] font-black uppercase tracking-widest text-slate-700 italic">
@@ -88,9 +88,9 @@ export const RevenueAnalytics = ({ data = [] }) => {
       </div>
     </div>
   );
-};
+});
 
-export const MonthlyBarChart = ({ branding, data = [] }) => {
+export const MonthlyBarChart = React.memo(({ branding, data = [] }) => {
   // LOGIC PARA SA TATLONG BULAN (Prev, Current, Next)
   const months = [
     "Jan",
@@ -116,7 +116,7 @@ export const MonthlyBarChart = ({ branding, data = [] }) => {
   ];
 
   return (
-    <div className="bg-white p-5 rounded-[2rem] border-2 border-slate-200 shadow-sm hover:border-slate-400 transition-all duration-300 h-[260px]">
+    <div className="bg-white p-5 rounded-[2rem] border-2 border-slate-200 shadow-sm hover:border-slate-300 transition-colors duration-200 h-[260px]">
       <div className="mb-4">
         <h2 className="text-[11px] font-black uppercase tracking-widest text-slate-700 italic">
           Monthly Overview
@@ -164,31 +164,31 @@ export const MonthlyBarChart = ({ branding, data = [] }) => {
       </div>
     </div>
   );
-};
+});
 
-export const StatCard = ({ title, value, icon: Icon, colorClass, subText }) => (
-  <div className="relative overflow-hidden bg-white px-3 py-1 md:px-4 md:py-2 rounded-[1.2rem] md:rounded-[1.5rem] border-2 border-slate-200 shadow-sm hover:border-slate-400 transition-all duration-300 group flex items-center gap-2 md:gap-3 h-[75px] md:h-[85px] cursor-default">
-    {/* ICON - Mawawala (scale-0) at mag-sh-shrink (w-0) kapag nahover ang card */}
+export const StatCard = React.memo(({ title, value, icon: Icon, colorClass, subText }) => (
+  <div className="relative overflow-hidden bg-white px-3 py-1 md:px-4 md:py-2 rounded-[1.2rem] md:rounded-[1.5rem] border-2 border-slate-200 shadow-sm hover:border-indigo-400 transition-all duration-200 group flex items-center gap-2 md:gap-3 h-[75px] md:h-[85px] cursor-default">
+    {/* ICON */}
     <div
-      className={`p-2 md:p-2.5 rounded-xl ${colorClass} text-white shadow-lg shrink-0 transition-all duration-300 group-hover:scale-0 group-hover:w-0 group-hover:opacity-0 group-hover:p-0`}
+      className={`p-2 md:p-2.5 rounded-xl ${colorClass} text-white shadow-md shrink-0 transition-transform duration-200 group-hover:scale-105`}
     >
       <Icon size={16} className="md:w-[18px] md:h-[18px]" />
     </div>
 
-    {/* TEXT CONTENT - Mag-e-expand at lalaki ang font kapag nahover */}
-    <div className="min-w-0 flex-1 flex flex-col justify-center h-full transition-all duration-300 group-hover:pl-2">
-      <p className="text-[7px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1 leading-none truncate transition-all duration-300 group-hover:text-[9px] md:group-hover:text-[11px] group-hover:text-slate-600">
+    {/* TEXT CONTENT */}
+    <div className="min-w-0 flex-1 flex flex-col justify-center h-full">
+      <p className="text-[7px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1 leading-none truncate transition-colors duration-200 group-hover:text-slate-600">
         {title}
       </p>
 
-      <h3 className="text-[12px] sm:text-sm md:text-base lg:text-lg font-black text-slate-800 italic tracking-tighter truncate leading-none transition-all duration-300 group-hover:scale-110 origin-left group-hover:text-indigo-600">
+      <h3 className="text-[12px] sm:text-sm md:text-base lg:text-lg font-black text-slate-800 italic tracking-tighter truncate leading-none transition-colors duration-200 group-hover:text-indigo-600">
         {value}
       </h3>
     </div>
   </div>
-);
+));
 
-export const SectionHeader = ({ title, icon: Icon, action }) => (
+export const SectionHeader = React.memo(({ title, icon: Icon, action }) => (
   <div className="flex items-center justify-between mb-2 px-2">
     <div className="flex items-center gap-2 group">
       <div className="p-2 bg-slate-900 rounded-xl text-white">
@@ -200,4 +200,4 @@ export const SectionHeader = ({ title, icon: Icon, action }) => (
     </div>
     {action && <div>{action}</div>}
   </div>
-);
+));

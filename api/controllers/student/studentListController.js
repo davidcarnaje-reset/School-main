@@ -24,14 +24,26 @@ export const getStudents = async (req, res) => {
         b.balance,
         b.last_payment_date
       FROM students s 
-      LEFT JOIN enrollments e ON e.id = (
-        SELECT id FROM enrollments 
-        WHERE student_id = s.student_id 
-        ORDER BY id DESC LIMIT 1
-      )
+      LEFT JOIN (
+        SELECT e1.*
+        FROM enrollments e1
+        INNER JOIN (
+          SELECT student_id, MAX(id) as max_id
+          FROM enrollments
+          GROUP BY student_id
+        ) e2 ON e1.id = e2.max_id
+      ) e ON s.student_id = e.student_id
       LEFT JOIN sections sec ON e.section_id = sec.id 
       LEFT JOIN academic_programs ap ON e.program_id = ap.id
-      LEFT JOIN student_billing b ON s.student_id = b.student_id
+      LEFT JOIN (
+        SELECT b1.*
+        FROM student_billing b1
+        INNER JOIN (
+          SELECT student_id, MAX(id) as max_id
+          FROM student_billing
+          GROUP BY student_id
+        ) b2 ON b1.id = b2.max_id
+      ) b ON s.student_id = b.student_id
       ORDER BY s.id DESC
     `;
 

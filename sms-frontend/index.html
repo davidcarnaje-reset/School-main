@@ -5,6 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>sms-frontend</title>
+    <script>
+      (function() {
+        try {
+          const isDark = localStorage.getItem('lms_dark_mode') === '1';
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          }
+          const themeColor = localStorage.getItem('lms_theme_color');
+          if (themeColor) {
+            document.documentElement.style.setProperty('--primary-color', themeColor);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

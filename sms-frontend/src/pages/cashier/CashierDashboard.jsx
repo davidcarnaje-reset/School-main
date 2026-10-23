@@ -19,10 +19,71 @@ import {
   MonthlyBarChart,
 } from "../../components/cashier/CashierComponents";
 
+// Standalone memoized clock so the entire dashboard doesn't re-render every second
+const LiveTimeCard = React.memo(() => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="bg-white/90 px-3 py-2 md:px-4 md:py-3 rounded-[1.2rem] md:rounded-[1.5rem] border-2 border-slate-200 shadow-sm flex items-center gap-2 md:gap-3 h-[75px] md:h-[85px] group transition-all duration-200 hover:border-indigo-400">
+      <div className="p-2 md:p-2.5 rounded-xl bg-slate-800 text-white shrink-0 shadow-md transition-transform duration-200 group-hover:scale-105">
+        <Clock size={16} className="md:w-[18px]" />
+      </div>
+      <div className="min-w-0 flex flex-col justify-center">
+        <p className="text-[7px] md:text-[9px] font-black text-slate-400 uppercase leading-none mb-1">
+          Time
+        </p>
+        <h3 className="text-[11px] md:text-base font-black text-slate-800 italic leading-none whitespace-nowrap">
+          {time.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </h3>
+      </div>
+    </div>
+  );
+});
+
+// Standalone memoized date so it doesn't cause unnecessary parent re-renders
+const LiveDateCard = React.memo(() => {
+  const [date, setDate] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setDate(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatDate = (d) =>
+    d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+  return (
+    <div className="bg-white/90 px-3 py-2 md:px-4 md:py-3 rounded-[1.2rem] md:rounded-[1.5rem] border-2 border-slate-200 shadow-sm flex items-center gap-2 md:gap-3 h-[75px] md:h-[85px] group transition-all duration-200 hover:border-indigo-400">
+      <div className="p-2 md:p-2.5 rounded-xl bg-slate-800 text-white shrink-0 shadow-md transition-transform duration-200 group-hover:scale-105">
+        <Calendar size={16} className="md:w-[18px]" />
+      </div>
+      <div className="min-w-0 flex flex-col justify-center">
+        <p className="text-[7px] md:text-[9px] font-black text-slate-400 uppercase leading-none mb-1">
+          Date
+        </p>
+        <h3 className="text-[11px] md:text-base font-black text-slate-800 italic leading-none whitespace-nowrap">
+          {formatDate(date)}
+        </h3>
+      </div>
+    </div>
+  );
+});
+
 const CashierDashboard = () => {
   const { API_BASE_URL, branding } = useAuth();
   const [isAllTxModalOpen, setIsAllTxModalOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [stats, setStats] = useState({
     totalCollections: "₱0.00",
     todayTransactions: 0,
@@ -44,25 +105,6 @@ const CashierDashboard = () => {
     if (!hexColor) return "#f1f5f9";
     return `${hexColor}33`; // 20% opacity
   };
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatDate = (date) =>
-    date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-
-  const formatTime = (date) =>
-    date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
 
   const fetchData = async () => {
     try {
@@ -133,38 +175,11 @@ const CashierDashboard = () => {
             colorClass="bg-emerald-500"
           />
 
-          {/* 5. Time Card (Glass Effect) */}
-          <div className="bg-white/60 backdrop-blur-md px-3 py-2 md:px-4 md:py-3 rounded-[1.2rem] md:rounded-[1.5rem] border border-white shadow-sm flex items-center gap-3 h-[75px] md:h-[85px] group transition-all duration-300 hover:bg-white/80">
-            <div className="p-2 md:p-2 rounded-xl bg-slate-800 text-white shrink-0 shadow-md transition-all duration-300 group-hover:scale-0 group-hover:w-0 group-hover:opacity-0 group-hover:p-0">
-              <Clock size={16} className="md:w-[18px]" />
-            </div>
-            <div className="min-w-0 flex flex-col justify-center transition-all duration-300 group-hover:pl-2">
-              <p className="text-[7px] md:text-[9px] font-black text-slate-400 uppercase leading-none mb-1 transition-all duration-300 group-hover:text-slate-600">
-                Time
-              </p>
-              <h3 className="text-[11px] md:text-base font-black text-slate-800 italic leading-none whitespace-nowrap transition-all duration-300 group-hover:scale-110 origin-left">
-                {currentTime.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </h3>
-            </div>
-          </div>
+          {/* 5. Live Time Card */}
+          <LiveTimeCard />
 
-          {/* 6. Date Card (Glass Effect) */}
-          <div className="bg-white/60 backdrop-blur-md px-3 py-2 md:px-4 md:py-3 rounded-[1.2rem] md:rounded-[1.5rem] border border-white shadow-sm flex items-center gap-3 h-[75px] md:h-[85px] group transition-all duration-300 hover:bg-white/80">
-            <div className="p-2 md:p-2 rounded-xl bg-slate-800 text-white shrink-0 shadow-md transition-all duration-300 group-hover:scale-0 group-hover:w-0 group-hover:opacity-0 group-hover:p-0">
-              <Calendar size={16} className="md:w-[18px]" />
-            </div>
-            <div className="min-w-0 flex flex-col justify-center transition-all duration-300 group-hover:pl-2">
-              <p className="text-[7px] md:text-[9px] font-black text-slate-400 uppercase leading-none mb-1 transition-all duration-300 group-hover:text-slate-600">
-                Date
-              </p>
-              <h3 className="text-[11px] md:text-base font-black text-slate-800 italic leading-none whitespace-nowrap transition-all duration-300 group-hover:scale-110 origin-left">
-                {formatDate(currentTime)}
-              </h3>
-            </div>
-          </div>
+          {/* 6. Live Date Card */}
+          <LiveDateCard />
         </div>
 
         {/* CHART SECTION */}

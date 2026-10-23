@@ -17,18 +17,25 @@ const StandardSchedule = ({ scheduleData = [] }) => {
   const [newReminderText, setNewReminderText] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
 
-  const currentDate = new Date();
-  const currentMonth = currentDate.toLocaleString('default', { month: 'long' });
-  const currentYear = currentDate.getFullYear();
-  const currentMonthNumber = currentDate.getMonth() + 1;
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const currentMonth = calendarDate.toLocaleString('default', { month: 'long' });
+  const currentYear = calendarDate.getFullYear();
+  const currentMonthNumber = calendarDate.getMonth() + 1;
   
-  const daysInMonth = new Date(currentYear, currentDate.getMonth() + 1, 0).getDate();
-  const startDayOfWeek = new Date(currentYear, currentDate.getMonth(), 1).getDay(); 
+  const daysInMonth = new Date(currentYear, calendarDate.getMonth() + 1, 0).getDate();
+  const startDayOfWeek = new Date(currentYear, calendarDate.getMonth(), 1).getDay(); 
   
   const calendarCells = Array.from({ length: 35 }, (_, i) => {
     const dayNum = i - startDayOfWeek + 1;
     return dayNum > 0 && dayNum <= daysInMonth ? dayNum : null;
   });
+
+  const prevMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
+  };
+  const nextMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
+  };
 
   // ==========================================
   // [ FETCH NOTES FROM DATABASE ]
@@ -58,24 +65,45 @@ const StandardSchedule = ({ scheduleData = [] }) => {
   // ==========================================
   // [ DYNAMIC SCHEDULE MAPPING ]
   // ==========================================
+  const isClassScheduledOnDay = (classItem, dayOfWeek) => {
+    const daysStr = (classItem.days || '').trim().toUpperCase();
+    const schedStr = (classItem.schedule || '').trim().toUpperCase();
+    const combined = `${daysStr} ${schedStr}`;
+
+    switch (dayOfWeek) {
+      case 0: // Sunday
+        return daysStr.includes('SU') || daysStr.includes('SUN') || combined.includes('SUNDAY');
+      case 1: // Monday
+        return daysStr.split(/[\s,]+/).some(d => d === 'M' || d === 'MON') || combined.includes('MWF') || combined.includes('MONDAY');
+      case 2: // Tuesday
+        return daysStr.split(/[\s,]+/).some(d => d === 'T' || d === 'TUE') || combined.includes('TTH') || combined.includes('TUESDAY');
+      case 3: // Wednesday
+        return daysStr.split(/[\s,]+/).some(d => d === 'W' || d === 'WED') || combined.includes('MWF') || combined.includes('WEDNESDAY');
+      case 4: // Thursday
+        return daysStr.split(/[\s,]+/).some(d => d === 'TH' || d === 'THU') || combined.includes('TTH') || combined.includes('THURSDAY');
+      case 5: // Friday
+        return daysStr.split(/[\s,]+/).some(d => d === 'F' || d === 'FRI') || combined.includes('MWF') || combined.includes('FRIDAY');
+      case 6: // Saturday
+        return daysStr.split(/[\s,]+/).some(d => d === 'S' || d === 'SAT') || combined.includes('SATURDAY');
+      default:
+        return false;
+    }
+  };
+
   const monthData = useMemo(() => {
     const dataMap = {};
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const dayOfWeekForDate = new Date(currentYear, currentDate.getMonth(), day).getDay();
-      const dayNameMap = { 'Su': 0, 'M': 1, 'T': 2, 'W': 3, 'Th': 4, 'F': 5, 'S': 6 };
+      const dayOfWeekForDate = new Date(currentYear, calendarDate.getMonth(), day).getDay();
 
-      const classesForToday = scheduleData.filter(c => {
-         if (!c.days) return false;
-         return dayNameMap[c.days.trim()] === dayOfWeekForDate;
-      });
+      const classesForToday = scheduleData.filter(c => isClassScheduledOnDay(c, dayOfWeekForDate));
 
       if (classesForToday.length > 0) {
         dataMap[day] = { classes: classesForToday, deadlines: [], assigned: [] };
       }
     }
     return dataMap;
-  }, [scheduleData, currentYear, currentDate, daysInMonth]);
+  }, [scheduleData, currentYear, calendarDate, daysInMonth]);
 
   // ==========================================
   // [ HANDLERS ]
@@ -158,8 +186,8 @@ const StandardSchedule = ({ scheduleData = [] }) => {
               </div>
            </div>
            <div className="flex gap-1 md:gap-2">
-              <button className="p-2 md:p-3 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-[var(--primary-color)] hover:text-white dark:hover:bg-[var(--primary-color)] transition-colors"><ChevronLeft size={18}/></button>
-              <button className="p-2 md:p-3 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-[var(--primary-color)] hover:text-white dark:hover:bg-[var(--primary-color)] transition-colors"><ChevronRight size={18}/></button>
+              <button onClick={prevMonth} title="Previous Month" className="p-2 md:p-3 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-[var(--primary-color)] hover:text-white dark:hover:bg-[var(--primary-color)] transition-colors"><ChevronLeft size={18}/></button>
+              <button onClick={nextMonth} title="Next Month" className="p-2 md:p-3 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-[var(--primary-color)] hover:text-white dark:hover:bg-[var(--primary-color)] transition-colors"><ChevronRight size={18}/></button>
            </div>
         </div>
 
@@ -181,7 +209,8 @@ const StandardSchedule = ({ scheduleData = [] }) => {
              {calendarCells.map((day, idx) => {
                const dayData = monthData[day];
                const dayReminders = reminders[day];
-               const isToday = day === currentDate.getDate();
+               const today = new Date();
+               const isToday = day === today.getDate() && calendarDate.getMonth() === today.getMonth() && calendarDate.getFullYear() === today.getFullYear();
                const hasContent = dayData || dayReminders?.length > 0;
 
                return (
@@ -241,7 +270,7 @@ const StandardSchedule = ({ scheduleData = [] }) => {
          </div>
          {/* DARK MODE FIX: Badge for Timeline View */}
          <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm text-sm font-bold text-[var(--primary-color)] flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[var(--primary-color)] animate-pulse"></span> {selectedDay === currentDate.getDate() ? 'Today' : 'Selected Date'}
+            <span className="w-2 h-2 rounded-full bg-[var(--primary-color)] animate-pulse"></span> {selectedDay === new Date().getDate() && calendarDate.getMonth() === new Date().getMonth() && calendarDate.getFullYear() === new Date().getFullYear() ? 'Today' : 'Selected Date'}
          </div>
       </div>
 

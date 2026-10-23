@@ -30,10 +30,31 @@ const LmsLayout = () => {
   const lastScrollY = useRef(0);
 
   // ==========================================
-  // [ NEW: GLOBAL THEME INJECTION ]
-  // (Idinagdag lang para alam ng layout kung naka-Dark Mode sa DB)
+  // [ GLOBAL THEME INJECTION WITH INSTANT CACHE ]
   // ==========================================
   useEffect(() => {
+    // 1. Instant Cache application (Zero-flicker)
+    try {
+      const cachedDark = localStorage.getItem('lms_dark_mode');
+      const cachedTheme = localStorage.getItem('lms_theme_color');
+      const htmlElement = document.documentElement;
+
+      if (cachedDark !== null) {
+        if (cachedDark === '1') {
+          htmlElement.classList.add('dark');
+          htmlElement.style.colorScheme = 'dark';
+        } else {
+          htmlElement.classList.remove('dark');
+          htmlElement.style.colorScheme = 'light';
+        }
+      }
+
+      if (cachedTheme) {
+        htmlElement.style.setProperty('--primary-color', cachedTheme);
+      }
+    } catch (e) {}
+
+    // 2. Cloud DB sync
     const loadGlobalSettings = async () => {
       const studentId = user?.id || user?.username;
       const role = user?.role || 'student';
@@ -41,20 +62,23 @@ const LmsLayout = () => {
 
       try {
         const res = await axios.get(`${API_BASE_URL}/settings/get_settings.php?user_id=${studentId}&user_role=${role}`);
-        if (res.data.status === 'success') {
+        if (res.data.status === 'success' && res.data.settings) {
           const dbSettings = res.data.settings;
           const htmlElement = document.documentElement;
           
           if (parseInt(dbSettings.dark_mode) === 1) {
             htmlElement.classList.add('dark');
             htmlElement.style.colorScheme = 'dark';
+            localStorage.setItem('lms_dark_mode', '1');
           } else {
             htmlElement.classList.remove('dark');
             htmlElement.style.colorScheme = 'light';
+            localStorage.setItem('lms_dark_mode', '0');
           }
 
           if (dbSettings.theme_color) {
             htmlElement.style.setProperty('--primary-color', dbSettings.theme_color);
+            localStorage.setItem('lms_theme_color', dbSettings.theme_color);
           }
         }
       } catch (err) {

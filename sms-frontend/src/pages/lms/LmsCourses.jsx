@@ -7,7 +7,9 @@ import {
   List as ListIcon, 
   ArrowRight,
   User,
-  Users
+  Users,
+  Clock,
+  MapPin
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -138,10 +140,18 @@ const LmsCourses = () => {
                     <h3 className="font-black text-slate-800 dark:text-white text-[15px] leading-snug line-clamp-2 transition-colors">
                       {sub.title}
                     </h3>
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1 flex items-center gap-1.5 truncate">
-                      <User size={12} className="text-slate-300 dark:text-slate-600" />
-                      {sub.teacher || 'TBA'}
-                    </p>
+                    <div className="flex flex-col gap-1 mt-1">
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide flex items-center gap-1.5 truncate">
+                        <User size={12} className="text-[var(--primary-color)]" />
+                        {sub.teacher || 'TBA'}
+                      </p>
+                      {sub.schedule && (
+                        <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-1.5 truncate">
+                          <Clock size={11} className="text-amber-500" />
+                          {sub.schedule} {sub.room && sub.room !== 'TBA' ? `• ${sub.room}` : ''}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 

@@ -32,7 +32,11 @@ const fetchData = async () => {
       // 1. Fetch Student & Balance Info
       const res = await axios.get(`${API_BASE_URL}/student/get_students.php`);
       const allStudents = res.data.students || [];
-      const myData = allStudents.find(s => s.email === user.email);
+      const myId = user?.student_id || user?.username || user?.id;
+      const myData = allStudents.find(s => 
+        (myId && String(s.student_id).toLowerCase() === String(myId).toLowerCase()) || 
+        (user?.email && String(s.email).toLowerCase() === String(user.email).toLowerCase())
+      ) || (allStudents.length > 0 ? allStudents[0] : null);
       
       if (myData) {
         const totalAmount = parseFloat(myData.total_amount || 0);
@@ -41,13 +45,13 @@ const fetchData = async () => {
         myData.balanceAmount = totalAmount - totalPaid;
         
         setStudentData(myData);
-        const currentSy = myData.school_year || '2023-2024';
+        const currentSy = myData.school_year || '2026-2027';
         setSelectedSy(currentSy);
 
         // 2. FETCH REAL GRADES FROM DB!
-        const gradeRes = await axios.get(`${API_BASE_URL}/student/get_student_grades.php?email=${user.email}&sy=${currentSy}`);
+        const gradeRes = await axios.get(`${API_BASE_URL}/student/get_student_grades.php?student_id=${myData.student_id}&sy=${currentSy}`);
         if (gradeRes.data.status === 'success') {
-           setGrades(gradeRes.data.data);
+           setGrades(gradeRes.data.data || []);
         } else {
            setGrades([]);
         }
@@ -60,8 +64,13 @@ const fetchData = async () => {
   };
 
   useEffect(() => {
-    if (user?.email) fetchData();
-  }, [user.email]);
+    if (user) {
+      fetchData();
+    } else {
+      const timer = setTimeout(() => setLoading(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank", "width=800,height=900");

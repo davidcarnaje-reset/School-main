@@ -20,8 +20,8 @@ export const login = async (req, res) => {
     // ==========================================
     if (portal === 'student') {
       const [rows] = await pool.query(
-        "SELECT * FROM students WHERE student_id = ? AND is_verified = 1",
-        [username]
+        "SELECT * FROM students WHERE (student_id = ? OR email = ?) AND is_verified = 1",
+        [username, username]
       );
       const student = rows[0];
 
@@ -38,6 +38,21 @@ export const login = async (req, res) => {
           status: 'error',
           message: 'Invalid student credentials.'
         });
+      }
+
+      // Fetch student's latest enrollment info
+      const [enrRows] = await pool.query(
+        "SELECT grade_level, section_id, status FROM enrollments WHERE student_id = ? ORDER BY id DESC LIMIT 1",
+        [student.student_id]
+      );
+      const enrollment = enrRows[0] || {};
+
+      // Trigger automatic LMS classes sync in background
+      try {
+        const { syncStudentEnrolledClasses } = await import('../../utils/lmsSync.js');
+        await syncStudentEnrolledClasses(student.student_id);
+      } catch (syncErr) {
+        console.warn("[LMS SYNC WARNING] Failed to sync on login:", syncErr.message);
       }
 
       const displayName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Student';
@@ -63,9 +78,13 @@ export const login = async (req, res) => {
           username: student.student_id,
           name: displayName,
           full_name: displayName,
+          email: student.email,
           role: 'student',
           student_id: student.student_id,
           school_id: student.school_id,
+          grade_level: enrollment.grade_level || 'Grade 1',
+          section_id: enrollment.section_id || null,
+          enrollment_status: enrollment.status || 'Enrolled',
           profile_image: student.profile_image
         }
       });

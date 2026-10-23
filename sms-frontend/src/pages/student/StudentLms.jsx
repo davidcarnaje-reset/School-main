@@ -47,7 +47,11 @@ const StudentLms = () => {
       const response = await axios.get(`${API_BASE_URL}/student/get_students.php`);
       const studentList = response.data.students || [];
       const billingItems = response.data.billing_items || []; 
-      const myData = studentList.find(s => s.email === user.email);
+      const myId = user?.student_id || user?.username || user?.id;
+      const myData = studentList.find(s => 
+        (myId && String(s.student_id).toLowerCase() === String(myId).toLowerCase()) || 
+        (user?.email && String(s.email).toLowerCase() === String(user.email).toLowerCase())
+      ) || (studentList.length > 0 ? studentList[0] : null);
       
       if (myData) {
         // --- GATEKEEPER LOGIC ---
@@ -132,8 +136,13 @@ const StudentLms = () => {
   };
 
   useEffect(() => {
-    if (user?.email) fetchData();
-  }, [user.email]);
+    if (user) {
+      fetchData();
+    } else {
+      const timer = setTimeout(() => setLoading(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   const safeThemeColor = branding?.theme_color?.startsWith('#') ? branding.theme_color : '#6366f1';
 

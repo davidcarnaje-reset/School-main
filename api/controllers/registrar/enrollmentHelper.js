@@ -1,4 +1,5 @@
 import pool from '../../config/db.js';
+import { syncStudentEnrolledClasses } from '../../utils/lmsSync.js';
 
 export const getStudentsByStatus = async (req, res) => {
   const { status } = req.query;
@@ -194,6 +195,12 @@ export const processEnrollment = async (req, res) => {
     }
 
     await connection.commit();
+
+    // Auto-sync LMS enrolled classes for this student
+    syncStudentEnrolledClasses(student_id).catch(err => {
+      console.error("LMS auto-sync non-fatal error in processEnrollment:", err.message);
+    });
+
     return res.status(200).json({
       success: true,
       message: "Successfully Assessed & Sectioned! Forwarded to Cashier."

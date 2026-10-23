@@ -27,7 +27,11 @@ const StudentDashboard = () => {
       const res = await axios.get(`${API_BASE_URL}/student/get_students.php`);
       const allStudents = res.data.students || [];
       const allItems = res.data.billing_items || [];
-      const myData = allStudents.find(s => s.email === user.email);
+      const myId = user?.student_id || user?.username || user?.id;
+      const myData = allStudents.find(s => 
+        (myId && String(s.student_id).toLowerCase() === String(myId).toLowerCase()) || 
+        (user?.email && String(s.email).toLowerCase() === String(user.email).toLowerCase())
+      ) || (allStudents.length > 0 ? allStudents[0] : null);
 
       if (myData) {
         // --- Compute LMS Lock Logic ---
@@ -39,7 +43,7 @@ const StudentDashboard = () => {
         
         const tuitionItem = allItems.find(item => 
           parseInt(item.billing_id) === parseInt(myData.billing_id) && 
-          item.item_name.toLowerCase().includes('tuition')
+          item.item_name && item.item_name.toLowerCase().includes('tuition')
         );
         
         const actualTuitionPaid = tuitionItem ? parseFloat(tuitionItem.paid_amount || 0) : 0;
@@ -54,15 +58,15 @@ const StudentDashboard = () => {
         // 2. FETCH REAL ANNOUNCEMENTS
         try {
           const annRes = await axios.get(`${API_BASE_URL}/notifications/get_student_announcements.php?student_id=${myData.student_id}`);
-          if (annRes.data.success) {
-            setAnnouncements(annRes.data.data);
+          if (annRes.data && annRes.data.success) {
+            setAnnouncements(annRes.data.data || []);
           }
         } catch (e) { console.error("Announcements Error:", e); }
 
         // 3. FETCH REAL SCHEDULE & TASKS
         try {
           const acadRes = await axios.get(`${API_BASE_URL}/student/get_student_dashboard_data.php?student_id=${myData.student_id}`);
-          if (acadRes.data.success) {
+          if (acadRes.data && acadRes.data.success) {
             setScheduleToday(acadRes.data.scheduleToday || []);
             setPendingTasks(acadRes.data.pendingTasks || []);
           }
@@ -76,8 +80,13 @@ const StudentDashboard = () => {
   };
 
   useEffect(() => {
-    if (user?.email) fetchData();
-  }, [user.email]);
+    if (user) {
+      fetchData();
+    } else {
+      const timer = setTimeout(() => setLoading(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   const safeThemeColor = branding?.theme_color?.startsWith('#') ? branding.theme_color : '#6366f1';
   const today = new Date();

@@ -1,29 +1,40 @@
 import pool from '../../config/db.js';
+import { resolveStudentId, syncStudentEnrolledClasses } from '../../utils/lmsSync.js';
 
 const getDashboard = async (req, res) => {
-  const { student_id } = req.query;
+  const rawStudentId = req.query.student_id;
 
-  if (!student_id) {
+  if (!rawStudentId) {
     return res.status(400).json({ status: "error", message: "Missing student_id" });
   }
 
   try {
+    const studentId = await resolveStudentId(rawStudentId);
+
+    // Auto-sync officially enrolled classes
+    await syncStudentEnrolledClasses(studentId);
+
     // 1. KUNIN ANG ANALYTICS (Time spent & Logins)
     const [statsRows] = await pool.query(
       "SELECT lms_login_count, lms_total_minutes FROM students WHERE student_id = ?",
-      [student_id]
+      [studentId]
     );
     let stats = statsRows[0];
     if (!stats) {
       stats = { lms_login_count: 0, lms_total_minutes: 0 };
     }
 
-    // 2. KUNIN ANG MGA ENROLLED SUBJECTS + CLASS POPULATION + TOTAL MODULES
+    // 2. KUNIN ANG MGA ENROLLED SUBJECTS + CLASS POPULATION + TOTAL MODULES + TEACHER
     const subjQuery = `
       SELECT 
           c.id as class_id,
           s.subject_code as tag,
           s.subject_description as title,
+          COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), 'To Be Assigned') as teacher,
+          u.profile_image as teacher_image,
+          sec.section_name,
+          c.schedule,
+          r.room_name as room,
           ec.last_accessed, 
           (SELECT COUNT(*) FROM enrolled_classes WHERE class_assignment_id = c.id AND status = 'Enrolled') as student_count,
           (SELECT COUNT(*) FROM classroom_modules WHERE class_id = c.id) as total_lessons,
@@ -31,11 +42,14 @@ const getDashboard = async (req, res) => {
       FROM enrolled_classes ec
       JOIN class_assignments c ON ec.class_assignment_id = c.id
       JOIN subjects s ON c.subject_id = s.id
+      LEFT JOIN sections sec ON c.section_id = sec.id
+      LEFT JOIN users u ON c.teacher_id = u.id
+      LEFT JOIN rooms r ON c.room_id = r.id
       WHERE ec.student_id = ? AND ec.status = 'Enrolled'
-      ORDER BY ec.last_accessed DESC 
-      LIMIT 3
+      ORDER BY ec.last_accessed DESC, s.subject_code ASC
+      LIMIT 6
     `;
-    const [subjectsResult] = await pool.query(subjQuery, [student_id, student_id]);
+    const [subjectsResult] = await pool.query(subjQuery, [studentId, studentId]);
 
     const colors = ['#2563eb', '#059669', '#7c3aed', '#db2777', '#ea580c'];
     const courses = subjectsResult.map((row, index) => {
@@ -57,13 +71,13 @@ const getDashboard = async (req, res) => {
           a.class_id,
           a.title,
           s.subject_code as \`desc\`,
-          CONCAT(u.first_name, ' ', u.last_name) as teacher,
+          COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), 'Teacher') as teacher,
           a.due_date as duration
       FROM activities a
       JOIN class_assignments c ON a.class_id = c.id
       JOIN enrolled_classes ec ON c.id = ec.class_assignment_id
       JOIN subjects s ON c.subject_id = s.id
-      JOIN users u ON a.teacher_id = u.id
+      LEFT JOIN users u ON a.teacher_id = u.id
       LEFT JOIN student_activity_scores sas ON a.id = sas.activity_id AND sas.student_id = ec.student_id
       WHERE ec.student_id = ? AND ec.status = 'Enrolled'
         AND (sas.status IS NULL OR sas.status = 'Pending')
@@ -71,7 +85,7 @@ const getDashboard = async (req, res) => {
       ORDER BY a.due_date ASC 
       LIMIT 4
     `;
-    const [tasksResult] = await pool.query(taskQuery, [student_id]);
+    const [tasksResult] = await pool.query(taskQuery, [studentId]);
 
     const nextLessons = tasksResult.map(row => {
       let durationStr = "No Due Date";
@@ -86,7 +100,7 @@ const getDashboard = async (req, res) => {
           const minutes = date.getMinutes().toString().padStart(2, '0');
           const ampm = hours >= 12 ? 'PM' : 'AM';
           hours = hours % 12;
-          hours = hours ? hours : 12; // the hour '0' should be '12'
+          hours = hours ? hours : 12;
           
           durationStr = `${m} ${d}, ${hours}:${minutes} ${ampm}`;
         }

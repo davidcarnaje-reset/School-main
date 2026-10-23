@@ -1,13 +1,19 @@
 import pool from '../../config/db.js';
+import { resolveStudentId, syncStudentEnrolledClasses } from '../../utils/lmsSync.js';
 
 export const getProfileOverview = async (req, res) => {
-  const studentId = req.query.student_id;
+  const rawStudentId = req.query.student_id;
 
-  if (!studentId) {
+  if (!rawStudentId) {
     return res.status(400).json({ error: "Missing student_id parameter" });
   }
 
   try {
+    const studentId = await resolveStudentId(rawStudentId);
+
+    // Auto-sync officially enrolled classes
+    await syncStudentEnrolledClasses(studentId);
+
     // 1. Get profile data
     const profileQuery = `
       SELECT 
@@ -33,13 +39,15 @@ export const getProfileOverview = async (req, res) => {
       SELECT 
         sub.subject_code, 
         sub.subject_description, 
-        t.full_name AS teacher_name, 
+        COALESCE(NULLIF(TRIM(CONCAT(COALESCE(t.first_name, ''), ' ', COALESCE(t.last_name, ''))), ''), 'To Be Assigned') AS teacher_name, 
         t.profile_image
       FROM enrolled_classes ec
       JOIN class_assignments ca ON ec.class_assignment_id = ca.id
       JOIN subjects sub ON ca.subject_id = sub.id
-      JOIN users t ON ca.teacher_id = t.id
+      LEFT JOIN sections sec ON ca.section_id = sec.id
+      LEFT JOIN users t ON ca.teacher_id = t.id
       WHERE ec.student_id = ? AND ec.status = 'Enrolled'
+      ORDER BY sub.subject_code ASC
     `;
 
     const [subjectsData] = await pool.query(subjectsQuery, [studentId]);
@@ -47,7 +55,7 @@ export const getProfileOverview = async (req, res) => {
     // Unique teachers mapping
     const teachersMap = {};
     subjectsData.forEach(row => {
-      if (!teachersMap[row.teacher_name]) {
+      if (row.teacher_name && !teachersMap[row.teacher_name]) {
         teachersMap[row.teacher_name] = {
           name: row.teacher_name,
           image: row.profile_image

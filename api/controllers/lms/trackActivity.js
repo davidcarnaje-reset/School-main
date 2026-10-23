@@ -44,12 +44,23 @@ export const trackActivity = async (req, res) => {
         );
 
         // B. Update daily usage
-        await connection.query(
-          `INSERT INTO lms_daily_usage (student_id, usage_date, minutes_spent) 
-           VALUES (?, ?, 1)
-           ON DUPLICATE KEY UPDATE minutes_spent = minutes_spent + 1`,
+        const [existing] = await connection.query(
+          "SELECT id FROM lms_daily_usage WHERE student_id = ? AND usage_date = ? LIMIT 1",
           [studentId, today]
         );
+
+        if (existing.length > 0) {
+          await connection.query(
+            "UPDATE lms_daily_usage SET minutes_spent = minutes_spent + 1 WHERE id = ?",
+            [existing[0].id]
+          );
+        } else {
+          const [maxId] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM lms_daily_usage");
+          await connection.query(
+            "INSERT INTO lms_daily_usage (id, student_id, usage_date, minutes_spent) VALUES (?, ?, ?, 1)",
+            [maxId[0].nextId, studentId, today]
+          );
+        }
 
         await connection.commit();
         return res.json({ status: 'success', message: '1 minute added to overall and daily tracking' });

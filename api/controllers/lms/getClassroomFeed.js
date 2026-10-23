@@ -1,40 +1,46 @@
 import pool from '../../config/db.js';
+import { resolveStudentId } from '../../utils/lmsSync.js';
 
 const getClassroomFeed = async (req, res) => {
-  const { student_id, class_id } = req.query;
+  const { student_id: rawStudentId, class_id } = req.query;
 
-  if (!student_id || !class_id) {
+  if (!rawStudentId || !class_id) {
     return res.status(400).json({ status: "error", message: "Missing parameters" });
   }
 
   try {
-    // ==========================================
-    // ARCHITECT FIX 1: UPDATE LAST ACCESSED PARA PUMUNTA SA UNAHAN NG DASHBOARD
-    // ==========================================
+    const student_id = await resolveStudentId(rawStudentId);
+
+    // Update last_accessed for student
     await pool.query(
       "UPDATE enrolled_classes SET last_accessed = NOW() WHERE student_id = ? AND class_assignment_id = ?",
       [student_id, class_id]
     );
 
-    // ==========================================
-    // ARCHITECT FIX 2: KUNIN ANG SUBJECT AT TEACHER INFO PARA WALA NANG "TBA" SA FRONTEND HEADER
-    // ==========================================
+    // Fetch official subject, teacher, section, room, and schedule info
     const infoQuery = `
       SELECT 
           s.subject_code as tag, 
           s.subject_description as title, 
-          CONCAT(u.first_name, ' ', u.last_name) as teacher
+          COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), 'To Be Assigned') as teacher,
+          u.profile_image as teacher_image,
+          sec.section_name,
+          ca.schedule,
+          ca.days,
+          TIME_FORMAT(ca.start_time, '%h:%i %p') as start_time,
+          TIME_FORMAT(ca.end_time, '%h:%i %p') as end_time,
+          r.room_name as room
       FROM class_assignments ca
       JOIN subjects s ON ca.subject_id = s.id
+      LEFT JOIN sections sec ON ca.section_id = sec.id
       LEFT JOIN users u ON ca.teacher_id = u.id
+      LEFT JOIN rooms r ON ca.room_id = r.id
       WHERE ca.id = ?
     `;
     const [infoRows] = await pool.query(infoQuery, [class_id]);
     const courseInfo = infoRows[0] || null;
 
-    // ==========================================
     // 1. FETCH MAIN FEED (Activities + Modules using UNION)
-    // ==========================================
     const feedQuery = `
       SELECT 
           CONCAT('act_', a.id) as id,
@@ -93,9 +99,7 @@ const getClassroomFeed = async (req, res) => {
       max_attempts: item.max_attempts !== null && item.max_attempts !== undefined ? parseInt(item.max_attempts, 10) : null
     }));
 
-    // ==========================================
-    // 2. FETCH DUE SOON (Upcoming Deadlines mula sa activities table)
-    // ==========================================
+    // 2. FETCH DUE SOON
     const dueQuery = `
       SELECT 
           id, 
@@ -110,9 +114,7 @@ const getClassroomFeed = async (req, res) => {
     `;
     const [dueSoonRows] = await pool.query(dueQuery, [class_id]);
 
-    // ==========================================
-    // 3. FETCH RECENT GRADES (Mula sa student_activity_scores)
-    // ==========================================
+    // 3. FETCH RECENT GRADES
     const gradesQuery = `
       SELECT 
           a.id, 
@@ -134,9 +136,7 @@ const getClassroomFeed = async (req, res) => {
     `;
     const [gradesRows] = await pool.query(gradesQuery, [class_id, student_id]);
 
-    // ==========================================
-    // 4. GET QUARTER STANDING (Mula sa student_grades table)
-    // ==========================================
+    // 4. GET QUARTER STANDING
     const standingQuery = `
       SELECT final_grade, remarks 
       FROM student_grades 

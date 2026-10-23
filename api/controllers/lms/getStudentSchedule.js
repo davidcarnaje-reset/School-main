@@ -1,30 +1,40 @@
 import pool from '../../config/db.js';
+import { resolveStudentId, syncStudentEnrolledClasses } from '../../utils/lmsSync.js';
 
 export const getStudentSchedule = async (req, res) => {
-  const studentId = req.query.student_id;
+  const rawStudentId = req.query.student_id;
 
-  if (!studentId) {
+  if (!rawStudentId) {
     return res.status(400).json({ status: 'error', message: 'Missing student ID' });
   }
 
   try {
+    const studentId = await resolveStudentId(rawStudentId);
+
+    // Auto-sync officially enrolled classes
+    await syncStudentEnrolledClasses(studentId);
+
     const query = `
       SELECT 
         ca.id as class_id,
         s.subject_code as code,
         s.subject_description as subject,
         ca.days,
+        ca.schedule,
         TIME_FORMAT(ca.start_time, '%h:%i %p') as startTime,
         TIME_FORMAT(ca.end_time, '%h:%i %p') as endTime,
-        CONCAT(u.first_name, ' ', u.last_name) as teacher,
-        r.room_name as room
+        COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), 'To Be Assigned') as teacher,
+        u.profile_image as teacher_image,
+        COALESCE(r.room_name, 'TBA') as room,
+        sec.section_name
       FROM enrolled_classes ec
       JOIN class_assignments ca ON ec.class_assignment_id = ca.id
       JOIN subjects s ON ca.subject_id = s.id
+      LEFT JOIN sections sec ON ca.section_id = sec.id
       LEFT JOIN users u ON ca.teacher_id = u.id
       LEFT JOIN rooms r ON ca.room_id = r.id
       WHERE ec.student_id = ? AND ec.status = 'Enrolled'
-      ORDER BY ca.start_time ASC
+      ORDER BY ca.start_time ASC, s.subject_code ASC
     `;
 
     const [schedule] = await pool.query(query, [studentId]);
