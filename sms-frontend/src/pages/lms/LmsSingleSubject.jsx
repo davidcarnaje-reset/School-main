@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
   FileText, Video, CheckSquare, Award, Clock, MoreVertical, 
   MessageCircle, FileDown, PieChart as PieChartIcon, 
-  LayoutGrid, List as ListIcon, CheckCircle, Loader2, User
+  LayoutGrid, List as ListIcon, CheckCircle, Loader2, User, Megaphone
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -15,7 +15,7 @@ const LmsSingleSubject = () => {
   const currentTab = searchParams.get('tab') || 'all';
   const { user, API_BASE_URL } = useAuth();
 
-// [ SECTION 1: INSTANT HEADER LOAD ]
+  // [ SECTION 1: INSTANT HEADER LOAD ]
   const [courseInfo, setCourseInfo] = useState({ tag: 'SYNCING...', title: 'Loading Subject...', teacher: 'Fetching Teacher...' });
 
   const [gradesViewMode, setGradesViewMode] = useState('list'); // 'list' or 'card'
@@ -35,13 +35,12 @@ const LmsSingleSubject = () => {
     const fetchClassroomData = async () => {
       setLoading(true);
       try {
-        const studentIdentifier = user?.id || user?.username;
-        // Ito ang bagong endpoint na kailangan sa backend
+        const studentIdentifier = user?.student_id || user?.id || user?.username;
         const res = await axios.get(`${API_BASE_URL}/lms/get_classroom_feed.php?student_id=${studentIdentifier}&class_id=${id}`);
         
         if (res.data.status === 'success') {
-         if (res.data.course_info) {
-             setCourseInfo(res.data.course_info);
+          if (res.data.course_info) {
+            setCourseInfo(res.data.course_info);
           }
           setCourseFeed(res.data.feed || []);
           setDueSoon(res.data.due_soon || []);
@@ -63,6 +62,7 @@ const LmsSingleSubject = () => {
   // ==========================================
   const filteredFeed = courseFeed.filter(item => {
     if (currentTab === 'all') return true;
+    if (currentTab === 'announcements' && item.type === 'announcement') return true;
     if (currentTab === 'lectures' && item.type === 'lecture') return true;
     if (currentTab === 'videos' && item.type === 'video') return true;
     if (currentTab === 'activities' && item.type === 'activity') return true;
@@ -70,12 +70,19 @@ const LmsSingleSubject = () => {
     return false;
   });
 
-  const getPostStyle = (type) => {
+  const getPostStyle = (type, subType) => {
     switch(type) {
+      case 'announcement':
+        if (subType === 'Urgent Alert') {
+          return { icon: <Megaphone size={20}/>, bg: 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400', tag: 'Urgent Class Alert' };
+        }
+        if (subType === 'Task Reminder') {
+          return { icon: <Megaphone size={20}/>, bg: 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400', tag: 'Task Reminder' };
+        }
+        return { icon: <Megaphone size={20}/>, bg: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400', tag: 'Class Announcement' };
       case 'video': return { icon: <Video size={20}/>, bg: 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400', tag: 'Video Lecture' };
       case 'activity': return { icon: <CheckSquare size={20}/>, bg: 'bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400', tag: 'Written Activity' };
       case 'exam': return { icon: <Award size={20}/>, bg: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400', tag: 'Major Exam' };
-      // FIX: Gumamit ng primary color para sa default files
       default: return { icon: <FileText size={20}/>, bg: 'bg-[var(--primary-color)]/20 text-[var(--primary-color)]', tag: 'Handout / PDF' };
     }
   };
@@ -249,11 +256,11 @@ const LmsSingleSubject = () => {
                   {filteredFeed.length === 0 ? (
                      <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-12 border border-slate-100 dark:border-slate-700 shadow-sm text-center animate-in fade-in transition-colors">
                         <div className="w-20 h-20 bg-slate-50 dark:bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300 dark:text-slate-500"><CheckSquare size={32} /></div>
-                        <h3 className="text-lg font-black text-slate-700 dark:text-slate-300">No {currentTab} posted yet.</h3>
+                        <h3 className="text-lg font-black text-slate-700 dark:text-slate-300">No {currentTab === 'all' ? 'posts or announcements' : currentTab} posted yet.</h3>
                      </div>
                   ) : (
                      filteredFeed.map((post) => {
-                        const style = getPostStyle(post.type);
+                        const style = getPostStyle(post.type, post.status);
                         return (
                            <div key={post.id} className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all group animate-in slide-in-from-bottom-2">
                               <div className="flex justify-between items-start mb-4">
@@ -269,7 +276,7 @@ const LmsSingleSubject = () => {
                               </div>
 
                               <div className="pl-16">
-                                 <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-4">{post.desc}</p>
+                                 <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-4 whitespace-pre-line leading-relaxed">{post.desc}</p>
                                  <div className="flex flex-wrap items-center gap-3">
                                     {post.type === 'video' && <button className="px-5 py-2.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors"><Video size={16} /> Watch Video</button>}
                                     {post.type === 'lecture' && <button className="px-5 py-2.5 bg-[var(--primary-color)]/10 text-[var(--primary-color)] rounded-xl text-xs font-black flex items-center gap-2 hover:bg-[var(--primary-color)]/20 transition-colors"><FileDown size={16} /> Download PDF</button>}
@@ -300,7 +307,6 @@ const LmsSingleSubject = () => {
                                        Waiting for Grade
                                     </div>
                                     )}
-                                    <button className="px-4 py-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"><MessageCircle size={16} /> Add class comment</button>
                                  </div>
                               </div>
                            </div>

@@ -3,7 +3,7 @@ import express from 'express';
 import { getTeacherProfile } from '../controllers/teacher/profileController.js';
 import { getMySchedule } from '../controllers/teacher/scheduleController.js';
 import { getSections } from '../controllers/teacher/sectionsController.js';
-import { createActivity, createExam, getActivities } from '../controllers/teacher/activityController.js';
+import { createActivity, createExam, getActivities, shareActivity } from '../controllers/teacher/activityController.js';
 import { getActivityScores, getExamQuestions, saveActivityScores } from '../controllers/teacher/gradingController.js';
 import { 
   getClassGrades, 
@@ -14,7 +14,13 @@ import {
   requestGradeUnlock 
 } from '../controllers/teacher/gradebookController.js';
 import { getDtrToday, logDtr } from '../controllers/teacher/dtrController.js';
-import { getAnnouncements, markNotificationsRead } from '../controllers/teacher/announcementsController.js';
+import {
+  getAnnouncements,
+  markNotificationsRead,
+  getClassAnnouncements,
+  createClassAnnouncement,
+  deleteClassAnnouncement
+} from '../controllers/teacher/announcementsController.js';
 
 const router = express.Router();
 
@@ -42,6 +48,10 @@ router.post('/create_exam.php', createExam);
 router.get('/activities', getActivities);
 router.get('/get_activities', getActivities);
 router.get('/get_activities.php', getActivities);
+
+router.post('/share-activity', shareActivity);
+router.post('/share_activity', shareActivity);
+router.post('/share_activity.php', shareActivity);
 
 // --- Grading & Exam Submissions ---
 router.get('/activity-scores', getActivityScores);
@@ -98,5 +108,19 @@ router.get('/get_announcements.php', getAnnouncements);
 router.post('/mark-notifications-read', markNotificationsRead);
 router.post('/mark_notifications_read', markNotificationsRead);
 router.post('/mark_notifications_read.php', markNotificationsRead);
+
+// --- Classroom Stream Announcements ---
+router.get('/class-announcements', getClassAnnouncements);
+router.get('/get_class_announcements', getClassAnnouncements);
+router.get('/get_class_announcements.php', getClassAnnouncements);
+router.get('/class_announcements.php', getClassAnnouncements);
+
+router.post('/create-class-announcement', createClassAnnouncement);
+router.post('/create_class_announcement', createClassAnnouncement);
+router.post('/create_class_announcement.php', createClassAnnouncement);
+
+router.post('/delete-class-announcement', deleteClassAnnouncement);
+router.post('/delete_class_announcement', deleteClassAnnouncement);
+router.post('/delete_class_announcement.php', deleteClassAnnouncement);
 
 export default router;

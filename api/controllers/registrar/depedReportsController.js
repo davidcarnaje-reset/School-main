@@ -1,6 +1,17 @@
 import pool from '../../config/db.js';
 import { logAuditTrail } from '../../utils/auditLogger.js';
 
+// Helper: DO 015, s. 2026 Table 11 Qualitative Descriptors of Numeric Grades
+const getDO2026Descriptor = (numGrade) => {
+  const g = parseFloat(numGrade);
+  if (isNaN(g) || g <= 0) return 'N/A';
+  if (g >= 90) return 'Advancing (90-100)';
+  if (g >= 80) return 'Benchmarking (80-89)';
+  if (g >= 75) return 'Connecting (75-79)';
+  if (g >= 65) return 'Developing (65-74)';
+  return 'Emerging (0-64)';
+};
+
 // ====================================================
 // 1. GET SF1: DEPED SCHOOL REGISTER REPORT
 // ====================================================
@@ -26,10 +37,11 @@ export const getSF1Report = async (req, res) => {
         s.guardian_rel,
         s.mobile_no,
         e.grade_level,
-        COALESCE(e.section, 'TBA') AS section,
+        COALESCE(sec.section_name, e.section, 'TBA') AS section,
         COALESCE(ap.program_code, 'K-12 Basic Ed') AS program
       FROM students s
       JOIN enrollments e ON s.student_id = e.student_id
+      LEFT JOIN sections sec ON e.section_id = sec.id
       LEFT JOIN academic_programs ap ON e.program_id = ap.id
       WHERE 1=1
     `;
@@ -40,8 +52,8 @@ export const getSF1Report = async (req, res) => {
       params.push(grade_level);
     }
     if (section && section !== 'All') {
-      sql += ` AND e.section = ?`;
-      params.push(section);
+      sql += ` AND (e.section = ? OR sec.section_name = ?)`;
+      params.push(section, section);
     }
 
     sql += ` ORDER BY s.gender DESC, s.last_name ASC, s.first_name ASC`;
@@ -77,9 +89,10 @@ export const getSF5Report = async (req, res) => {
         CONCAT(s.last_name, ', ', s.first_name, ' ', COALESCE(s.middle_name, '')) AS student_name,
         s.gender,
         e.grade_level,
-        e.section
+        COALESCE(sec.section_name, e.section, 'TBA') AS section
       FROM students s
       JOIN enrollments e ON s.student_id = e.student_id
+      LEFT JOIN sections sec ON e.section_id = sec.id
       WHERE 1=1
     `;
 
@@ -89,54 +102,63 @@ export const getSF5Report = async (req, res) => {
       params.push(grade_level);
     }
     if (section && section !== 'All') {
-      sql_students += ` AND e.section = ?`;
-      params.push(section);
+      sql_students += ` AND (e.section = ? OR sec.section_name = ?)`;
+      params.push(section, section);
     }
 
     sql_students += ` ORDER BY s.gender DESC, s.last_name ASC`;
 
     const [students] = await pool.query(sql_students, params);
 
-    // Compute grades for each student
+    // Compute grades for each student per subject
     const resultData = await Promise.all(students.map(async (st) => {
       const [grades] = await pool.query(`
-        SELECT sg.final_grade, sub.subject_code, sub.subject_description
+        SELECT sg.class_id, sg.quarter, sg.final_grade, sg.descriptive_grade, sub.subject_code, sub.subject_description
         FROM student_grades sg
         JOIN class_assignments ca ON sg.class_id = ca.id
         JOIN subjects sub ON ca.subject_id = sub.id
-        WHERE sg.student_id = ? AND sg.final_grade IS NOT NULL
+        WHERE sg.student_id = ? AND (sg.final_grade IS NOT NULL OR sg.descriptive_grade IS NOT NULL)
       `, [st.student_id]);
+
+      // Group by subject to compute Final Grade (FG) per learning area
+      const bySubject = {};
+      grades.forEach(g => {
+        const val = parseFloat(g.final_grade || 0);
+        if (val > 0) {
+          if (!bySubject[g.subject_code]) bySubject[g.subject_code] = [];
+          bySubject[g.subject_code].push(val);
+        }
+      });
+
+      const subjectFGs = Object.values(bySubject).map(vals =>
+        Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+      );
 
       let gwa = 0;
       let status = 'Promoted';
       let failedCount = 0;
 
-      if (grades.length > 0) {
-        const total = grades.reduce((acc, g) => acc + parseFloat(g.final_grade || 0), 0);
-        gwa = (total / grades.length).toFixed(2);
+      if (subjectFGs.length > 0) {
+        const total = subjectFGs.reduce((acc, fg) => acc + fg, 0);
+        // DO 015, s. 2026 Sec. 53: GA expressed as a whole number (with 2-decimal precision kept for display if needed)
+        gwa = Math.round(total / subjectFGs.length);
         
-        failedCount = grades.filter(g => parseFloat(g.final_grade) < 75).length;
+        failedCount = subjectFGs.filter(fg => fg < 75).length;
         if (failedCount >= 3) {
           status = 'Retained';
         } else if (failedCount > 0) {
-          status = 'Conditional';
+          status = 'Conditional (Summer Remedial)';
         }
       }
 
-      // Level of Proficiency
-      let level = 'Did Not Meet Expectations';
-      const numGwa = parseFloat(gwa);
-      if (numGwa >= 90) level = 'Outstanding (90-100)';
-      else if (numGwa >= 85) level = 'Very Satisfactory (85-89)';
-      else if (numGwa >= 80) level = 'Satisfactory (80-84)';
-      else if (numGwa >= 75) level = 'Fairly Satisfactory (75-79)';
+      const level = subjectFGs.length > 0 ? getDO2026Descriptor(gwa) : 'N/A';
 
       return {
         ...st,
-        gwa: grades.length > 0 ? gwa : 'N/A',
+        gwa: subjectFGs.length > 0 ? gwa : 'N/A',
         status,
         failed_count: failedCount,
-        proficiency_level: grades.length > 0 ? level : 'N/A'
+        proficiency_level: level
       };
     }));
 
@@ -147,7 +169,7 @@ export const getSF5Report = async (req, res) => {
       summary: {
         total: resultData.length,
         promoted: resultData.filter(r => r.status === 'Promoted').length,
-        conditional: resultData.filter(r => r.status === 'Conditional').length,
+        conditional: resultData.filter(r => r.status.startsWith('Conditional')).length,
         retained: resultData.filter(r => r.status === 'Retained').length
       },
       data: resultData
@@ -159,7 +181,7 @@ export const getSF5Report = async (req, res) => {
 };
 
 // ====================================================
-// 3. GET FORM 138 (REPORT CARD)
+// 3. GET FORM 138 / SF9 (REPORT CARD)
 // ====================================================
 export const getForm138ReportCard = async (req, res) => {
   const { student_id } = req.query;
@@ -169,76 +191,150 @@ export const getForm138ReportCard = async (req, res) => {
   }
 
   try {
+    const q = String(student_id).trim();
+    const likeQ = `%${q}%`;
+
     const [studentRows] = await pool.query(`
       SELECT 
         s.student_id, s.lrn, s.first_name, s.middle_name, s.last_name, s.suffix, s.gender, s.dob,
-        e.grade_level, COALESCE(e.section, 'TBA') AS section, e.school_year,
-        COALESCE(ap.program_code, 'Basic Education') AS program
+        TIMESTAMPDIFF(YEAR, s.dob, CURDATE()) AS age,
+        CONCAT_WS(' ', s.first_name, COALESCE(s.middle_name,''), s.last_name, COALESCE(s.suffix,'')) AS name,
+        COALESCE(e.grade_level, sec.grade_level, 'Grade 1') AS grade_level, 
+        COALESCE(sec.section_name, e.section, 'Section A') AS section, 
+        COALESCE(e.school_year, '2026-2027') AS school_year,
+        e.section_id,
+        CONCAT_WS(' ', adv.first_name, adv.last_name) AS adviser_name,
+        COALESCE(ap.program_code, 'Basic Education') AS program,
+        CASE
+          WHEN COALESCE(e.grade_level, sec.grade_level, '') LIKE '%College%' OR COALESCE(e.grade_level, '') LIKE '%Year%' THEN 'College'
+          WHEN COALESCE(e.grade_level, sec.grade_level, '') LIKE '%11%' OR COALESCE(e.grade_level, sec.grade_level, '') LIKE '%12%' THEN 'SHS'
+          WHEN COALESCE(e.grade_level, sec.grade_level, '') LIKE '%Kinder%' THEN 'Kinder'
+          ELSE 'K-10'
+        END AS department
       FROM students s
-      JOIN enrollments e ON s.student_id = e.student_id
+      LEFT JOIN enrollments e ON s.student_id = e.student_id
+      LEFT JOIN sections sec ON e.section_id = sec.id
+      LEFT JOIN users adv ON sec.adviser_id = adv.id
       LEFT JOIN academic_programs ap ON e.program_id = ap.id
-      WHERE s.student_id = ?
+      WHERE s.student_id = ? 
+         OR s.lrn = ? 
+         OR CONCAT_WS(' ', s.first_name, s.last_name) LIKE ?
+         OR CONCAT_WS(', ', s.last_name, s.first_name) LIKE ?
       ORDER BY e.created_at DESC LIMIT 1
-    `, [student_id]);
+    `, [q, q, likeQ, likeQ]);
 
     if (studentRows.length === 0) {
       return res.status(404).json({ success: false, message: "Student record not found." });
     }
 
     const student = studentRows[0];
+    const resolvedId = student.student_id;
 
     const [grades] = await pool.query(`
       SELECT 
+        ca.id AS class_id,
         sub.subject_code,
         sub.subject_description,
+        sub.subject_type,
+        sub.level_category,
+        sub.units,
         sg.quarter,
+        sg.written,
+        sg.performance,
+        sg.exam,
+        sg.initial_grade,
         sg.final_grade,
-        sg.remarks
-      FROM student_grades sg
-      JOIN class_assignments ca ON sg.class_id = ca.id
+        sg.descriptive_grade,
+        sg.descriptor,
+        sg.remarks,
+        sg.details_json,
+        COALESCE(cgl.is_locked, 0) AS is_locked
+      FROM class_assignments ca
       JOIN subjects sub ON ca.subject_id = sub.id
-      WHERE sg.student_id = ?
+      LEFT JOIN student_grades sg ON sg.class_id = ca.id AND sg.student_id = ?
+      LEFT JOIN class_grade_locks cgl ON ca.id = cgl.class_id AND sg.quarter = cgl.quarter
+      WHERE ca.section_id = ?
+         OR ca.id IN (SELECT ec.class_assignment_id FROM enrolled_classes ec WHERE ec.student_id = ?)
+         OR ca.id IN (SELECT sg2.class_id FROM student_grades sg2 WHERE sg2.student_id = ?)
       ORDER BY sub.subject_code ASC, sg.quarter ASC
-    `, [student_id]);
+    `, [resolvedId, student.section_id || 0, resolvedId, resolvedId]);
 
-    // Group grades per subject (Q1, Q2, Q3, Q4, Final)
+    // Group grades per subject (Q1/T1, Q2/T2, Q3/T3, Q4, Final)
     const subjectMap = {};
     grades.forEach(g => {
       if (!subjectMap[g.subject_code]) {
         subjectMap[g.subject_code] = {
+          class_id: g.class_id,
           code: g.subject_code,
           description: g.subject_description,
+          subject_type: g.subject_type,
+          level_category: g.level_category,
+          units: g.units,
           q1: null, q2: null, q3: null, q4: null,
+          desc1: null, desc2: null, desc3: null, desc4: null,
+          details1: null, details2: null, details3: null, details4: null,
+          is_locked: { q1: 0, q2: 0, q3: 0, q4: 0 },
           final_grade: null,
-          remarks: 'PASSED'
+          descriptive_final: null,
+          descriptor: null,
+          remarks: ''
         };
       }
-      if (g.quarter === '1' || g.quarter === 1) subjectMap[g.subject_code].q1 = g.final_grade;
-      if (g.quarter === '2' || g.quarter === 2) subjectMap[g.subject_code].q2 = g.final_grade;
-      if (g.quarter === '3' || g.quarter === 3) subjectMap[g.subject_code].q3 = g.final_grade;
-      if (g.quarter === '4' || g.quarter === 4) subjectMap[g.subject_code].q4 = g.final_grade;
-      if (!g.quarter && g.final_grade) {
-        subjectMap[g.subject_code].final_grade = g.final_grade;
-        subjectMap[g.subject_code].remarks = parseFloat(g.final_grade) >= 75 ? 'PASSED' : 'FAILED';
+      const qNum = parseInt(g.quarter, 10);
+      const fgNum = parseFloat(g.final_grade);
+      const validFg = !isNaN(fgNum) && fgNum > 0 ? Math.round(fgNum) : null;
+
+      if (qNum >= 1 && qNum <= 4) {
+        subjectMap[g.subject_code][`q${qNum}`] = validFg;
+        subjectMap[g.subject_code][`desc${qNum}`] = g.descriptive_grade || null;
+        subjectMap[g.subject_code][`details${qNum}`] = g.details_json || null;
+        subjectMap[g.subject_code].is_locked[`q${qNum}`] = g.is_locked;
+      } else if (!g.quarter && validFg) {
+        subjectMap[g.subject_code].final_grade = validFg;
       }
     });
 
-    const subjectList = Object.values(subjectMap);
+    const subjectList = Object.values(subjectMap).map(sub => {
+      const termVals = [sub.q1, sub.q2, sub.q3, sub.q4].filter(v => v !== null && v > 0);
+      if (sub.final_grade === null && termVals.length > 0) {
+        // DO 015, s. 2026 Sec. 52: FG is average of TGs, rounded to nearest whole number
+        sub.final_grade = Math.round(termVals.reduce((a, b) => a + b, 0) / termVals.length);
+      }
+      if (sub.final_grade !== null) {
+        sub.descriptor = getDO2026Descriptor(sub.final_grade).split(' (')[0];
+        sub.remarks = sub.final_grade >= 75 ? 'PASSED' : 'FAILED';
+      } else {
+        const descVals = [sub.desc3, sub.desc2, sub.desc1].filter(Boolean);
+        if (descVals.length > 0) {
+          sub.descriptive_final = descVals[0];
+          sub.remarks = 'PROMOTED';
+        }
+      }
+      return sub;
+    });
 
-    // Compute General Average
+    // Compute General Average (DO 015, s. 2026 Sec. 53: whole number)
     let generalAverage = 0;
-    const validGrades = subjectList.filter(s => s.final_grade !== null);
+    const validGrades = subjectList.filter(s => s.final_grade !== null && s.final_grade > 0);
     if (validGrades.length > 0) {
       const sum = validGrades.reduce((acc, curr) => acc + parseFloat(curr.final_grade), 0);
-      generalAverage = (sum / validGrades.length).toFixed(2);
+      generalAverage = Math.round(sum / validGrades.length);
     }
+
+    const minFg = validGrades.length > 0 ? Math.min(...validGrades.map(s => parseFloat(s.final_grade))) : 0;
+    const hasAcademicExcellence = generalAverage >= 90 && minFg >= 80;
 
     return res.status(200).json({
       success: true,
       student,
+      grades,
       subjects: subjectList,
       general_average: generalAverage > 0 ? generalAverage : 'N/A',
-      promotion_status: generalAverage >= 75 ? 'PROMOTED TO NEXT GRADE LEVEL' : 'RETAINED'
+      descriptor: generalAverage > 0 ? getDO2026Descriptor(generalAverage) : 'N/A',
+      academic_award: hasAcademicExcellence ? 'Academic Excellence Award' : null,
+      promotion_status: generalAverage >= 75 || subjectList.some(s => s.descriptive_final)
+        ? 'PROMOTED TO NEXT GRADE LEVEL'
+        : (generalAverage > 0 ? 'FOR INTERVENTION / RETAINED' : 'IN PROGRESS')
     });
   } catch (error) {
     console.error("getForm138ReportCard Error:", error);
@@ -260,15 +356,16 @@ export const getCertificateOfEnrollment = async (req, res) => {
     const [studentRows] = await pool.query(`
       SELECT 
         s.student_id, s.lrn, s.first_name, s.middle_name, s.last_name, s.suffix, s.gender, s.email, s.mobile_no,
-        e.grade_level, COALESCE(e.section, 'TBA') AS section, e.school_year, e.enrollment_type, e.payment_plan,
+        e.grade_level, COALESCE(sec.section_name, e.section, 'TBA') AS section, e.school_year, e.enrollment_type, e.payment_plan,
         COALESCE(ap.program_code, 'Basic Education') AS program_code,
         COALESCE(ap.program_description, 'General Education Curriculum') AS program_desc
       FROM students s
       JOIN enrollments e ON s.student_id = e.student_id
+      LEFT JOIN sections sec ON e.section_id = sec.id
       LEFT JOIN academic_programs ap ON e.program_id = ap.id
-      WHERE s.student_id = ?
+      WHERE s.student_id = ? OR s.lrn = ?
       ORDER BY e.created_at DESC LIMIT 1
-    `, [student_id]);
+    `, [student_id, student_id]);
 
     if (studentRows.length === 0) {
       return res.status(404).json({ success: false, message: "Student record not found." });
@@ -276,7 +373,6 @@ export const getCertificateOfEnrollment = async (req, res) => {
 
     const student = studentRows[0];
 
-    // Get Enrolled Classes & Schedules
     const [enrolledSubjects] = await pool.query(`
       SELECT 
         sub.subject_code, sub.subject_description, sub.units,
@@ -289,7 +385,7 @@ export const getCertificateOfEnrollment = async (req, res) => {
       LEFT JOIN users u ON ca.teacher_id = u.id
       WHERE sg.student_id = ?
       GROUP BY ca.id, sub.subject_code, sub.subject_description, sub.units, ca.room_name, ca.schedule_time, u.first_name, u.last_name
-    `, [student_id]);
+    `, [student.student_id]);
 
     const totalUnits = enrolledSubjects.reduce((acc, sub) => acc + (parseInt(sub.units) || 0), 0);
 
@@ -307,7 +403,7 @@ export const getCertificateOfEnrollment = async (req, res) => {
 };
 
 // ====================================================
-// 5. GET HONOR STUDENTS & DEAN'S LIST CALCULATOR
+// 5. GET HONOR STUDENTS & ACADEMIC EXCELLENCE (DO 015, s. 2026)
 // ====================================================
 export const getHonorStudents = async (req, res) => {
   const { grade_level } = req.query;
@@ -316,10 +412,11 @@ export const getHonorStudents = async (req, res) => {
     let sql = `
       SELECT 
         s.student_id, s.lrn, s.first_name, s.middle_name, s.last_name, s.gender,
-        e.grade_level, COALESCE(e.section, 'TBA') AS section,
+        e.grade_level, COALESCE(sec.section_name, e.section, 'TBA') AS section,
         COALESCE(ap.program_code, 'Basic Ed') AS program
       FROM students s
       JOIN enrollments e ON s.student_id = e.student_id
+      LEFT JOIN sections sec ON e.section_id = sec.id
       LEFT JOIN academic_programs ap ON e.program_id = ap.id
       WHERE 1=1
     `;
@@ -336,22 +433,33 @@ export const getHonorStudents = async (req, res) => {
 
     for (const st of students) {
       const [grades] = await pool.query(`
-        SELECT sg.final_grade
+        SELECT sg.class_id, sg.final_grade
         FROM student_grades sg
-        WHERE sg.student_id = ? AND sg.final_grade IS NOT NULL
+        WHERE sg.student_id = ? AND sg.final_grade IS NOT NULL AND sg.final_grade > 0
       `, [st.student_id]);
 
       if (grades.length === 0) continue;
 
-      const numGrades = grades.map(g => parseFloat(g.final_grade));
-      const hasFailingGrade = numGrades.some(g => g < 85); // DepEd rule: No grade below 85 for honors
-      const total = numGrades.reduce((a, b) => a + b, 0);
-      const gwa = parseFloat((total / numGrades.length).toFixed(2));
+      // Group by class_id to get FG per learning area
+      const byClass = {};
+      grades.forEach(g => {
+        if (!byClass[g.class_id]) byClass[g.class_id] = [];
+        byClass[g.class_id].push(parseFloat(g.final_grade));
+      });
 
-      if (gwa >= 90 && !hasFailingGrade) {
-        let honorTitle = 'With Honors';
-        if (gwa >= 98) honorTitle = 'With Highest Honors';
-        else if (gwa >= 95) honorTitle = 'With High Honors';
+      const subjectFGs = Object.values(byClass).map(vals =>
+        Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+      );
+
+      // DO 015, s. 2026 Sec. IX.75: GA of 90 or higher, with no FG below 80 in any learning area
+      const hasLowGrade = subjectFGs.some(fg => fg < 80);
+      const total = subjectFGs.reduce((a, b) => a + b, 0);
+      const gwa = Math.round(total / subjectFGs.length);
+
+      if (gwa >= 90 && !hasLowGrade) {
+        let honorTitle = 'Academic Excellence Award (Advancing)';
+        if (gwa >= 98) honorTitle = 'Academic Excellence Award (With Highest Honors)';
+        else if (gwa >= 95) honorTitle = 'Academic Excellence Award (With High Honors)';
 
         honorList.push({
           ...st,
@@ -361,7 +469,8 @@ export const getHonorStudents = async (req, res) => {
       }
     }
 
-    honorList.sort((a, b) => b.gwa - a.gwa);
+    // DO 015, s. 2026 Sec. IX.75: Awardees listed alphabetically (or by GWA then alphabetically)
+    honorList.sort((a, b) => b.gwa - a.gwa || a.last_name.localeCompare(b.last_name));
 
     return res.status(200).json({
       success: true,

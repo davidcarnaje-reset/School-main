@@ -13,7 +13,13 @@ import ReadNotificationModal from '../components/shared/ReadNotificationModal';
 const StudentLayout = () => {
   const { user, logout, branding, API_BASE_URL, getLogoUrl } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('studentSidebarCollapsed')) ?? false;
+    } catch {
+      return false;
+    }
+  });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [studentData, setStudentData] = useState(null);
   
@@ -21,6 +27,10 @@ const StudentLayout = () => {
   const [editForm, setEditForm] = useState({ email: '', contact_no: '', address: '' });
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem('studentSidebarCollapsed', JSON.stringify(isCollapsed));
+  }, [isCollapsed]);
 
   // Notifications State (Para consistent sa Admin)
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -77,14 +87,21 @@ const StudentLayout = () => {
   }, [user, fetchData]);
 
   // ====================================================
-  // 📌 DITO NATIN DINAGDAG ANG GRADES SA SIDEBAR
+  // 📌 PARTITIONED STUDENT SIDEBAR MENU
   // ====================================================
   const studentMenu = [
+    { type: 'header', label: 'Student Portal' },
     { icon: <LayoutDashboard size={20}/>, label: "Dashboard", path: "/student/dashboard" },
+
+    { type: 'header', label: 'Academics & Learning' },
     { icon: <BookOpen size={20}/>, label: "Learning Hub", path: "/student/lms" },
-    { icon: <GraduationCap size={20}/>, label: "My Grades", path: "/student/grades" }, // <--- DINAGDAG
+    { icon: <GraduationCap size={20}/>, label: "My Grades", path: "/student/grades" },
+
+    { type: 'header', label: 'Finance & Grants' },
     { icon: <CreditCard size={20}/>, label: "Accounting", path: "/student/accounting" },
-    { icon: <FileBadge size={20}/>, label: "Scholarship", path: "/student/scholarship" }, // <--- INIBA ANG ICON
+    { icon: <FileBadge size={20}/>, label: "Scholarship", path: "/student/scholarship" },
+
+    { type: 'header', label: 'Student Services' },
     { icon: <Heart size={20}/>, label: "Guidance Center", path: "/student/guidance" },
     { icon: <Activity size={20}/>, label: "School Health", path: "/student/health" },
   ];
@@ -130,66 +147,159 @@ const StudentLayout = () => {
     } catch (err) { console.error(err); }
   };
 
+  const themeColor = branding?.theme_color || '#2563eb';
+
   return (
     <div className="flex h-screen bg-slate-50 relative font-sans overflow-hidden">
       
       {/* 1. MOBILE OVERLAY */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
       )}
 
-      {/* 2. SIDEBAR */}
-      <aside className={`
-        fixed z-50 bg-slate-900 text-slate-300 flex flex-col transition-all duration-300 ease-in-out shadow-2xl
-        inset-y-0 left-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-        lg:translate-x-0 lg:static lg:h-[calc(100vh-2rem)] lg:my-4 lg:ml-4 lg:rounded-[2rem]
-        w-64 ${isCollapsed ? 'lg:w-[5.5rem]' : 'lg:w-64'} 
-      `}>
-        {/* LOGO SECTION */}
-        <div className={`h-20 px-4 border-b border-slate-800 flex items-center shrink-0 transition-all justify-between ${isCollapsed ? 'lg:justify-center' : 'lg:justify-between'}`}>
-          <div className="flex items-center gap-3 overflow-hidden">
-            {branding?.school_logo && <img src={getLogoUrl(branding.school_logo)} alt="Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg" />}
-            <span className={`text-[15px] leading-tight font-black text-white tracking-tight line-clamp-2 w-36 ${isCollapsed ? 'lg:w-0 lg:opacity-0 lg:hidden' : ''}`}>{branding?.school_name}</span>
-          </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-white/50 hover:text-white"><X size={20}/></button>
-        </div>
-
-        {/* NAVIGATION */}
-        <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto scrollbar-hide">
-          <div className={`px-3 mb-2 ${isCollapsed ? 'hidden' : 'block'}`}>
-            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Student Portal</p>
-          </div>
-          {studentMenu.map((item, index) => {
-            const isActive = location.pathname.includes(item.path);
-            return (
-              <Link 
-                key={index} 
-                to={item.path} 
-                className={`flex items-center p-3 rounded-2xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${isCollapsed ? 'lg:justify-center' : 'gap-4'}`} 
-                style={isActive ? { backgroundColor: branding?.theme_color || '#4f46e5' } : {}}
-              >
-                {item.icon}
-                {!isCollapsed && <span className="font-bold text-sm">{item.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* SIDEBAR FOOTER */}
-        <div className="p-4 border-t border-slate-800 shrink-0">
-          <button onClick={logout} className="flex items-center p-3 rounded-2xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 w-full gap-3 transition-all">
-            <LogOut size={20} />
-            {!isCollapsed && <span className="text-sm font-bold">Sign Out</span>}
-          </button>
-        </div>
-
+      {/* 2. SIDEBAR (Outer wrapper keeps collapse button unclipped while inner box clips text during shrink animation) */}
+      <aside
+        className={`
+          fixed z-50 inset-y-0 left-0
+          transition-[width,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0 lg:relative lg:h-[calc(100vh-2rem)] lg:my-4 lg:ml-4
+          w-64 ${isCollapsed ? 'lg:w-[5.5rem]' : 'lg:w-64'}
+        `}
+      >
         {/* COLLAPSE TOGGLE (Desktop Only) */}
-        <button 
+        <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden lg:flex absolute -right-3 top-24 w-6 h-6 bg-white border border-slate-200 rounded-full items-center justify-center text-slate-600 shadow-sm hover:text-blue-600 z-50"
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          className="hidden lg:flex absolute right-0 translate-x-1/2 top-10 w-8 h-8 bg-blue-600 text-white rounded-full items-center justify-center shadow-md border-[3px] border-slate-50 z-50 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          style={{ backgroundColor: themeColor }}
         >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          <ChevronLeft
+            size={17}
+            strokeWidth={2.5}
+            className={`transition-transform duration-300 ease-in-out ${isCollapsed ? 'rotate-180' : 'rotate-0'}`}
+          />
         </button>
+
+        {/* INNER VISUAL BOX */}
+        <div className="bg-slate-900 text-slate-300 flex flex-col w-full h-full overflow-hidden shadow-2xl lg:rounded-[2rem]">
+          
+          {/* LOGO SECTION */}
+          <div className="h-20 px-6 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+            <div className="flex items-center min-w-0">
+              {branding?.school_logo ? (
+                <img
+                  src={getLogoUrl(branding.school_logo)}
+                  alt="Logo"
+                  className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-lg"
+                />
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg"
+                  style={{ backgroundColor: themeColor }}
+                >
+                  {branding?.school_name?.charAt(0) || 'S'}
+                </div>
+              )}
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                  isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[160px] lg:opacity-100 ml-3'
+                }`}
+              >
+                <span className="block text-[14px] leading-tight font-black text-white tracking-tight line-clamp-2 w-[148px]">
+                  {branding?.school_name || 'Student Portal'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden text-white/50 hover:text-white p-1"
+            >
+              <X size={20}/>
+            </button>
+          </div>
+
+          {/* NAVIGATION WITH PARTITIONS */}
+          <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {studentMenu.map((item, index) => {
+              if (item.type === 'header') {
+                return (
+                  <div
+                    key={`header-${index}`}
+                    className={`relative flex items-center px-3 overflow-hidden transition-all duration-300 ${
+                      index === 0 ? 'pt-1 pb-1.5' : 'pt-4 pb-1.5'
+                    }`}
+                  >
+                    {/* Expanded Section Title */}
+                    <p
+                      className={`text-[10px] font-black uppercase text-slate-500 tracking-widest whitespace-nowrap transition-all duration-300 ease-in-out ${
+                        isCollapsed ? 'lg:opacity-0 lg:-translate-x-2 lg:pointer-events-none' : 'lg:opacity-100 lg:translate-x-0'
+                      }`}
+                    >
+                      {item.label}
+                    </p>
+                    {/* Collapsed Partition Line */}
+                    <div
+                      className={`hidden lg:block absolute left-3 right-3 border-t border-slate-700/80 transition-all duration-300 ease-in-out ${
+                        isCollapsed ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+                      }`}
+                    />
+                  </div>
+                );
+              }
+
+              const isActive = location.pathname.includes(item.path);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setIsSidebarOpen(false)}
+                  title={isCollapsed ? item.label : ''}
+                  className={`flex items-center px-3 py-1.5 rounded-2xl transition-colors duration-200 group ${
+                    isActive
+                      ? 'text-white shadow-lg'
+                      : 'text-slate-400 hover:bg-slate-800/80 hover:text-white'
+                  }`}
+                  style={isActive ? { backgroundColor: themeColor } : {}}
+                >
+                  <div className="w-10 h-9 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105">
+                    {item.icon}
+                  </div>
+                  <span
+                    className={`font-bold text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                      isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[160px] lg:opacity-100 ml-2'
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* SIDEBAR FOOTER */}
+          <div className="p-3 border-t border-slate-800/80 shrink-0">
+            <button
+              onClick={logout}
+              title={isCollapsed ? "Sign Out" : ""}
+              className="flex items-center px-3 py-1.5 rounded-2xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 w-full transition-colors duration-200 group"
+            >
+              <div className="w-10 h-9 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105">
+                <LogOut size={20} />
+              </div>
+              <span
+                className={`text-sm font-bold whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                  isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[140px] lg:opacity-100 ml-2'
+                }`}
+              >
+                Sign Out
+              </span>
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* 3. MAIN CONTENT AREA */}

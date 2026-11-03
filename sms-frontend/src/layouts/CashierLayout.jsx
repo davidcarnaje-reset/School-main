@@ -33,7 +33,11 @@ const CashierLayout = () => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    return JSON.parse(localStorage.getItem('cashierSidebarCollapsed')) ?? false;
+    try {
+      return JSON.parse(localStorage.getItem('cashierSidebarCollapsed')) ?? false;
+    } catch {
+      return false;
+    }
   });
   
   const isAppRouteActive = location.pathname === '/employee-portal' || location.pathname === '/cashier/helpdesk';
@@ -155,6 +159,8 @@ const CashierLayout = () => {
     });
   }, [portalEnabled, activePermissions]);
 
+  const themeColor = branding?.theme_color || '#2563eb';
+
   return (
     <div
       className="flex h-screen w-full overflow-hidden p-3 md:p-5 transition-colors duration-500"
@@ -168,64 +174,86 @@ const CashierLayout = () => {
       {/* SIDEBAR - Collapsible & Partitioned */}
       <aside
         className={`
-        fixed inset-y-4 left-4 z-50 bg-slate-900 rounded-[2rem] shadow-2xl transition-all duration-300 ease-in-out
-        ${isSidebarOpen ? "translate-x-0" : "-translate-x-[120%]"}
-        lg:relative lg:translate-x-0 lg:inset-y-0 lg:left-0
-        w-64 ${isCollapsed ? "lg:w-[5.5rem]" : "lg:w-64"}
-      `}
+          fixed inset-y-4 left-4 z-50
+          transition-[width,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-[120%]"}
+          lg:relative lg:translate-x-0 lg:inset-y-0 lg:left-0
+          w-64 ${isCollapsed ? "lg:w-[5.5rem]" : "lg:w-64"}
+        `}
       >
         {/* COLLAPSE TOGGLE BUTTON */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden lg:flex absolute right-0 translate-x-1/2 top-10 w-8 h-8 bg-blue-600 text-white rounded-full items-center justify-center shadow-md border-[3px] border-slate-50 z-50 hover:bg-blue-700 hover:scale-105 transition-all cursor-pointer"
+          className="hidden lg:flex absolute right-0 translate-x-1/2 top-10 w-8 h-8 text-white rounded-full items-center justify-center shadow-md border-[3px] border-slate-50 z-50 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          style={{ backgroundColor: themeColor }}
           title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
         >
-          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} strokeWidth={2.5} />}
+          <ChevronLeft
+            size={17}
+            strokeWidth={2.5}
+            className={`transition-transform duration-300 ease-in-out ${isCollapsed ? 'rotate-180' : 'rotate-0'}`}
+          />
         </button>
 
-        <div className="flex flex-col h-full p-4 md:p-6 overflow-hidden">
+        <div className="bg-slate-900 rounded-[2rem] shadow-2xl flex flex-col h-full overflow-hidden">
           {/* BRANDING AREA */}
-          <div className="flex flex-col items-center text-center mb-6 shrink-0">
-            <div className="w-12 h-12 md:w-14 md:h-14 bg-white rounded-2xl p-2 shadow-xl mb-2 flex items-center justify-center overflow-hidden border-2 border-slate-800 shrink-0">
-              {branding?.school_logo ? (
-                <img
-                  src={getLogoUrl(branding.school_logo)}
-                  className="w-full h-full object-contain"
-                  alt="Logo"
-                />
-              ) : (
-                <span className="text-xl font-black text-slate-900 italic uppercase">
-                  {branding?.school_name?.charAt(0)}
-                </span>
-              )}
-            </div>
-            {!isCollapsed && (
-              <>
-                <h1 className="text-white font-black italic tracking-tighter text-xs md:text-sm leading-tight uppercase line-clamp-2 px-2">
-                  {branding?.school_name}
+          <div className="h-20 px-6 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+            <div className="flex items-center min-w-0">
+              <div className="w-10 h-10 bg-white rounded-xl p-1.5 shadow-lg flex items-center justify-center overflow-hidden shrink-0">
+                {branding?.school_logo ? (
+                  <img
+                    src={getLogoUrl(branding.school_logo)}
+                    className="w-full h-full object-contain"
+                    alt="Logo"
+                  />
+                ) : (
+                  <span className="text-base font-black text-slate-900 italic uppercase">
+                    {branding?.school_name?.charAt(0) || 'C'}
+                  </span>
+                )}
+              </div>
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                  isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[160px] lg:opacity-100 ml-3'
+                }`}
+              >
+                <h1 className="text-white font-black tracking-tight text-[13px] leading-tight line-clamp-2 w-[148px]">
+                  {branding?.school_name || 'Cashier Portal'}
                 </h1>
-                <div className="mt-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
-                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
-                    Cashier Portal
-                  </p>
-                </div>
-              </>
-            )}
+              </div>
+            </div>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden text-white/50 hover:text-white p-1"
+            >
+              <X size={20} />
+            </button>
           </div>
 
           {/* NAVIGATION */}
-          <nav className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar">
+          <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto overflow-x-hidden no-scrollbar">
             {finalMenuItems.map((item, index) => {
               if (item.type === "header") {
                 return (
-                  <React.Fragment key={`header-${index}`}>
-                    <div className={`my-3 mx-auto w-6 border-t border-slate-800 hidden ${isCollapsed ? 'lg:block' : ''}`} />
-                    <div className={`pt-4 pb-1 px-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap truncate">
-                        {item.label}
-                      </p>
-                    </div>
-                  </React.Fragment>
+                  <div
+                    key={`header-${index}`}
+                    className={`relative flex items-center px-3 overflow-hidden transition-all duration-300 ${
+                      index === 0 ? 'pt-1 pb-1.5' : 'pt-4 pb-1.5'
+                    }`}
+                  >
+                    <p
+                      className={`text-[10px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap transition-all duration-300 ease-in-out ${
+                        isCollapsed ? 'lg:opacity-0 lg:-translate-x-2 lg:pointer-events-none' : 'lg:opacity-100 lg:translate-x-0'
+                      }`}
+                    >
+                      {item.label}
+                    </p>
+                    <div
+                      className={`hidden lg:block absolute left-3 right-3 border-t border-slate-700/80 transition-all duration-300 ease-in-out ${
+                        isCollapsed ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+                      }`}
+                    />
+                  </div>
                 );
               }
 
@@ -236,88 +264,83 @@ const CashierLayout = () => {
                   to={item.path}
                   title={isCollapsed ? item.label : undefined}
                   onClick={() => setIsSidebarOpen(false)}
-                  className={`flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-4'} py-3 rounded-full font-bold transition-all duration-300 ease-in-out group ${
+                  className={`flex items-center px-3 py-1.5 rounded-2xl font-bold transition-colors duration-200 group ${
                     isActive
-                      ? "text-white shadow-lg shadow-black/20 scale-[1.02]"
-                      : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                      ? "text-white shadow-lg shadow-black/20"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800/80"
                   }`}
-                  style={
-                    isActive ? { backgroundColor: branding?.theme_color || '#2563eb' } : {}
-                  }
+                  style={isActive ? { backgroundColor: themeColor } : {}}
                 >
-                  <item.icon
-                    size={18}
-                    className={`shrink-0 transition-transform duration-300 ${isActive ? "scale-110" : "group-hover:scale-110"}`}
-                  />
-                  {!isCollapsed && (
-                    <span className="tracking-tight text-xs uppercase italic text-[11px] ml-3 truncate">
-                      {item.label}
-                    </span>
-                  )}
+                  <div className="w-10 h-9 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105">
+                    <item.icon size={19} />
+                  </div>
+                  <span
+                    className={`text-sm font-bold whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                      isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[160px] lg:opacity-100 ml-2'
+                    }`}
+                  >
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}
 
             {/* APPS DROPDOWN */}
-            <div className="space-y-1 mt-3 border-t border-white/10 pt-3">
+            <div className="space-y-1 mt-2 border-t border-slate-800/80 pt-3">
               <button
                 onClick={() => setIsAppsOpen(!isAppsOpen)}
                 title={isCollapsed ? "Apps" : undefined}
-                className={`w-full flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-4 justify-between'} py-3 rounded-full font-bold transition-all duration-300 ease-in-out group ${
+                className={`w-full flex items-center px-3 py-1.5 rounded-2xl font-bold transition-colors duration-200 group ${
                   location.pathname === '/employee-portal' || location.pathname === '/cashier/helpdesk'
-                    ? "bg-white/10 text-white"
-                    : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/80"
                 }`}
               >
-                <div className="flex items-center">
-                  <LayoutGrid
-                    size={18}
-                    className={`shrink-0 transition-transform duration-300 ${
-                      location.pathname === '/employee-portal' || location.pathname === '/cashier/helpdesk' ? "scale-110 text-white" : "text-slate-500 group-hover:scale-110"
-                    }`}
-                  />
-                  {!isCollapsed && (
-                    <span className="tracking-tight text-xs uppercase italic text-[11px] ml-3 truncate">
-                      Apps
-                    </span>
-                  )}
+                <div className="w-10 h-9 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105">
+                  <LayoutGrid size={19} />
                 </div>
-                {!isCollapsed && (
-                  <span className="text-slate-500 group-hover:text-slate-300">
-                    {isAppsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                <div
+                  className={`flex items-center justify-between flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                    isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[160px] lg:opacity-100 ml-2'
+                  }`}
+                >
+                  <span className="text-sm font-bold whitespace-nowrap truncate">
+                    Apps
                   </span>
-                )}
+                  <span className="text-slate-400 group-hover:text-white shrink-0 ml-2">
+                    {isAppsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </span>
+                </div>
               </button>
 
               {isAppsOpen && (
-                <div className={`space-y-1 transition-all duration-300 ${isCollapsed ? 'lg:pl-0' : 'pl-4'}`}>
+                <div className={`space-y-1 transition-all duration-300 ${isCollapsed ? 'lg:pl-0' : 'pl-3'}`}>
                   {/* Payroll Portal */}
                   <Link
                     to="/employee-portal"
                     title={isCollapsed ? "Payroll Portal" : undefined}
                     onClick={() => setIsSidebarOpen(false)}
-                    className={`flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-3'} py-2.5 rounded-full font-bold transition-all duration-250 group ${
+                    className={`flex items-center px-3 py-1.5 rounded-xl font-bold transition-colors duration-200 group ${
                       location.pathname === '/employee-portal'
-                        ? "text-white shadow-md scale-[1.02]"
-                        : "text-slate-400 hover:text-slate-300 hover:bg-white/5"
+                        ? "text-white shadow-md"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800/80"
                     }`}
                     style={
                       location.pathname === '/employee-portal'
-                        ? { backgroundColor: branding?.theme_color || '#2563eb' }
+                        ? { backgroundColor: themeColor }
                         : {}
                     }
                   >
-                    <CreditCard
-                      size={16}
-                      className={`shrink-0 transition-transform duration-300 ${
-                        location.pathname === '/employee-portal' ? "scale-110" : "group-hover:scale-110"
+                    <div className="w-10 h-8 flex items-center justify-center shrink-0">
+                      <CreditCard size={17} />
+                    </div>
+                    <span
+                      className={`text-xs font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                        isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[150px] lg:opacity-100 ml-2'
                       }`}
-                    />
-                    {!isCollapsed && (
-                      <span className="tracking-tight text-[10px] uppercase ml-2.5 truncate">
-                        Payroll Portal
-                      </span>
-                    )}
+                    >
+                      Payroll Portal
+                    </span>
                   </Link>
 
                   {/* IT Help Desk */}
@@ -325,28 +348,27 @@ const CashierLayout = () => {
                     to="/cashier/helpdesk"
                     title={isCollapsed ? "IT Help Desk" : undefined}
                     onClick={() => setIsSidebarOpen(false)}
-                    className={`flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-3'} py-2.5 rounded-full font-bold transition-all duration-250 group ${
+                    className={`flex items-center px-3 py-1.5 rounded-xl font-bold transition-colors duration-200 group ${
                       location.pathname === '/cashier/helpdesk'
-                        ? "text-white shadow-md scale-[1.02]"
-                        : "text-slate-400 hover:text-slate-300 hover:bg-white/5"
+                        ? "text-white shadow-md"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800/80"
                     }`}
                     style={
                       location.pathname === '/cashier/helpdesk'
-                        ? { backgroundColor: branding?.theme_color || '#2563eb' }
+                        ? { backgroundColor: themeColor }
                         : {}
                     }
                   >
-                    <LifeBuoy
-                      size={16}
-                      className={`shrink-0 transition-transform duration-300 ${
-                        location.pathname === '/cashier/helpdesk' ? "scale-110" : "group-hover:scale-110"
+                    <div className="w-10 h-8 flex items-center justify-center shrink-0">
+                      <LifeBuoy size={17} />
+                    </div>
+                    <span
+                      className={`text-xs font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                        isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[150px] lg:opacity-100 ml-2'
                       }`}
-                    />
-                    {!isCollapsed && (
-                      <span className="tracking-tight text-[10px] uppercase ml-2.5 truncate">
-                        IT Help Desk
-                      </span>
-                    )}
+                    >
+                      IT Help Desk
+                    </span>
                   </Link>
                 </div>
               )}
@@ -354,14 +376,24 @@ const CashierLayout = () => {
           </nav>
 
           {/* LOGOUT */}
-          <button
-            onClick={logout}
-            title={isCollapsed ? "Sign Out" : undefined}
-            className={`flex items-center ${isCollapsed ? 'lg:justify-center px-0' : 'px-4'} py-3.5 rounded-2xl font-black text-rose-500 hover:bg-rose-500/10 transition-all mt-4 uppercase text-[10px] tracking-widest border border-rose-500/10 shrink-0 cursor-pointer`}
-          >
-            <LogOut size={16} className="shrink-0" />
-            {!isCollapsed && <span className="ml-3">Sign Out</span>}
-          </button>
+          <div className="p-3 border-t border-slate-800/80 shrink-0">
+            <button
+              onClick={logout}
+              title={isCollapsed ? "Sign Out" : undefined}
+              className="flex items-center px-3 py-1.5 rounded-2xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 w-full transition-colors duration-200 group cursor-pointer"
+            >
+              <div className="w-10 h-9 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105">
+                <LogOut size={19} />
+              </div>
+              <span
+                className={`text-sm font-bold whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                  isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[140px] lg:opacity-100 ml-2'
+                }`}
+              >
+                Sign Out
+              </span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -379,7 +411,6 @@ const CashierLayout = () => {
               <Menu size={20} />
             </button>
 
-            {/* Tinanggal ang 'hidden sm:block' para laging kita ang title */}
             <div className="block">
               <h2 className="text-sm md:text-lg font-black italic text-slate-800 uppercase tracking-tighter leading-none">
                 {getPageTitle()}

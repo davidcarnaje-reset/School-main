@@ -1,5 +1,6 @@
 import pool from '../../config/db.js';
 import { resolveStudentId } from '../../utils/lmsSync.js';
+import { ensureClassAnnouncementsTable } from '../teacher/announcementsController.js';
 
 const getClassroomFeed = async (req, res) => {
   const { student_id: rawStudentId, class_id } = req.query;
@@ -9,12 +10,20 @@ const getClassroomFeed = async (req, res) => {
   }
 
   try {
+    await ensureClassAnnouncementsTable();
     const student_id = await resolveStudentId(rawStudentId);
+
+    // Also resolve numeric student id in case student_activity_scores uses numeric id
+    const [stRows] = await pool.query(
+      "SELECT id, student_id FROM students WHERE student_id = ? OR id = ? LIMIT 1",
+      [student_id, rawStudentId]
+    );
+    const stNumericId = stRows[0]?.id || student_id;
 
     // Update last_accessed for student
     await pool.query(
-      "UPDATE enrolled_classes SET last_accessed = NOW() WHERE student_id = ? AND class_assignment_id = ?",
-      [student_id, class_id]
+      "UPDATE enrolled_classes SET last_accessed = NOW() WHERE (student_id = ? OR student_id = ?) AND class_assignment_id = ?",
+      [student_id, stNumericId, class_id]
     );
 
     // Fetch official subject, teacher, section, room, and schedule info
@@ -22,7 +31,11 @@ const getClassroomFeed = async (req, res) => {
       SELECT 
           s.subject_code as tag, 
           s.subject_description as title, 
-          COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), 'To Be Assigned') as teacher,
+          COALESCE(
+            NULLIF(TRIM(u.full_name), ''),
+            NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+            'To Be Assigned'
+          ) as teacher,
           u.profile_image as teacher_image,
           sec.section_name,
           ca.schedule,
@@ -40,8 +53,26 @@ const getClassroomFeed = async (req, res) => {
     const [infoRows] = await pool.query(infoQuery, [class_id]);
     const courseInfo = infoRows[0] || null;
 
-    // 1. FETCH MAIN FEED (Activities + Modules using UNION)
+    // 1. FETCH MAIN FEED (Announcements + Activities + Modules using UNION)
     const feedQuery = `
+      SELECT 
+          CONCAT('ann_', ca.id) as id,
+          'announcement' as type,
+          ca.title,
+          ca.message as desc_text,
+          DATE_FORMAT(ca.created_at, '%M %d, %Y') as date,
+          DATE_FORMAT(ca.created_at, '%h:%i %p') as time,
+          ca.created_at as sort_date,
+          NULL as total,
+          NULL as score,
+          ca.type as submission_status,
+          NULL as attempts,
+          NULL as max_attempts
+      FROM class_announcements ca
+      WHERE ca.class_id = ?
+
+      UNION ALL
+
       SELECT 
           CONCAT('act_', a.id) as id,
           CASE 
@@ -59,7 +90,8 @@ const getClassroomFeed = async (req, res) => {
           COALESCE(sas.attempts, 0) as attempts,
           COALESCE(a.max_attempts, 1) as max_attempts
       FROM activities a
-      LEFT JOIN student_activity_scores sas ON a.id = sas.activity_id AND sas.student_id = ?
+      LEFT JOIN student_activity_scores sas 
+        ON a.id = sas.activity_id AND (sas.student_id = ? OR sas.student_id = ?)
       WHERE a.class_id = ?
 
       UNION ALL
@@ -83,7 +115,7 @@ const getClassroomFeed = async (req, res) => {
       ORDER BY sort_date DESC
     `;
 
-    const [feedRows] = await pool.query(feedQuery, [student_id, class_id, class_id]);
+    const [feedRows] = await pool.query(feedQuery, [class_id, student_id, stNumericId, class_id, class_id]);
 
     const feed = feedRows.map(item => ({
       id: item.id,
@@ -129,21 +161,21 @@ const getClassroomFeed = async (req, res) => {
       FROM student_activity_scores sas
       JOIN activities a ON sas.activity_id = a.id
       WHERE a.class_id = ? 
-        AND sas.student_id = ?
+        AND (sas.student_id = ? OR sas.student_id = ?)
         AND sas.status = 'Graded'
       ORDER BY sas.date_graded DESC 
       LIMIT 5
     `;
-    const [gradesRows] = await pool.query(gradesQuery, [class_id, student_id]);
+    const [gradesRows] = await pool.query(gradesQuery, [class_id, student_id, stNumericId]);
 
     // 4. GET QUARTER STANDING
     const standingQuery = `
       SELECT final_grade, remarks 
       FROM student_grades 
-      WHERE class_id = ? AND student_id = ? 
+      WHERE class_id = ? AND (student_id = ? OR student_id = ?) 
       ORDER BY last_updated DESC LIMIT 1
     `;
-    const [standingRows] = await pool.query(standingQuery, [class_id, student_id]);
+    const [standingRows] = await pool.query(standingQuery, [class_id, student_id, stNumericId]);
     const gradeRecord = standingRows[0];
 
     const standing = {

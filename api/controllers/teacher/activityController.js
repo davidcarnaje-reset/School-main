@@ -1,5 +1,54 @@
 import pool from '../../config/db.js';
 import { logAuditTrail } from '../../utils/auditLogger.js';
+import { ensureClassAnnouncementsTable } from './announcementsController.js';
+
+// Helper to get all student IDs (numeric id & string student_id) enrolled in a class/section
+const getClassEnrolledStudents = async (connection, classId) => {
+  const [classRows] = await connection.query(
+    `SELECT ca.id, ca.section_id, ca.teacher_id, s.subject_code, s.subject_description, sec.section_name
+     FROM class_assignments ca
+     LEFT JOIN subjects s ON ca.subject_id = s.id
+     LEFT JOIN sections sec ON ca.section_id = sec.id
+     WHERE ca.id = ? LIMIT 1`,
+    [classId]
+  );
+  const classInfo = classRows[0] || {};
+
+  // Ensure students in enrollments for this section are also in enrolled_classes
+  if (classInfo.section_id) {
+    const [secStudents] = await connection.query(
+      `SELECT DISTINCT s.id as numeric_id, s.student_id
+       FROM enrollments e
+       JOIN students s ON (e.student_id = s.student_id OR e.student_id = s.id)
+       WHERE e.section_id = ? AND e.status = 'Enrolled'`,
+      [classInfo.section_id]
+    );
+    for (const st of secStudents) {
+      if (st.numeric_id) {
+        const [exists] = await connection.query(
+          "SELECT id FROM enrolled_classes WHERE student_id = ? AND class_assignment_id = ? LIMIT 1",
+          [st.numeric_id, classId]
+        );
+        if (exists.length === 0) {
+          await connection.query(
+            "INSERT INTO enrolled_classes (student_id, class_assignment_id, status) VALUES (?, ?, 'Enrolled')",
+            [st.numeric_id, classId]
+          );
+        }
+      }
+    }
+  }
+
+  const [students] = await connection.query(
+    `SELECT DISTINCT ec.student_id as ec_student_id, s.id as numeric_id, s.student_id as string_id
+     FROM enrolled_classes ec
+     LEFT JOIN students s ON (ec.student_id = s.id OR ec.student_id = s.student_id)
+     WHERE ec.class_assignment_id = ? AND ec.status = 'Enrolled'`,
+    [classId]
+  );
+
+  return { classInfo, students };
+};
 
 // CREATE STANDARD CLASSROOM ACTIVITY
 export const createActivity = async (req, res) => {
@@ -27,18 +76,15 @@ export const createActivity = async (req, res) => {
 
     const activityId = result.insertId;
 
-    // 2. Fetch all enrolled students
-    const [students] = await connection.query(
-      "SELECT student_id FROM enrolled_classes WHERE class_assignment_id = ? AND status = 'Enrolled'",
-      [class_id]
-    );
+    // 2. Fetch all enrolled students (syncing section enrollments automatically)
+    const { students } = await getClassEnrolledStudents(connection, class_id);
 
     // 3. Assign to students with 'Pending' status
     if (students.length > 0) {
-      const insertPromises = students.map(s => 
+      const insertPromises = students.map(s =>
         connection.query(
           "INSERT INTO student_activity_scores (activity_id, student_id, score, status) VALUES (?, ?, 0, 'Pending')",
-          [activityId, s.student_id]
+          [activityId, s.ec_student_id]
         )
       );
       await Promise.all(insertPromises);
@@ -131,16 +177,13 @@ export const createExam = async (req, res) => {
     }
 
     // 5. Assign to Enrolled Students
-    const [students] = await connection.query(
-      "SELECT student_id FROM enrolled_classes WHERE class_assignment_id = ? AND status = 'Enrolled'",
-      [exam_details.class_id]
-    );
+    const { students } = await getClassEnrolledStudents(connection, exam_details.class_id);
 
     if (students.length > 0) {
       const insertPromises = students.map(s =>
         connection.query(
           "INSERT INTO student_activity_scores (activity_id, student_id, score, status) VALUES (?, ?, 0, 'Pending')",
-          [activityId, s.student_id]
+          [activityId, s.ec_student_id]
         )
       );
       await Promise.all(insertPromises);
@@ -215,4 +258,78 @@ export const getActivities = async (req, res) => {
   }
 };
 
-export default { createActivity, createExam, getActivities };
+// SHARE ACTIVITY TO STUDENTS (NOTIFY & POST TO STREAM)
+export const shareActivity = async (req, res) => {
+  const { activity_id, class_id, title } = req.body;
+
+  if (!class_id || !title) {
+    return res.status(400).json({ status: "error", message: "Class ID and activity title are required." });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await ensureClassAnnouncementsTable();
+    await connection.beginTransaction();
+
+    const { classInfo, students } = await getClassEnrolledStudents(connection, class_id);
+    const subjectLabel = classInfo.subject_description || classInfo.subject_code || 'Class';
+    const teacherId = req.user?.id || classInfo.teacher_id || 1;
+
+    // Fetch activity details if activity_id provided
+    let activityDesc = `New classwork "${title}" has been posted in ${subjectLabel}. Please check your LMS Classroom to view and complete it.`;
+    if (activity_id) {
+      const [actRows] = await connection.query("SELECT description, due_date, max_score FROM activities WHERE id = ? LIMIT 1", [activity_id]);
+      if (actRows.length > 0 && actRows[0].description) {
+        activityDesc = `${actRows[0].description}${actRows[0].due_date ? ` (Due: ${new Date(actRows[0].due_date).toLocaleDateString()})` : ''}`;
+      }
+    }
+
+    // 1. Insert into class_announcements so it shows up on the Stream as well
+    await connection.query(
+      `INSERT INTO class_announcements (class_id, teacher_id, title, message, type)
+       VALUES (?, ?, ?, ?, 'Task Reminder')`,
+      [class_id, teacherId, `New Activity: ${title}`, activityDesc]
+    );
+
+    // 2. Insert into notifications & notification_recipients
+    const [notifRes] = await connection.query(
+      `INSERT INTO notifications (sender_id, sender_role, type, title, message, created_at)
+       VALUES (?, 'teacher', 'Task Reminder', ?, ?, NOW())`,
+      [teacherId, `[${subjectLabel}] ${title}`, activityDesc]
+    );
+    const notificationId = notifRes.insertId;
+
+    const recipientSet = new Set();
+    for (const s of students) {
+      if (s.string_id) recipientSet.add(String(s.string_id));
+      if (s.numeric_id) recipientSet.add(String(s.numeric_id));
+    }
+
+    if (recipientSet.size > 0) {
+      const recipientValues = Array.from(recipientSet).map(sid => [notificationId, sid, 'student', 0]);
+      await connection.query(
+        `INSERT INTO notification_recipients (notification_id, recipient_id, recipient_role, is_read) VALUES ?`,
+        [recipientValues]
+      );
+    } else {
+      await connection.query(
+        `INSERT INTO notification_recipients (notification_id, recipient_id, recipient_role, is_read) VALUES (?, 'all', 'student', 0)`,
+        [notificationId]
+      );
+    }
+
+    await connection.commit();
+    return res.json({
+      status: "success",
+      message: "Activity shared to all students in the class!"
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error("Share activity error:", error);
+    return res.status(500).json({ status: "error", message: "Database Error: " + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+export default { createActivity, createExam, getActivities, shareActivity };

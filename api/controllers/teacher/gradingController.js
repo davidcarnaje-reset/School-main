@@ -4,6 +4,29 @@ import { logAuditTrail } from '../../utils/auditLogger.js';
 // GET ACTIVITY SCORES & SUBMISSIONS FOR CLASS
 export const getActivityScores = async (req, res) => {
   const activityId = req.query.activity_id ? parseInt(req.query.activity_id, 10) : null;
+  const classIdParam = req.query.class_id ? parseInt(req.query.class_id, 10) : null;
+  const quarterParam = req.query.quarter ? parseInt(req.query.quarter, 10) : null;
+
+  if (!activityId && classIdParam) {
+    try {
+      let sql = `
+        SELECT sas.activity_id, sas.student_id, sas.score, sas.status, a.category, a.max_score, a.title
+        FROM student_activity_scores sas
+        JOIN activities a ON sas.activity_id = a.id
+        WHERE a.class_id = ?
+      `;
+      const params = [classIdParam];
+      if (quarterParam) {
+        sql += ` AND a.quarter = ?`;
+        params.push(quarterParam);
+      }
+      const [rows] = await pool.query(sql, params);
+      return res.json({ status: "success", data: rows });
+    } catch (err) {
+      console.error("Get class activity scores error:", err);
+      return res.status(500).json({ status: "error", message: err.message });
+    }
+  }
 
   if (!activityId) {
     return res.status(400).json({ status: "error", message: "Activity ID required" });

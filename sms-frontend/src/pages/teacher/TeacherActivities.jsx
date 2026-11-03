@@ -4,7 +4,8 @@ import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherLevel, getGradingCategories } from '../../utils/gradingUtils';
 import {
-  Plus, BookOpen, FileText, MoreVertical, ChevronDown, ChevronUp, MessageSquare, Share, Link as LinkIcon, Edit3
+  Plus, BookOpen, FileText, MoreVertical, ChevronDown, ChevronUp,
+  MessageSquare, Share, Link as LinkIcon, Edit3, Megaphone, Send, Trash2, X, Clock, AlertCircle
 } from 'lucide-react';
 
 import {
@@ -25,9 +26,19 @@ const TeacherActivities = () => {
   const [assignedClasses, setAssignedClasses] = useState([]);
   const [viewClassId, setViewClassId] = useState(urlClassId || '');
   const [activities, setActivities] = useState([]);
+  const [classAnnouncements, setClassAnnouncements] = useState([]);
   const [activeTab, setActiveTab] = useState('Stream'); // 🟢 Default na ito
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Class Announcement Composer States
+  const [isComposingAnnouncement, setIsComposingAnnouncement] = useState(false);
+  const [isPostingAnnouncement, setIsPostingAnnouncement] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: '',
+    message: '',
+    type: 'Announcement'
+  });
 
   const [filterCategory, setFilterCategory] = useState('');
   const [filterQuarter, setFilterQuarter] = useState('');
@@ -88,8 +99,75 @@ const TeacherActivities = () => {
     finally { setIsLoading(false); }
   }, [viewClassId, API_BASE_URL]);
 
+  const fetchClassAnnouncements = useCallback(async () => {
+    if (!viewClassId) return;
+    try {
+      const token = localStorage.getItem('sms_token');
+      const res = await axios.get(`${API_BASE_URL}/teacher/get_class_announcements.php?class_id=${viewClassId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data.status === 'success') {
+        setClassAnnouncements(res.data.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch class announcements:", err);
+    }
+  }, [viewClassId, API_BASE_URL]);
+
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
-  useEffect(() => { fetchActivities(); }, [fetchActivities]);
+  useEffect(() => {
+    fetchActivities();
+    fetchClassAnnouncements();
+  }, [fetchActivities, fetchClassAnnouncements]);
+
+  const handlePostAnnouncement = async (e) => {
+    e.preventDefault();
+    if (!announcementForm.message.trim()) {
+      alert('Please enter an announcement message for your class.');
+      return;
+    }
+
+    setIsPostingAnnouncement(true);
+    try {
+      const token = localStorage.getItem('sms_token');
+      const payload = {
+        class_id: viewClassId,
+        teacher_id: user?.id,
+        title: announcementForm.title.trim() || `${selectedClassForView?.subject_description || 'Class'} Announcement`,
+        message: announcementForm.message.trim(),
+        type: announcementForm.type
+      };
+      const res = await axios.post(`${API_BASE_URL}/teacher/create_class_announcement.php`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data.status === 'success') {
+        setAnnouncementForm({ title: '', message: '', type: 'Announcement' });
+        setIsComposingAnnouncement(false);
+        fetchClassAnnouncements();
+      } else {
+        alert(res.data.message || 'Failed to post announcement.');
+      }
+    } catch (err) {
+      alert('Failed to post class announcement. Please check your connection.');
+    } finally {
+      setIsPostingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (announcementId) => {
+    if (!window.confirm('Remove this announcement from the class stream?')) return;
+    try {
+      const token = localStorage.getItem('sms_token');
+      const res = await axios.post(`${API_BASE_URL}/teacher/delete_class_announcement.php`, {
+        id: announcementId,
+        class_id: viewClassId
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data.status === 'success') {
+        fetchClassAnnouncements();
+      }
+    } catch (err) {
+      alert('Failed to delete announcement.');
+    }
+  };
 
   const handleOpenModal = () => {
     setFormData(prev => ({ ...prev, class_id: viewClassId, category: '', quarter: '' }));
@@ -124,15 +202,19 @@ const TeacherActivities = () => {
   };
 
   const handleShareActivity = async (activity) => {
-    if (!window.confirm(`Share "${activity.title}" to all students in this class? They will receive a notification.`)) return;
+    if (!window.confirm(`Share "${activity.title}" to all students in this class? They will receive a notification and see it in the stream.`)) return;
 
     try {
       const token = localStorage.getItem('sms_token');
       const payload = { activity_id: activity.id, class_id: viewClassId, title: activity.title };
       const res = await axios.post(`${API_BASE_URL}/teacher/share_activity.php`, payload, { headers: { Authorization: `Bearer ${token}` } });
 
-      if (res.data.status === 'success') alert('Activity shared successfully! All enrolled students have been notified.');
-      else alert(res.data.message || 'Failed to share activity.');
+      if (res.data.status === 'success') {
+        alert('Activity shared successfully! All enrolled students have been notified.');
+        fetchClassAnnouncements();
+      } else {
+        alert(res.data.message || 'Failed to share activity.');
+      }
     } catch (err) {
       alert('Error sharing activity to students. Please check your connection.');
     }
@@ -157,31 +239,79 @@ const TeacherActivities = () => {
     return true;
   });
 
+  // Merge announcements and classwork for Stream view sorted by newest first
+  const streamItems = [
+    ...classAnnouncements.map(ann => ({
+      streamKey: `ann_${ann.id}`,
+      streamType: 'announcement',
+      rawId: ann.id,
+      title: ann.title,
+      message: ann.message,
+      badgeType: ann.type || 'Announcement',
+      author: ann.teacher_name || user?.full_name || 'Teacher',
+      dateLabel: `${ann.date_posted || ''} ${ann.time_posted ? `• ${ann.time_posted}` : ''}`,
+      createdAt: ann.created_at
+    })),
+    ...activities.filter(a => a.category !== 'performance').map(act => ({
+      streamKey: `act_${act.id}`,
+      streamType: 'activity',
+      rawId: act.id,
+      title: act.title,
+      message: act.description || `${act.max_score} pts ${act.quarter ? `• Quarter ${act.quarter}` : ''}`,
+      badgeType: act.category === 'exam' ? 'Examination' : 'Classwork',
+      author: user?.full_name || 'Teacher',
+      dateLabel: act.created_at ? new Date(act.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '',
+      createdAt: act.created_at,
+      activityObj: act
+    }))
+  ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
   return (
     <div className="w-full max-w-5xl mx-auto pb-10">
       <style>{gcGlassStyles(themeColor)}</style>
 
-      {/* TABS */}
-      <div className="gc-tabs">
-        {['Stream', 'Classwork', 'Grades'].map(tab => (
-          <div key={tab} className={`gc-tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => {
-              if (tab === 'Grades' && selectedClassForView) {
-                navigate(`/teacher/sections/${selectedClassForView.id}`, {
-                  state: {
-                    subject: selectedClassForView.subject_description,
-                    section: selectedClassForView.section_name || selectedClassForView.section,
-                    grade_level: selectedClassForView.grade_level || selectedClassForView.level,
-                    fromActivities: true
-                  }
-                });
-              } else {
-                setActiveTab(tab);
-              }
-            }}>
-            {tab}
+      {/* TABS + CLASS SWITCHER */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="gc-tabs">
+          {['Stream', 'Classwork', 'Grades'].map(tab => (
+            <div key={tab} className={`gc-tab ${activeTab === tab ? 'active' : ''}`}
+              onClick={() => {
+                if (tab === 'Grades' && selectedClassForView) {
+                  navigate(`/teacher/sections/${selectedClassForView.id}`, {
+                    state: {
+                      subject: selectedClassForView.subject_description,
+                      section: selectedClassForView.section_name || selectedClassForView.section,
+                      grade_level: selectedClassForView.grade_level || selectedClassForView.level,
+                      fromActivities: true
+                    }
+                  });
+                } else {
+                  setActiveTab(tab);
+                }
+              }}>
+              {tab}
+            </div>
+          ))}
+        </div>
+
+        {assignedClasses.length > 1 && (
+          <div className="px-4">
+            <select
+              value={viewClassId}
+              onChange={(e) => {
+                setViewClassId(e.target.value);
+                navigate(`/teacher/activities/${e.target.value}`);
+              }}
+              className="bg-white/80 backdrop-blur-md border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              {assignedClasses.map(cls => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.subject_description || cls.subject_code} — {cls.section_name || cls.section} ({cls.grade_level})
+                </option>
+              ))}
+            </select>
           </div>
-        ))}
+        )}
       </div>
 
       {/* STREAM TAB */}
@@ -197,9 +327,9 @@ const TeacherActivities = () => {
             <div className="absolute top-5 right-5 z-10">
               <button
                 className="bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/40 text-white px-4 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all shadow-sm"
-                onClick={() => alert("Customization coming soon!")}
+                onClick={() => setIsComposingAnnouncement(true)}
               >
-                <Edit3 size={16} /> Customize
+                <Megaphone size={16} /> New Announcement
               </button>
             </div>
 
@@ -226,20 +356,194 @@ const TeacherActivities = () => {
             </div>
           ) : (
             <div className="w-full max-w-4xl mx-auto">
-              <div className="bg-white/60 backdrop-blur-md border border-white rounded-2xl p-6 shadow-sm mb-6 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-lg shrink-0 shadow-sm" style={{ backgroundColor: themeColor }}>
-                  {user?.full_name?.charAt(0) || 'T'}
+              {/* 🟢 CLASS ANNOUNCEMENT COMPOSER CARD 🟢 */}
+              {!isComposingAnnouncement ? (
+                <div
+                  className="bg-white/75 backdrop-blur-md border border-white rounded-2xl p-5 shadow-sm mb-6 flex items-center gap-4 cursor-pointer hover:bg-white/95 transition-all"
+                  onClick={() => setIsComposingAnnouncement(true)}
+                >
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-lg shrink-0 shadow-sm" style={{ backgroundColor: themeColor }}>
+                    {user?.full_name?.charAt(0) || 'T'}
+                  </div>
+                  <div className="flex-1 bg-slate-50/90 border border-slate-200 rounded-full px-5 py-3.5 text-slate-500 font-bold text-sm hover:bg-white hover:border-indigo-300 transition-all shadow-inner flex items-center justify-between">
+                    <span>Announce something to your class...</span>
+                    <Megaphone size={18} className="text-indigo-500" />
+                  </div>
                 </div>
-                <div className="flex-1 bg-white border border-slate-200 rounded-full px-5 py-3.5 text-slate-500 font-bold text-sm cursor-pointer hover:bg-slate-50 transition-colors shadow-inner" onClick={() => alert("Announcement creation coming soon!")}>
-                  Announce something to your class
-                </div>
-              </div>
+              ) : (
+                <form
+                  onSubmit={handlePostAnnouncement}
+                  className="bg-white/90 backdrop-blur-xl border-2 border-indigo-100 rounded-3xl p-6 shadow-lg mb-6 space-y-4 animate-in fade-in zoom-in-95 duration-200"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm shadow-sm" style={{ backgroundColor: themeColor }}>
+                        {user?.full_name?.charAt(0) || 'T'}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-800">
+                          Post Announcement to {selectedClassForView?.subject_description} ({selectedClassForView?.section_name || selectedClassForView?.section})
+                        </h3>
+                        <p className="text-[11px] font-semibold text-slate-400">
+                          Visible in Student Dashboard Bulletin, Notification Bell, and LMS Classroom Stream
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsComposingAnnouncement(false)}
+                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
 
-              <div className="text-center py-16 bg-white/40 border border-white rounded-3xl backdrop-blur-md shadow-sm">
-                <MessageSquare size={54} className="mx-auto text-slate-300 mb-4" />
-                <p className="text-slate-600 font-black text-xl">This is where you can talk to your class</p>
-                <p className="text-slate-500 text-sm mt-2 font-semibold">Use the stream to share announcements, syllabi, and engaging materials.</p>
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1">
+                        Title / Subject Heading (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={`e.g., Reminder for ${selectedClassForView?.subject_description || 'Class'} tomorrow`}
+                        value={announcementForm.title}
+                        onChange={(e) => setAnnouncementForm(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none text-sm font-bold text-slate-800 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={announcementForm.type}
+                        onChange={(e) => setAnnouncementForm(prev => ({ ...prev, type: e.target.value }))}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none text-sm font-bold text-slate-700 cursor-pointer"
+                      >
+                        <option value="Announcement">📢 General Announcement</option>
+                        <option value="Task Reminder">📝 Task / Assignment Reminder</option>
+                        <option value="Urgent Alert">🚨 Urgent Class Alert</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1">
+                      Message to Students <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      required
+                      placeholder="Write your announcement, instructions, or reminders for your students here..."
+                      value={announcementForm.message}
+                      onChange={(e) => setAnnouncementForm(prev => ({ ...prev, message: e.target.value }))}
+                      className="w-full p-4 rounded-2xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none text-sm font-semibold text-slate-700 leading-relaxed transition-all resize-y"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsComposingAnnouncement(false)}
+                      className="px-5 py-2.5 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isPostingAnnouncement}
+                      className="px-6 py-2.5 rounded-xl font-black text-xs text-white shadow-md hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
+                      style={{ backgroundColor: themeColor }}
+                    >
+                      <Send size={15} />
+                      {isPostingAnnouncement ? 'Posting to Students...' : 'Post Announcement'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* 🟢 STREAM FEED LIST (ANNOUNCEMENTS + CLASSWORK) 🟢 */}
+              {streamItems.length === 0 ? (
+                <div className="text-center py-16 bg-white/40 border border-white rounded-3xl backdrop-blur-md shadow-sm">
+                  <MessageSquare size={54} className="mx-auto text-slate-300 mb-4" />
+                  <p className="text-slate-600 font-black text-xl">This is where you can talk to your class</p>
+                  <p className="text-slate-500 text-sm mt-2 font-semibold">Use the stream to share announcements, syllabi, and engaging materials.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {streamItems.map((item) => (
+                    <div
+                      key={item.streamKey}
+                      className="bg-white/80 backdrop-blur-md border border-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3.5">
+                          <div
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-sm shrink-0 ${
+                              item.streamType === 'announcement'
+                                ? item.badgeType === 'Urgent Alert'
+                                  ? 'bg-red-500'
+                                  : item.badgeType === 'Task Reminder'
+                                  ? 'bg-amber-500'
+                                  : 'bg-indigo-600'
+                                : 'bg-slate-700'
+                            }`}
+                            style={item.streamType === 'announcement' && item.badgeType === 'Announcement' ? { backgroundColor: themeColor } : {}}
+                          >
+                            {item.streamType === 'announcement' ? <Megaphone size={20} /> : <FileText size={20} />}
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                item.badgeType === 'Urgent Alert'
+                                  ? 'bg-red-100 text-red-700'
+                                  : item.badgeType === 'Task Reminder'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : item.streamType === 'announcement'
+                                  ? 'bg-indigo-100 text-indigo-700'
+                                  : 'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {item.badgeType}
+                              </span>
+                              <span className="text-xs font-bold text-slate-400">{item.dateLabel}</span>
+                            </div>
+                            <h3 className="text-base font-black text-slate-800 mt-1">{item.title}</h3>
+                          </div>
+                        </div>
+
+                        {item.streamType === 'announcement' ? (
+                          <button
+                            onClick={() => handleDeleteAnnouncement(item.rawId)}
+                            title="Delete Announcement"
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => navigate(`/teacher/activities/${item.rawId}/grading`, {
+                              state: {
+                                subject: selectedClassForView?.subject_description,
+                                section: selectedClassForView?.section_name || selectedClassForView?.section,
+                                quarter: item.activityObj?.quarter
+                              }
+                            })}
+                            className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 text-xs font-black transition-colors"
+                          >
+                            Open Activity
+                          </button>
+                        )}
+                      </div>
+
+                      {item.message && (
+                        <div className="mt-4 pl-14 text-sm font-medium text-slate-700 whitespace-pre-line leading-relaxed">
+                          {item.message}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -343,12 +647,13 @@ const TeacherActivities = () => {
                             key={act.id}
                             className="flex items-center gap-4 p-4 border-b border-slate-300/50 bg-white/30 hover:bg-white/70 backdrop-blur-md cursor-pointer transition-all group/item"
                             onClick={() => navigate(`/teacher/activities/${act.id}/grading`, { 
-  state: { 
-    subject: selectedClassForView?.subject_description, 
-    section: selectedClassForView?.section_name || selectedClassForView?.section,
-    quarter: act.quarter
-  } 
-})}>
+                              state: { 
+                                subject: selectedClassForView?.subject_description, 
+                                section: selectedClassForView?.section_name || selectedClassForView?.section,
+                                quarter: act.quarter
+                              } 
+                            })}
+                          >
                             <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm shrink-0" style={{ backgroundColor: themeColor }}><FileText size={20} /></div>
                             <div className="flex-1">
                               <h3 className="font-semibold text-slate-800 text-[15px]">{act.title}</h3>
@@ -370,7 +675,7 @@ const TeacherActivities = () => {
                                       className="w-full text-left px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-100 transition-colors flex items-center gap-2.5"
                                       onClick={(e) => {
                                         e.stopPropagation(); setOpenMenuId(null);
-                                        const shareLink = `${window.location.origin}/student/activity/${act.id}`;
+                                        const shareLink = `${window.location.origin}/lms/exam/${act.id}`;
                                         navigator.clipboard.writeText(shareLink).then(() => { alert('Link copied to clipboard!\n\n' + shareLink); });
                                       }}
                                     >

@@ -55,7 +55,7 @@ const StudentDashboard = () => {
 
         setStudentData(myData);
 
-        // 2. FETCH REAL ANNOUNCEMENTS
+        // 2. FETCH REAL ANNOUNCEMENTS (Both Class Announcements & School Notifications)
         try {
           const annRes = await axios.get(`${API_BASE_URL}/notifications/get_student_announcements.php?student_id=${myData.student_id}`);
           if (annRes.data && annRes.data.success) {
@@ -193,22 +193,55 @@ const StudentDashboard = () => {
           <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                <Megaphone size={18} className="text-indigo-500"/> Bulletin & Announcements
+                <Megaphone size={18} className="text-indigo-500"/> Bulletin & Class Announcements
               </h2>
+              {announcements.length > 0 && (
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-wider">
+                  {announcements.length} {announcements.length === 1 ? 'Update' : 'Updates'}
+                </span>
+              )}
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
                {announcements.length > 0 ? (
-                  announcements.slice(0, 3).map((notif, i) => (
-                    <div key={i} className="flex gap-4 p-5 rounded-2xl border border-slate-100 hover:shadow-md transition-shadow bg-slate-50/50 hover:bg-white group">
-                      <div className={`w-2 h-full rounded-full shrink-0 ${
+                  announcements.slice(0, 10).map((notif, i) => (
+                    <div
+                      key={notif.id || i}
+                      onClick={() => {
+                        if (notif.class_id && studentData?.isLmsActive) {
+                          navigate(`/lms/course/${notif.class_id}`);
+                        }
+                      }}
+                      className={`flex gap-4 p-5 rounded-2xl border border-slate-100 hover:shadow-md transition-all bg-slate-50/50 hover:bg-white group ${
+                        notif.class_id && studentData?.isLmsActive ? 'cursor-pointer' : ''
+                      }`}
+                    >
+                      <div className={`w-2 rounded-full shrink-0 ${
                          notif.type === 'Urgent Alert' ? 'bg-red-500' : notif.type === 'Task Reminder' ? 'bg-amber-500' : 'bg-indigo-500'
                       }`}></div>
                       <div className="flex-1">
-                        <div className="flex justify-between items-center mb-1">
-                           <h4 className="font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{notif.title}</h4>
+                        <div className="flex flex-wrap justify-between items-center gap-2 mb-1.5">
+                           <div className="flex flex-wrap items-center gap-2">
+                             <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                               notif.type === 'Urgent Alert'
+                                 ? 'bg-red-100 text-red-700'
+                                 : notif.type === 'Task Reminder'
+                                 ? 'bg-amber-100 text-amber-700'
+                                 : 'bg-indigo-100 text-indigo-700'
+                             }`}>
+                               {notif.type || 'Announcement'}
+                             </span>
+                             {notif.sender_name && (
+                               <span className="text-[10px] font-bold text-slate-400">
+                                 By {notif.sender_name}
+                               </span>
+                             )}
+                           </div>
                            <span className="text-[10px] font-bold text-slate-400">{notif.date_posted}</span>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2">{notif.message}</p>
+                        <h4 className="font-black text-slate-800 group-hover:text-indigo-600 transition-colors text-sm mb-1">
+                          {notif.title}
+                        </h4>
+                        <p className="text-xs text-slate-600 font-medium leading-relaxed whitespace-pre-line">{notif.message}</p>
                       </div>
                     </div>
                   ))

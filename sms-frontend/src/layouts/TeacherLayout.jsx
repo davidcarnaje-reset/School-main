@@ -36,7 +36,13 @@ const TeacherLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [teachingClasses, setTeachingClasses] = useState([]);
-  const [isCollapsed, setIsCollapsed] = useState(() => JSON.parse(localStorage.getItem('teacherSidebarCollapsed')) ?? true);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('teacherSidebarCollapsed')) ?? true;
+    } catch {
+      return true;
+    }
+  });
 
   const isAppRouteActive = location.pathname === '/employee-portal' || location.pathname === '/teacher/helpdesk';
   const [isAppsOpen, setIsAppsOpen] = useState(isAppRouteActive);
@@ -185,16 +191,14 @@ const TeacherLayout = () => {
   const currentMenu = [
     { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/teacher/dashboard' },
     { icon: <School size={20} />, label: 'My Classes', path: '/teacher/classes' },
-    { icon: <BookOpen size={20} />, label: 'LMS', path: '/teacher/activities', state: { tab: 'Stream' } }
+    { icon: <BookOpen size={20} />, label: 'LMS Classroom', path: '/teacher/activities', state: { tab: 'Stream' } }
   ];
 
   const getHeaderTitle = () => {
     const path = location.pathname;
 
-    // 1. Kung may state na pinasa galing sa navigate(), yun ang gamitin natin
     if (location.state && location.state.subject) {
       const isGrading = path.includes('grading');
-      // I-check kung may quarter na naipasa, kung meron, ilagay ang "Quarter X | "
       const quarterText = location.state.quarter ? `Quarter ${location.state.quarter} | ` : '';
 
       return {
@@ -204,11 +208,9 @@ const TeacherLayout = () => {
         sub: location.state.section || ''
       };
     }
-    // 2. Fallback kung walang state (e.g. direct link or refresh)
     if (path.includes('/teacher/activities') || path.includes('/teacher/sections/')) {
       const classId = path.split('/').pop();
 
-      // Kung ang huling word ay 'grading', wag na i-try hanapin yung classId
       if (classId === 'grading') {
         return { main: 'Activity Grading', sub: 'Student Submissions' };
       }
@@ -255,25 +257,57 @@ const TeacherLayout = () => {
       {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/40 z-[100] lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />}
 
       {/* ─── SIDEBAR ─── */}
-      <aside className={`glass-sidebar fixed z-[110] text-slate-700 flex flex-col transition-all duration-300 ease-in-out shadow-2xl left-0 top-0 h-full w-[85%] max-w-xs m-0 rounded-r-[2rem] lg:left-0 lg:top-0 lg:h-full lg:m-0 lg:rounded-none lg:rounded-r-[2rem] ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:shadow-[4px_0_24px_rgba(0,0,0,0.05)] ${isCollapsed ? 'lg:w-[5.5rem]' : 'lg:w-64'}`}>
+      <aside
+        className={`
+          glass-sidebar fixed z-[110] text-slate-700 flex flex-col
+          transition-[width,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+          shadow-2xl left-0 top-0 h-full w-[85%] max-w-xs m-0 rounded-r-[2rem]
+          lg:left-0 lg:top-0 lg:h-full lg:m-0 lg:rounded-none lg:rounded-r-[2rem]
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0 lg:static lg:shadow-[4px_0_24px_rgba(0,0,0,0.05)]
+          ${isCollapsed ? 'lg:w-[5.5rem]' : 'lg:w-64'}
+        `}
+      >
 
         {/* LOGO */}
-        <div className="h-24 px-6 border-b border-slate-200/50 flex items-center shrink-0">
-          <div className="flex items-center gap-3 overflow-hidden">
+        <div className="h-24 px-6 border-b border-slate-200/50 flex items-center justify-between shrink-0 overflow-hidden">
+          <div className="flex items-center min-w-0">
             {branding?.school_logo ? (
               <img src={getLogoUrl(branding.school_logo)} alt="Logo" className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-sm border border-white" />
             ) : (
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shrink-0 border border-white shadow-sm" style={{ backgroundColor: themeColor }}>{branding?.school_name?.charAt(0) || 'S'}</div>
             )}
-            <span className={`header-jakarta text-[15px] leading-tight font-black text-slate-800 tracking-tight transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${isCollapsed ? 'lg:max-w-0 lg:opacity-0' : 'lg:max-w-[200px] lg:opacity-100'}`}>
-              {branding?.school_name || 'School System'}
-            </span>
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[160px] lg:opacity-100 ml-3'
+              }`}
+            >
+              <span className="header-jakarta block text-[14px] leading-tight font-black text-slate-800 tracking-tight line-clamp-2 w-[150px]">
+                {branding?.school_name || 'School System'}
+              </span>
+            </div>
           </div>
           <button className="lg:hidden text-slate-600 p-2 bg-slate-100/50 rounded-xl ml-auto" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>
         </div>
 
-        {/* NAV LINKS */}
-        <nav className="flex-1 py-6 px-3 space-y-2 sidebar-scroll">
+        {/* NAV LINKS WITH PARTITIONS */}
+        <nav className="flex-1 py-5 px-3 space-y-1.5 sidebar-scroll overflow-x-hidden">
+          {/* Partition 1: Teacher Portal */}
+          <div className="relative flex items-center px-3 pt-1 pb-1.5 overflow-hidden">
+            <p
+              className={`text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap transition-all duration-300 ease-in-out ${
+                isCollapsed ? 'lg:opacity-0 lg:-translate-x-2 lg:pointer-events-none' : 'lg:opacity-100 lg:translate-x-0'
+              }`}
+            >
+              Teacher Portal
+            </p>
+            <div
+              className={`hidden lg:block absolute left-3 right-3 border-t border-slate-300/70 transition-all duration-300 ease-in-out ${
+                isCollapsed ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+              }`}
+            />
+          </div>
+
           {currentMenu.map((item, index) => {
             const isActive = location.pathname === item.path || (location.pathname.includes('sections') && item.path.includes('classes')) || (location.pathname.includes('activities') && item.path.includes('activities'));
             return (
@@ -281,18 +315,23 @@ const TeacherLayout = () => {
                 key={index}
                 to={item.path}
                 state={item.state}
+                title={isCollapsed ? item.label : ''}
                 onClick={() => setIsSidebarOpen(false)}
-                className={`flex items-center rounded-2xl transition-all duration-300 group ${isCollapsed ? 'lg:justify-center lg:px-0' : 'lg:px-4 lg:gap-4'
-                  } px-4 py-3.5 gap-4 ${isActive ? 'text-white shadow-md border border-white/40' : 'text-slate-700'}`}
+                className={`flex items-center px-3 py-2 rounded-2xl transition-colors duration-200 group ${
+                  isActive ? 'text-white shadow-md border border-white/40' : 'text-slate-700'
+                }`}
                 style={activeStyle(isActive)}
                 onMouseEnter={(e) => applyHover(e, isActive)}
                 onMouseLeave={(e) => removeHover(e, isActive)}
               >
-                <span className={`w-6 h-6 flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}>
+                <span className={`w-10 h-9 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}>
                   {item.icon}
                 </span>
-                <span className={`font-bold text-sm transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${isCollapsed ? 'lg:hidden' : ''
-                  }`}>
+                <span
+                  className={`font-bold text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                    isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[155px] lg:opacity-100 ml-2'
+                  }`}
+                >
                   {item.label}
                 </span>
               </Link>
@@ -300,8 +339,22 @@ const TeacherLayout = () => {
           })}
 
           {teachingClasses.length > 0 && (
-            <div className="pt-4 mt-4 border-t border-slate-200/50">
-              <p className={`px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 transition-all duration-300 ${isCollapsed ? 'lg:hidden' : ''}`}>Teaching</p>
+            <div className="pt-2">
+              <div className="relative flex items-center px-3 pt-3 pb-1.5 overflow-hidden">
+                <p
+                  className={`text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap transition-all duration-300 ease-in-out ${
+                    isCollapsed ? 'lg:opacity-0 lg:-translate-x-2 lg:pointer-events-none' : 'lg:opacity-100 lg:translate-x-0'
+                  }`}
+                >
+                  Teaching Loads
+                </p>
+                <div
+                  className={`hidden lg:block absolute left-3 right-3 border-t border-slate-300/70 transition-all duration-300 ease-in-out ${
+                    isCollapsed ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+                  }`}
+                />
+              </div>
+
               <div className="space-y-1">
                 {teachingClasses.map(cls => {
                   const isActive = location.pathname.includes(`/${cls.id}`);
@@ -310,20 +363,27 @@ const TeacherLayout = () => {
                       key={cls.id}
                       to={`/teacher/activities/${cls.id}`}
                       state={{ tab: 'Stream' }}
+                      title={isCollapsed ? `${cls.subject} (${cls.section_name || cls.section})` : ''}
                       onClick={() => setIsSidebarOpen(false)}
-                      className={`flex items-center rounded-2xl transition-all duration-200 group ${isCollapsed ? 'lg:justify-center lg:px-0' : 'lg:px-3 lg:gap-3'
-                        } px-4 py-3 gap-4 ${isActive ? 'text-white shadow-md border border-white/40' : 'text-slate-700'}`}
+                      className={`flex items-center px-3 py-2 rounded-2xl transition-colors duration-200 group ${
+                        isActive ? 'text-white shadow-md border border-white/40' : 'text-slate-700'
+                      }`}
                       style={activeStyle(isActive)}
                       onMouseEnter={(e) => applyHover(e, isActive)}
                       onMouseLeave={(e) => removeHover(e, isActive)}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-all ${isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500 group-hover:bg-white/20 group-hover:text-white'}`}>
-                        {cls.subject?.charAt(0) || 'C'}
+                      <div className="w-10 h-9 flex items-center justify-center shrink-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-all ${isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500 group-hover:bg-white/20 group-hover:text-white'}`}>
+                          {cls.subject?.charAt(0) || 'C'}
+                        </div>
                       </div>
-                      <div className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out overflow-hidden ${isCollapsed ? 'lg:hidden' : ''
-                        }`}>
-                        <span className="text-[13px] font-bold truncate">{cls.subject}</span>
-                        <span className={`text-[10px] font-semibold truncate ${isActive ? 'text-white/80' : 'group-hover:text-white/80'}`}>
+                      <div
+                        className={`flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                          isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[155px] lg:opacity-100 ml-2'
+                        }`}
+                      >
+                        <span className="text-[13px] font-bold truncate whitespace-nowrap">{cls.subject}</span>
+                        <span className={`text-[10px] font-semibold truncate whitespace-nowrap ${isActive ? 'text-white/80' : 'group-hover:text-white/80'}`}>
                           {cls.section_name || cls.section}
                         </span>
                       </div>
@@ -334,58 +394,73 @@ const TeacherLayout = () => {
             </div>
           )}
 
-          {/* APPS DROPDOWN */}
-          <div className="space-y-1 mt-2 border-t border-slate-200/50 pt-2">
+          {/* APPS DROPDOWN PARTITION */}
+          <div className="space-y-1 pt-2">
+            <div className="relative flex items-center px-3 pt-2 pb-1 overflow-hidden">
+              <p
+                className={`text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap transition-all duration-300 ease-in-out ${
+                  isCollapsed ? 'lg:opacity-0 lg:-translate-x-2 lg:pointer-events-none' : 'lg:opacity-100 lg:translate-x-0'
+                }`}
+              >
+                Employee Services
+              </p>
+              <div
+                className={`hidden lg:block absolute left-3 right-3 border-t border-slate-300/70 transition-all duration-300 ease-in-out ${
+                  isCollapsed ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+                }`}
+              />
+            </div>
+
             <button
               onClick={() => setIsAppsOpen(!isAppsOpen)}
-              className={`w-full flex items-center p-3.5 rounded-2xl transition-all duration-300 group ${
-                isCollapsed ? 'lg:justify-center lg:px-0' : 'lg:px-4 lg:gap-4'
-              } px-4 py-3 gap-4 ${
+              className={`w-full flex items-center px-3 py-2 rounded-2xl transition-colors duration-200 group ${
                 location.pathname === '/employee-portal' || location.pathname === '/teacher/helpdesk'
                   ? 'bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-sm'
                   : 'text-slate-700 hover:bg-slate-100'
               }`}
               title={isCollapsed ? "Apps & Services" : ""}
             >
-              <span className={`w-6 h-6 flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${
+              <span className={`w-10 h-9 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 ${
                 location.pathname === '/employee-portal' || location.pathname === '/teacher/helpdesk' ? 'text-slate-900' : 'text-slate-500'
               }`}>
                 <LayoutGrid size={20} />
               </span>
-              <span className={`font-bold text-sm transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${
-                isCollapsed ? 'lg:hidden' : ''
-              }`}>
-                Apps
-              </span>
-              {!isCollapsed && (
-                <span className="ml-auto shrink-0 text-slate-400">
+              <div
+                className={`flex items-center justify-between flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                  isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[155px] lg:opacity-100 ml-2'
+                }`}
+              >
+                <span className="font-bold text-sm whitespace-nowrap truncate">
+                  Apps
+                </span>
+                <span className="ml-2 shrink-0 text-slate-400">
                   {isAppsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </span>
-              )}
+              </div>
             </button>
 
             {isAppsOpen && (
-              <div className={`space-y-1.5 transition-all duration-300 ${isCollapsed ? 'lg:pl-0' : 'pl-6'}`}>
+              <div className={`space-y-1 transition-all duration-300 ${isCollapsed ? 'lg:pl-0' : 'pl-3'}`}>
                 {/* Payroll Portal */}
                 <Link
                   to="/employee-portal"
                   onClick={() => setIsSidebarOpen(false)}
-                  className={`flex items-center rounded-xl transition-all duration-250 group ${
-                    isCollapsed ? 'lg:justify-center lg:px-0' : 'lg:px-3 lg:gap-3'
-                  } px-3 py-2 gap-3 ${
+                  className={`flex items-center px-3 py-1.5 rounded-xl transition-colors duration-200 group ${
                     location.pathname === '/employee-portal' ? 'text-white shadow-sm border border-white/40' : 'text-slate-600 hover:bg-slate-100'
                   }`}
                   style={location.pathname === '/employee-portal' ? { backgroundColor: themeColor } : {}}
                   title={isCollapsed ? "My Payroll Portal" : ""}
                 >
-                  <span className={`w-5 h-5 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                    location.pathname === '/employee-portal' ? 'text-white' : 'text-slate-550'
+                  <span className={`w-10 h-8 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                    location.pathname === '/employee-portal' ? 'text-white' : 'text-slate-500'
                   }`}>
                     <CreditCard size={18} />
                   </span>
-                  <span className={`font-semibold text-xs transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${
-                    isCollapsed ? 'lg:hidden' : ''
-                  }`}>
+                  <span
+                    className={`font-semibold text-xs whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                      isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[145px] lg:opacity-100 ml-2'
+                    }`}
+                  >
                     Payroll Portal
                   </span>
                 </Link>
@@ -394,22 +469,22 @@ const TeacherLayout = () => {
                 <Link
                   to="/teacher/helpdesk"
                   onClick={() => setIsSidebarOpen(false)}
-                  className={`flex items-center rounded-xl transition-all duration-250 group ${
-                    isCollapsed ? 'lg:justify-center lg:px-0' : 'lg:px-3 lg:gap-3'
-                  } px-3 py-2 gap-3 ${
+                  className={`flex items-center px-3 py-1.5 rounded-xl transition-colors duration-200 group ${
                     location.pathname === '/teacher/helpdesk' ? 'text-white shadow-sm border border-white/40' : 'text-slate-600 hover:bg-slate-100'
                   }`}
                   style={location.pathname === '/teacher/helpdesk' ? { backgroundColor: themeColor } : {}}
                   title={isCollapsed ? "IT Support Ticketing" : ""}
                 >
-                  <span className={`w-5 h-5 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                    location.pathname === '/teacher/helpdesk' ? 'text-white' : 'text-slate-550'
+                  <span className={`w-10 h-8 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                    location.pathname === '/teacher/helpdesk' ? 'text-white' : 'text-slate-500'
                   }`}>
                     <LifeBuoy size={18} />
                   </span>
-                  <span className={`font-semibold text-xs transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${
-                    isCollapsed ? 'lg:hidden' : ''
-                  }`}>
+                  <span
+                    className={`font-semibold text-xs whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                      isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[145px] lg:opacity-100 ml-2'
+                    }`}
+                  >
                     IT Help Desk
                   </span>
                 </Link>
@@ -418,16 +493,25 @@ const TeacherLayout = () => {
           </div>
         </nav>
 
-        <button onClick={() => setIsCollapsed(!isCollapsed)} className="hidden lg:flex absolute -right-3.5 top-24 w-7 h-7 bg-white text-slate-800 rounded-full items-center justify-center shadow-md border border-slate-200 hover:scale-110 transition-transform z-50">
-          {isCollapsed ? <ChevronRight size={16} strokeWidth={3} /> : <ChevronLeft size={16} strokeWidth={3} />}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          className="hidden lg:flex absolute -right-3.5 top-24 w-7 h-7 bg-white text-slate-800 rounded-full items-center justify-center shadow-md border border-slate-200 hover:scale-110 active:scale-95 transition-all z-50 cursor-pointer"
+        >
+          <ChevronLeft
+            size={16}
+            strokeWidth={3}
+            className={`transition-transform duration-300 ease-in-out ${isCollapsed ? 'rotate-180' : 'rotate-0'}`}
+          />
         </button>
 
         {/* BOTTOM NAV */}
-        <div className="p-4 border-t border-slate-200/50 bg-white/40 shrink-0 lg:rounded-br-[2rem] rounded-b-[2rem]">
+        <div className="p-3 border-t border-slate-200/50 bg-white/40 shrink-0 lg:rounded-br-[2rem] rounded-b-[2rem] overflow-hidden">
           <Link
             to="/teacher/profile"
             onClick={() => setIsSidebarOpen(false)}
-            className={`flex items-center mb-2 cursor-pointer transition-all duration-300 w-full gap-3 px-2 py-2 rounded-2xl ${isProfileActive ? 'text-white shadow-md border border-white/40' : 'text-slate-800'}`}
+            title={isCollapsed ? user?.full_name || "My Profile" : ""}
+            className={`flex items-center mb-1.5 cursor-pointer transition-colors duration-200 w-full px-3 py-1.5 rounded-2xl ${isProfileActive ? 'text-white shadow-md border border-white/40' : 'text-slate-800'}`}
             style={activeStyle(isProfileActive)}
             onMouseEnter={(e) => applyHover(e, isProfileActive)}
             onMouseLeave={(e) => removeHover(e, isProfileActive)}
@@ -441,8 +525,12 @@ const TeacherLayout = () => {
                 </div>
               )}
             </div>
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap ${isCollapsed ? 'lg:max-w-0 lg:opacity-0' : 'lg:max-w-[150px] lg:opacity-100'}`}>
-              <p className="header-jakarta text-[13px] leading-tight font-black line-clamp-1 mb-0.5">
+            <div
+              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[150px] lg:opacity-100 ml-2.5'
+              }`}
+            >
+              <p className="header-jakarta text-[13px] leading-tight font-black truncate mb-0.5">
                 {user?.full_name}
               </p>
               <p className={`text-[9px] uppercase tracking-widest font-bold ${isProfileActive ? 'text-white/80' : ' group-hover:text-white/80'}`}>
@@ -453,19 +541,38 @@ const TeacherLayout = () => {
 
           <button
             onClick={() => window.location.reload()}
-            className="flex items-center p-3 mb-2 rounded-2xl text-slate-700 transition-all group w-full gap-4 px-4 overflow-hidden"
+            title={isCollapsed ? "Refresh Page" : ""}
+            className="flex items-center px-3 py-1.5 mb-1 rounded-2xl text-slate-700 transition-colors duration-200 group w-full overflow-hidden"
             onMouseEnter={(e) => applyHover(e, false, '#ccfcec', '#10b981')}
             onMouseLeave={(e) => removeHover(e, false)}
           >
-            <RefreshCw size={20} className="shrink-0 group-hover:rotate-180 transition-transform duration-500 ease-out" />
-            <span className={`text-sm font-bold tracking-wide transition-all duration-300 whitespace-nowrap ${isCollapsed ? 'lg:hidden' : ''}`}>
+            <div className="w-10 h-9 flex items-center justify-center shrink-0">
+              <RefreshCw size={20} className="shrink-0 group-hover:rotate-180 transition-transform duration-500 ease-out" />
+            </div>
+            <span
+              className={`text-sm font-bold tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[140px] lg:opacity-100 ml-2'
+              }`}
+            >
               Refresh Page
             </span>
           </button>
 
-          <button onClick={logout} className="flex items-center p-3 rounded-2xl hover:bg-red-50 text-slate-700 hover:text-red-600 transition-all group w-full gap-4 px-4 overflow-hidden">
-            <LogOut size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
-            <span className={`text-sm font-bold whitespace-nowrap transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:max-w-0 lg:opacity-0' : 'lg:max-w-[100px] lg:opacity-100'}`}>Sign Out</span>
+          <button
+            onClick={logout}
+            title={isCollapsed ? "Sign Out" : ""}
+            className="flex items-center px-3 py-1.5 rounded-2xl hover:bg-red-50 text-slate-700 hover:text-red-600 transition-colors duration-200 group w-full overflow-hidden"
+          >
+            <div className="w-10 h-9 flex items-center justify-center shrink-0">
+              <LogOut size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
+            </div>
+            <span
+              className={`text-sm font-bold whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:ml-0' : 'lg:max-w-[140px] lg:opacity-100 ml-2'
+              }`}
+            >
+              Sign Out
+            </span>
           </button>
         </div>
       </aside>
@@ -490,7 +597,6 @@ const TeacherLayout = () => {
                 {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-white px-1 shadow-sm min-w-[18px]">{unreadCount > 99 ? '99+' : unreadCount}</span>}
               </button>
 
-              {/* ─── NOTIFICATION DROPDOWN (REVERTED TO STANDARD WHITE) ─── */}
               {isNotifyOpen && (
                 <div className="bg-white fixed sm:absolute top-[5rem] sm:top-[3.5rem] left-[50%] sm:left-auto right-auto sm:-right-4 -translate-x-1/2 sm:translate-x-0 w-[90%] sm:w-[380px] max-w-[380px] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 overflow-hidden z-[100] animate-in slide-in-from-top-2 flex flex-col">
 

@@ -1,7 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PlayCircle, Rocket, Star } from 'lucide-react';
 
 const KidsDashboard = ({ courses }) => {
+  const navigate = useNavigate();
+
   return (
     <div className="animate-in fade-in zoom-in duration-500">
       {/* Welcome Banner */}
@@ -18,14 +21,27 @@ const KidsDashboard = ({ courses }) => {
       {/* Course Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {courses.map((course, i) => (
-          <div key={i} className="bg-white p-2 rounded-[2.5rem] shadow-lg border-b-8 border-slate-200 hover:border-orange-400 transition-all cursor-pointer group">
+          <div
+            key={course.class_id || i}
+            onClick={() => navigate(`/lms/course/${course.class_id}`)}
+            className="bg-white p-2 rounded-[2.5rem] shadow-lg border-b-8 border-slate-200 hover:border-orange-400 transition-all cursor-pointer group"
+          >
              <div className={`h-48 rounded-[2rem] ${course.color} flex items-center justify-center mb-4 relative overflow-hidden`}>
                 <span className="text-3xl font-black text-white/30 px-4 text-center">{course.title.split(':')[0]}</span>
                 <PlayCircle className="absolute text-white group-hover:scale-125 transition-transform drop-shadow-lg" size={60} />
              </div>
              <div className="p-4 text-center">
                 <h3 className="text-xl font-black text-slate-800 truncate">{course.title}</h3>
-                <button className="mt-4 bg-orange-400 text-white px-6 py-2 rounded-full font-black text-sm w-full shadow-md hover:bg-orange-500 transition-colors">
+                {course.teacher && (
+                  <p className="text-xs font-bold text-slate-400 mt-1 truncate">Teacher: {course.teacher}</p>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/lms/course/${course.class_id}`);
+                  }}
+                  className="mt-4 bg-orange-400 text-white px-6 py-2 rounded-full font-black text-sm w-full shadow-md hover:bg-orange-500 transition-colors"
+                >
                   Let's Learn!
                 </button>
              </div>

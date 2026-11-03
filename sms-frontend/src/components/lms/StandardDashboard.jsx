@@ -24,7 +24,7 @@ const StandardDashboard = ({ courses, nextLessons }) => {
          </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course, index) => (
+          {courses.slice(0, 3).map((course, index) => (
                <div 
                   key={course.class_id} 
                   className="p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden text-white group transition-all hover:scale-[1.02] min-h-[320px] flex flex-col justify-between"

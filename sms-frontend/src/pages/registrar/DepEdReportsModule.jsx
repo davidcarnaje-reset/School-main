@@ -6,6 +6,7 @@ import {
   Calendar, Check, ShieldCheck, Download, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import OfficialSF9Card from '../../components/shared/OfficialSF9Card';
 
 const DepEdReportsModule = () => {
   const { branding, API_BASE_URL, getLogoUrl } = useAuth();
@@ -64,10 +65,25 @@ const DepEdReportsModule = () => {
     if (!studentId) return;
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/registrar/get_form138_card.php?student_id=${studentId}`);
+      const token = localStorage.getItem('sms_token') || '';
+      const recRes = await axios.get(
+        `${API_BASE_URL}/registrar/get_student_records.php?student_id=${encodeURIComponent(studentId)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (recRes.data.success) {
+        setForm138Data({
+          student: recRes.data.student,
+          grades: recRes.data.grades || []
+        });
+        setLoading(false);
+        return;
+      }
+
+      const res = await axios.get(`${API_BASE_URL}/registrar/get_form138_card.php?student_id=${encodeURIComponent(studentId)}`);
       if (res.data.success) setForm138Data(res.data);
     } catch (err) {
       console.error(err);
+      alert('Student record not found.');
     } finally {
       setLoading(false);
     }
@@ -123,7 +139,9 @@ const DepEdReportsModule = () => {
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <FileText className="text-blue-600" size={32} /> DepEd & CHED Official Forms Generator
           </h1>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Official Registrar Academic Reports & Student Promotion</p>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">
+            Official Registrar Academic Reports • DepEd Order No. 015, s. 2026 Compliant
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -141,9 +159,9 @@ const DepEdReportsModule = () => {
         {[
           { id: 'sf1', label: '📄 SF1: School Register' },
           { id: 'sf5', label: '📊 SF5: Promotion Report' },
-          { id: 'form138', label: '🎴 Form 138 (Report Card)' },
+          { id: 'form138', label: '🎴 SF9 / Form 138 (Report Card)' },
           { id: 'coe', label: '📜 Certificate of Enrollment (COE)' },
-          { id: 'honors', label: '🏆 Honor Students & GWAs' },
+          { id: 'honors', label: '🏆 Academic Excellence Awards' },
           { id: 'promote', label: '🎓 Batch Student Promotion' }
         ].map(t => (
           <button
@@ -185,12 +203,14 @@ const DepEdReportsModule = () => {
         </div>
       )}
 
-      {/* PRINTABLE HEADER FOR FORM REPORTS */}
-      <div className="hidden print:block text-center border-b border-slate-300 pb-4 mb-6">
-        <h2 className="text-lg font-black uppercase text-slate-900">{branding.school_name || 'School Management System'}</h2>
-        <p className="text-xs text-slate-600">{branding.school_address || 'Republic of the Philippines'}</p>
-        <p className="text-xs font-bold text-blue-800 mt-1 uppercase tracking-widest">Office of the School Registrar</p>
-      </div>
+      {/* PRINTABLE HEADER FOR FORM REPORTS (Hidden on SF9 since OfficialSF9Card has its own DepEd header) */}
+      {activeTab !== 'form138' && (
+        <div className="hidden print:block text-center border-b border-slate-300 pb-4 mb-6">
+          <h2 className="text-lg font-black uppercase text-slate-900">{branding.school_name || 'School Management System'}</h2>
+          <p className="text-xs text-slate-600">{branding.school_address || 'Republic of the Philippines'}</p>
+          <p className="text-xs font-bold text-blue-800 mt-1 uppercase tracking-widest">Office of the School Registrar</p>
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* TAB 1: SF1 SCHOOL REGISTER */}
@@ -232,7 +252,7 @@ const DepEdReportsModule = () => {
                 ) : !sf1Data || sf1Data.data.length === 0 ? (
                   <tr><td colSpan="9" className="p-10 text-center text-slate-400">No student records found.</td></tr>
                 ) : (
-                  sf1Data.data.map((s, idx) => (
+                  sf1Data.data.map((s) => (
                     <tr key={s.student_id} className="hover:bg-slate-50/80">
                       <td className="p-3 font-mono text-blue-600">{s.lrn || 'N/A'}</td>
                       <td className="p-3 font-black text-slate-800">{s.last_name}, {s.first_name} {s.middle_name || ''} {s.suffix || ''}</td>
@@ -259,8 +279,8 @@ const DepEdReportsModule = () => {
         <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-6">
           <div className="flex justify-between items-center border-b border-slate-100 pb-4">
             <div>
-              <h3 className="font-black text-slate-800 text-lg">School Form 5 (SF5) - Report on Promotion & Proficiency</h3>
-              <p className="text-xs text-slate-400 font-bold uppercase">Learner Promotion Status Summary</p>
+              <h3 className="font-black text-slate-800 text-lg">School Form 5 (SF5) - Report on Promotion & Level of Proficiency</h3>
+              <p className="text-xs text-slate-400 font-bold uppercase">Aligned with DO 015, s. 2026 Descriptors (Advancing to Emerging)</p>
             </div>
             {sf5Data && (
               <div className="flex gap-3 text-xs font-black">
@@ -278,8 +298,8 @@ const DepEdReportsModule = () => {
                   <th className="p-3">LRN</th>
                   <th className="p-3">Learner Name</th>
                   <th className="p-3">Grade Level</th>
-                  <th className="p-3">General Average (GWA)</th>
-                  <th className="p-3">Level of Proficiency</th>
+                  <th className="p-3">General Average</th>
+                  <th className="p-3">Qualitative Descriptor (DO 015, s. 2026)</th>
                   <th className="p-3">Action Taken</th>
                 </tr>
               </thead>
@@ -314,76 +334,34 @@ const DepEdReportsModule = () => {
       )}
 
       {/* ========================================================= */}
-      {/* TAB 3: FORM 138 REPORT CARD */}
+      {/* TAB 3: SF9 / FORM 138 REPORT CARD (DO 015, s. 2026)       */}
       {/* ========================================================= */}
       {activeTab === 'form138' && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-slate-200 flex items-center gap-4 print:hidden shadow-sm">
             <input 
               type="text" 
-              placeholder="Enter Student ID to load Report Card..." 
+              placeholder="Enter Student ID, LRN, or Learner Name to load Official SF9 Report Card..." 
               value={selectedStudentId} 
               onChange={e => setSelectedStudentId(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') fetchForm138(selectedStudentId); }}
               className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold flex-1 outline-none focus:border-blue-500"
             />
             <button 
               onClick={() => fetchForm138(selectedStudentId)}
-              className="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-2xl shadow-lg transition-all"
+              className="px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-2xl shadow-lg transition-all cursor-pointer"
             >
-              Generate Form 138
+              Generate Official SF9 (Form 138)
             </button>
           </div>
 
           {form138Data && (
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-              <div className="border-b border-slate-200 pb-4 flex justify-between items-center">
-                <div>
-                  <h3 className="font-black text-slate-800 text-xl">{form138Data.student.first_name} {form138Data.student.last_name}</h3>
-                  <p className="text-xs text-slate-500 font-bold uppercase">LRN: {form138Data.student.lrn} | Grade: {form138Data.student.grade_level} ({form138Data.student.section})</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-black text-blue-600 bg-blue-50 px-4 py-2 rounded-2xl border border-blue-100">
-                    General Average: {form138Data.general_average}
-                  </span>
-                </div>
-              </div>
-
-              <table className="w-full text-left border-collapse border border-slate-200 rounded-2xl overflow-hidden">
-                <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                  <tr>
-                    <th className="p-3 border">Subject Code & Description</th>
-                    <th className="p-3 border text-center">Q1</th>
-                    <th className="p-3 border text-center">Q2</th>
-                    <th className="p-3 border text-center">Q3</th>
-                    <th className="p-3 border text-center">Q4</th>
-                    <th className="p-3 border text-center">Final Grade</th>
-                    <th className="p-3 border text-center">Remarks</th>
-                  </tr>
-                </thead>
-                <tbody className="text-xs font-bold text-slate-700">
-                  {form138Data.subjects.map(sub => (
-                    <tr key={sub.code} className="border-b">
-                      <td className="p-3 border font-black">{sub.code} - {sub.description}</td>
-                      <td className="p-3 border text-center">{sub.q1 || '-'}</td>
-                      <td className="p-3 border text-center">{sub.q2 || '-'}</td>
-                      <td className="p-3 border text-center">{sub.q3 || '-'}</td>
-                      <td className="p-3 border text-center">{sub.q4 || '-'}</td>
-                      <td className="p-3 border text-center font-black text-blue-600">{sub.final_grade || '-'}</td>
-                      <td className="p-3 border text-center">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${sub.remarks === 'PASSED' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                          {sub.remarks}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-xs font-black text-emerald-900 flex justify-between items-center">
-                <span>Eligibility & Recommendation:</span>
-                <span className="uppercase">{form138Data.promotion_status}</span>
-              </div>
-            </div>
+            <OfficialSF9Card
+              student={form138Data.student}
+              rawGrades={form138Data.grades || form138Data.subjects || []}
+              branding={branding}
+              showRegistrarActions={false}
+            />
           )}
         </div>
       )}
@@ -467,8 +445,10 @@ const DepEdReportsModule = () => {
         <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-6">
           <div className="flex justify-between items-center border-b border-slate-100 pb-4">
             <div>
-              <h3 className="font-black text-slate-800 text-lg">Honor Students & Academic Excellence List</h3>
-              <p className="text-xs text-slate-400 font-bold uppercase">DepEd & CHED Compliant GWA Compute Engine</p>
+              <h3 className="font-black text-slate-800 text-lg">Academic Excellence Awardees (DO 015, s. 2026 Table 12)</h3>
+              <p className="text-xs text-slate-400 font-bold uppercase">
+                With Highest Honors (98–100) • With High Honors (95–97) • With Honors (90–94, no grade below 80)
+              </p>
             </div>
             {honorData && (
               <span className="bg-amber-100 text-amber-900 px-4 py-1.5 rounded-2xl text-xs font-black border border-amber-200">
@@ -485,7 +465,7 @@ const DepEdReportsModule = () => {
                   <th className="p-3">LRN</th>
                   <th className="p-3">Student Name</th>
                   <th className="p-3">Grade & Section</th>
-                  <th className="p-3">General Weighted Average (GWA)</th>
+                  <th className="p-3">General Average</th>
                   <th className="p-3">Academic Award</th>
                 </tr>
               </thead>
