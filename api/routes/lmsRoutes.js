@@ -1,4 +1,7 @@
 import express from 'express';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 import getDashboard from '../controllers/lms/getDashboard.js';
 import getClassroomFeed from '../controllers/lms/getClassroomFeed.js';
 import getAllCourses from '../controllers/lms/getAllCourses.js';
@@ -9,8 +12,31 @@ import getStudentPerformance from '../controllers/lms/getStudentPerformance.js';
 import getProfileOverview from '../controllers/lms/getProfileOverview.js';
 import { getCalendarNotes, saveCalendarNote, deleteCalendarNote } from '../controllers/lms/calendarNotes.js';
 import { getExamDetails, submitExam } from '../controllers/lms/examController.js';
+import submitWrittenWork from '../controllers/lms/submitWrittenWork.js';
 
 const router = express.Router();
+
+// Multer storage for student activity file submissions (paper photos, PDFs, documents)
+const submissionsStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = './uploads/submissions';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const cleanName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, '_');
+    const unique = Date.now() + '_' + Math.round(Math.random() * 1e5);
+    cb(null, `sub_${unique}_${cleanName}${ext}`);
+  }
+});
+
+const uploadSubmission = multer({
+  storage: submissionsStorage,
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
 
 // Clean RESTful endpoints
 router.get('/dashboard', getDashboard);
@@ -26,6 +52,7 @@ router.post('/calendar-notes', saveCalendarNote);
 router.delete('/calendar-notes', deleteCalendarNote);
 router.get('/exam-details', getExamDetails);
 router.post('/submit-exam', submitExam);
+router.post('/submit-activity', uploadSubmission.single('submission_file'), submitWrittenWork);
 
 // Legacy PHP compatibility endpoints (direct mapping from frontend)
 router.get('/get_dashboard', getDashboard);
@@ -54,5 +81,7 @@ router.get('/get_exam_details', getExamDetails);
 router.get('/get_exam_details.php', getExamDetails);
 router.post('/submit_exam', submitExam);
 router.post('/submit_exam.php', submitExam);
+router.post('/submit_activity', uploadSubmission.single('submission_file'), submitWrittenWork);
+router.post('/submit_activity.php', uploadSubmission.single('submission_file'), submitWrittenWork);
 
 export default router;

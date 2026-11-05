@@ -59,7 +59,7 @@ const LmsDashboard = () => {
 
   // Render the selected component with REAL data
   return isKidsView ? (
-    <KidsDashboard courses={myCourses} stats={stats} />
+    <KidsDashboard courses={myCourses} nextLessons={nextLessons} stats={stats} />
   ) : (
     <StandardDashboard 
       courses={myCourses} 

@@ -5,14 +5,15 @@ import { useAuth } from '../../context/AuthContext';
 import { getTeacherLevel, getGradingCategories } from '../../utils/gradingUtils';
 import {
   Plus, BookOpen, FileText, MoreVertical, ChevronDown, ChevronUp,
-  MessageSquare, Share, Link as LinkIcon, Edit3, Megaphone, Send, Trash2, X, Clock, AlertCircle
+  MessageSquare, Share, Link as LinkIcon, Edit3, Megaphone, Send, Trash2, X, Video, ExternalLink
 } from 'lucide-react';
 
 import {
   gcGlassStyles,
   ActivitySkeletonList,
   TypeSelectorModal,
-  CreateActivityModal
+  CreateActivityModal,
+  CreateModuleModal
 } from '../../components/shared/TeacherActivityUI';
 
 const TeacherActivities = () => {
@@ -26,6 +27,7 @@ const TeacherActivities = () => {
   const [assignedClasses, setAssignedClasses] = useState([]);
   const [viewClassId, setViewClassId] = useState(urlClassId || '');
   const [activities, setActivities] = useState([]);
+  const [modules, setModules] = useState([]);
   const [classAnnouncements, setClassAnnouncements] = useState([]);
   const [activeTab, setActiveTab] = useState('Stream'); // 🟢 Default na ito
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +49,17 @@ const TeacherActivities = () => {
 
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingActivityId, setEditingActivityId] = useState(null);
   const [formData, setFormData] = useState({ class_id: '', title: '', description: '', category: '', quarter: '', max_score: 100, due_date: '' });
+
+  // Learning Module Modal State
+  const [isModuleModalOpen, setIsModuleModalOpen] = useState(false);
+  const [moduleForm, setModuleForm] = useState({
+    title: '',
+    description: '',
+    module_type: 'lecture',
+    file_url: ''
+  });
 
   // 🟢 EFFECT PARA SALUHIN YUNG CLICK GALING SIDEBAR AT ILIPAT ANG TAB
   useEffect(() => {
@@ -99,6 +111,17 @@ const TeacherActivities = () => {
     finally { setIsLoading(false); }
   }, [viewClassId, API_BASE_URL]);
 
+  const fetchModules = useCallback(async () => {
+    if (!viewClassId) return;
+    try {
+      const token = localStorage.getItem('sms_token');
+      const res = await axios.get(`${API_BASE_URL}/teacher/get_modules.php?class_id=${viewClassId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data.status === 'success') setModules(res.data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch modules:", err);
+    }
+  }, [viewClassId, API_BASE_URL]);
+
   const fetchClassAnnouncements = useCallback(async () => {
     if (!viewClassId) return;
     try {
@@ -115,8 +138,9 @@ const TeacherActivities = () => {
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
   useEffect(() => {
     fetchActivities();
+    fetchModules();
     fetchClassAnnouncements();
-  }, [fetchActivities, fetchClassAnnouncements]);
+  }, [fetchActivities, fetchModules, fetchClassAnnouncements]);
 
   const handlePostAnnouncement = async (e) => {
     e.preventDefault();
@@ -170,9 +194,44 @@ const TeacherActivities = () => {
   };
 
   const handleOpenModal = () => {
-    setFormData(prev => ({ ...prev, class_id: viewClassId, category: '', quarter: '' }));
+    setEditingActivityId(null);
+    setFormData({ class_id: viewClassId, title: '', description: '', category: '', quarter: '', max_score: 100, due_date: '' });
     setShowTypeSelector(false);
     setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (act) => {
+    setEditingActivityId(act.id);
+    const formattedDate = act.due_date ? new Date(act.due_date).toISOString().split('T')[0] : '';
+    setFormData({
+      class_id: viewClassId,
+      title: act.title || '',
+      description: act.description || '',
+      category: act.category || '',
+      quarter: act.quarter || '',
+      max_score: act.max_score || 100,
+      due_date: formattedDate
+    });
+    setOpenMenuId(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteActivity = async (act) => {
+    if (!window.confirm(`Delete "${act.title}"? This will also remove any student scores recorded for this activity.`)) return;
+    try {
+      const token = localStorage.getItem('sms_token');
+      const res = await axios.post(`${API_BASE_URL}/teacher/delete_activity.php`, {
+        activity_id: act.id,
+        class_id: viewClassId
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data.status === 'success') {
+        fetchActivities();
+      } else {
+        alert(res.data.message || 'Failed to delete activity.');
+      }
+    } catch (err) {
+      alert('Error deleting activity.');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -185,19 +244,79 @@ const TeacherActivities = () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('sms_token');
-      const payload = { ...formData, teacher_id: user.id, quarter: isModalKto12 ? parseInt(formData.quarter) : null };
-      const res = await axios.post(`${API_BASE_URL}/teacher/create_activity.php`, payload, { headers: { Authorization: `Bearer ${token}` } });
+      const payload = {
+        ...formData,
+        activity_id: editingActivityId,
+        teacher_id: user.id,
+        quarter: isModalKto12 ? parseInt(formData.quarter, 10) : null
+      };
+
+      const endpoint = editingActivityId
+        ? `${API_BASE_URL}/teacher/update_activity.php`
+        : `${API_BASE_URL}/teacher/create_activity.php`;
+
+      const res = await axios.post(endpoint, payload, { headers: { Authorization: `Bearer ${token}` } });
 
       if (res.data.status === 'success') {
         setIsModalOpen(false);
+        setEditingActivityId(null);
         setFormData({ class_id: '', title: '', description: '', category: '', quarter: '', max_score: 100, due_date: '' });
-        alert('Activity created successfully!');
         fetchActivities();
+      } else {
+        alert(res.data.message || 'Failed to save activity.');
       }
     } catch (err) {
-      alert('Failed to create activity.');
+      alert('Failed to save activity.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenModuleModal = () => {
+    setModuleForm({ title: '', description: '', module_type: 'lecture', file_url: '' });
+    setShowTypeSelector(false);
+    setIsModuleModalOpen(true);
+  };
+
+  const handleCreateModule = async (e) => {
+    e.preventDefault();
+    if (!moduleForm.title.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem('sms_token');
+      const res = await axios.post(`${API_BASE_URL}/teacher/create_module.php`, {
+        class_id: viewClassId,
+        teacher_id: user?.id,
+        ...moduleForm
+      }, { headers: { Authorization: `Bearer ${token}` } });
+
+      if (res.data.status === 'success') {
+        setIsModuleModalOpen(false);
+        setModuleForm({ title: '', description: '', module_type: 'lecture', file_url: '' });
+        fetchModules();
+      } else {
+        alert(res.data.message || 'Failed to post module.');
+      }
+    } catch (err) {
+      alert('Failed to post learning module.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteModule = async (moduleId) => {
+    if (!window.confirm('Remove this learning module from the classroom?')) return;
+    try {
+      const token = localStorage.getItem('sms_token');
+      const res = await axios.post(`${API_BASE_URL}/teacher/delete_module.php`, {
+        module_id: moduleId
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data.status === 'success') {
+        fetchModules();
+      }
+    } catch (err) {
+      alert('Failed to delete module.');
     }
   };
 
@@ -232,14 +351,27 @@ const TeacherActivities = () => {
     }
   };
 
+  const matchesCategory = (actCategory, catKey) => {
+    if (!catKey) return true;
+    if (catKey === 'written') {
+      return actCategory === 'written' || actCategory === 'seatwork' || actCategory === 'quiz' || actCategory === 'task' || actCategory === 'assignment';
+    }
+    if (catKey === 'performance') {
+      return actCategory === 'performance' || actCategory === 'activity' || actCategory === 'pt' || actCategory === 'project';
+    }
+    if (catKey === 'exam') {
+      return actCategory === 'exam' || actCategory === 'quarterly' || actCategory === 'periodical' || actCategory === 'prelim' || actCategory === 'midterm' || actCategory === 'finals' || actCategory === 'quarterly_exam';
+    }
+    return actCategory === catKey;
+  };
+
   const displayedActivities = activities.filter(act => {
-    if (act.category === 'performance') return false;
-    if (filterCategory && act.category !== filterCategory) return false;
+    if (filterCategory && !matchesCategory(act.category, filterCategory)) return false;
     if (filterQuarter && String(act.quarter) !== String(filterQuarter)) return false;
     return true;
   });
 
-  // Merge announcements and classwork for Stream view sorted by newest first
+  // Merge announcements, modules, and classwork for Stream view sorted by newest first
   const streamItems = [
     ...classAnnouncements.map(ann => ({
       streamKey: `ann_${ann.id}`,
@@ -252,13 +384,26 @@ const TeacherActivities = () => {
       dateLabel: `${ann.date_posted || ''} ${ann.time_posted ? `• ${ann.time_posted}` : ''}`,
       createdAt: ann.created_at
     })),
-    ...activities.filter(a => a.category !== 'performance').map(act => ({
+    ...modules.map(mod => ({
+      streamKey: `mod_${mod.id}`,
+      streamType: 'module',
+      rawId: mod.id,
+      title: mod.title,
+      message: mod.description || (mod.module_type === 'video' ? 'Video Lecture Resource' : 'Learning Handout / Reference Material'),
+      badgeType: mod.module_type === 'video' ? 'Video Lecture' : 'Learning Module',
+      fileUrl: mod.file_url,
+      moduleType: mod.module_type,
+      author: user?.full_name || 'Teacher',
+      dateLabel: mod.created_at ? new Date(mod.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '',
+      createdAt: mod.created_at
+    })),
+    ...activities.map(act => ({
       streamKey: `act_${act.id}`,
       streamType: 'activity',
       rawId: act.id,
       title: act.title,
       message: act.description || `${act.max_score} pts ${act.quarter ? `• Quarter ${act.quarter}` : ''}`,
-      badgeType: act.category === 'exam' ? 'Examination' : 'Classwork',
+      badgeType: act.category === 'exam' ? 'Examination' : act.category === 'seatwork' ? 'Seatwork' : act.category === 'quiz' ? 'Class Quiz' : act.category === 'performance' ? 'Performance Task' : 'Classwork',
       author: user?.full_name || 'Teacher',
       dateLabel: act.created_at ? new Date(act.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '',
       createdAt: act.created_at,
@@ -324,7 +469,13 @@ const TeacherActivities = () => {
             <div className="absolute right-[-10%] top-[-20%] w-[450px] h-[450px] bg-black/10 rounded-full" />
 
             {/* Customize Button (Top Right) */}
-            <div className="absolute top-5 right-5 z-10">
+            <div className="absolute top-5 right-5 z-10 flex items-center gap-2">
+              <button
+                className="bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/40 text-white px-4 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all shadow-sm"
+                onClick={handleOpenModuleModal}
+              >
+                <BookOpen size={16} /> Post Module
+              </button>
               <button
                 className="bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/40 text-white px-4 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all shadow-sm"
                 onClick={() => setIsComposingAnnouncement(true)}
@@ -462,7 +613,7 @@ const TeacherActivities = () => {
                 </form>
               )}
 
-              {/* 🟢 STREAM FEED LIST (ANNOUNCEMENTS + CLASSWORK) 🟢 */}
+              {/* 🟢 STREAM FEED LIST (ANNOUNCEMENTS + MODULES + CLASSWORK) 🟢 */}
               {streamItems.length === 0 ? (
                 <div className="text-center py-16 bg-white/40 border border-white rounded-3xl backdrop-blur-md shadow-sm">
                   <MessageSquare size={54} className="mx-auto text-slate-300 mb-4" />
@@ -486,11 +637,21 @@ const TeacherActivities = () => {
                                   : item.badgeType === 'Task Reminder'
                                   ? 'bg-amber-500'
                                   : 'bg-indigo-600'
+                                : item.streamType === 'module'
+                                ? item.moduleType === 'video'
+                                  ? 'bg-rose-500'
+                                  : 'bg-emerald-600'
                                 : 'bg-slate-700'
                             }`}
                             style={item.streamType === 'announcement' && item.badgeType === 'Announcement' ? { backgroundColor: themeColor } : {}}
                           >
-                            {item.streamType === 'announcement' ? <Megaphone size={20} /> : <FileText size={20} />}
+                            {item.streamType === 'announcement' ? (
+                              <Megaphone size={20} />
+                            ) : item.streamType === 'module' ? (
+                              item.moduleType === 'video' ? <Video size={20} /> : <BookOpen size={20} />
+                            ) : (
+                              <FileText size={20} />
+                            )}
                           </div>
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -501,6 +662,8 @@ const TeacherActivities = () => {
                                   ? 'bg-amber-100 text-amber-700'
                                   : item.streamType === 'announcement'
                                   ? 'bg-indigo-100 text-indigo-700'
+                                  : item.streamType === 'module'
+                                  ? 'bg-teal-100 text-teal-700'
                                   : 'bg-emerald-100 text-emerald-700'
                               }`}>
                                 {item.badgeType}
@@ -519,6 +682,26 @@ const TeacherActivities = () => {
                           >
                             <Trash2 size={17} />
                           </button>
+                        ) : item.streamType === 'module' ? (
+                          <div className="flex items-center gap-2">
+                            {item.fileUrl && (
+                              <a
+                                href={item.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black flex items-center gap-1.5 transition-colors"
+                              >
+                                <ExternalLink size={14} /> Open Link
+                              </a>
+                            )}
+                            <button
+                              onClick={() => handleDeleteModule(item.rawId)}
+                              title="Delete Module"
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                            >
+                              <Trash2 size={17} />
+                            </button>
+                          </div>
                         ) : (
                           <button
                             onClick={() => navigate(`/teacher/activities/${item.rawId}/grading`, {
@@ -553,7 +736,7 @@ const TeacherActivities = () => {
       {activeTab === 'Classwork' && (
         <div className="w-full mt-6 max-w-4xl mx-auto animate-slide-up">
           <div className="mb-8">
-            <div className="mb-6">
+            <div className="mb-6 flex flex-wrap items-center gap-3">
               <button
                 className="px-6 py-2.5 rounded-full font-bold transition-all flex items-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 style={{ backgroundColor: themeColor, color: 'white' }}
@@ -561,12 +744,18 @@ const TeacherActivities = () => {
               >
                 <Plus size={20} /> Create
               </button>
+              <button
+                className="px-5 py-2.5 rounded-full font-bold transition-all flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                onClick={handleOpenModuleModal}
+              >
+                <BookOpen size={18} /> Post Module / Video
+              </button>
             </div>
 
-           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-300/50 pb-4">
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-300/50 pb-4">
               <div className="flex items-center gap-4">
 
-                {/* 1. TOPIC FILTER (LAGING NANDITO) */}
+                {/* 1. TOPIC FILTER */}
                 <div className="relative mt-2">
                   <label className="absolute -top-2 left-3 bg-slate-50/80 backdrop-blur-md px-1.5 text-[11px] font-bold text-slate-500 z-10 rounded">Topic filter</label>
                   <select 
@@ -574,7 +763,7 @@ const TeacherActivities = () => {
                     value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}
                   >
                     <option value="">All topics</option>
-                    {viewCategories.filter(cat => cat.key !== 'performance').map(cat => (
+                    {viewCategories.map(cat => (
                       <option key={cat.key} value={cat.key}>{cat.label}</option>
                     ))}
                   </select>
@@ -591,14 +780,11 @@ const TeacherActivities = () => {
                     value={filterQuarter} onChange={(e) => setFilterQuarter(e.target.value)}
                   >
                     <option value="">{isModalKto12 ? 'All quarters' : 'All terms'}</option>
-                    
-                    {/* Kung K-12, numbers 1-4 ang lalabas. Kung College, Prelim, Midterm, Finals */}
                     {isModalKto12 ? (
                       [1, 2, 3, 4].map(q => <option key={q} value={q}>Quarter {q}</option>)
                     ) : (
                       ['Prelims', 'Midterms', 'Finals'].map(term => <option key={term} value={term}>{term}</option>)
                     )}
-
                   </select>
                   <ChevronDown size={16} className="text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
                 </div>
@@ -616,6 +802,55 @@ const TeacherActivities = () => {
             </div>
           </div>
 
+          {/* LEARNING MODULES & VIDEO LECTURES SECTION */}
+          {modules.length > 0 && !filterCategory && (
+            <div className="mb-10">
+              <div className="flex justify-between items-center py-3 px-2">
+                <h2 className="text-[1.6rem] font-normal tracking-tight leading-none text-emerald-700">
+                  Learning Modules & Video Lectures
+                </h2>
+              </div>
+              <div className="flex flex-col border-t border-slate-300/50">
+                {modules.map(mod => (
+                  <div
+                    key={mod.id}
+                    className="flex items-center gap-4 p-4 border-b border-slate-300/50 bg-white/40 hover:bg-white/80 backdrop-blur-md transition-all"
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm shrink-0 ${mod.module_type === 'video' ? 'bg-rose-500' : 'bg-emerald-600'}`}>
+                      {mod.module_type === 'video' ? <Video size={20} /> : <BookOpen size={20} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-slate-800 text-[15px] truncate">{mod.title}</h3>
+                      <p className="text-xs font-semibold text-slate-500 mt-0.5 truncate">
+                        {mod.module_type === 'video' ? 'Video Lecture' : 'Handout / Reading Material'}
+                        {mod.description ? ` • ${mod.description}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {mod.file_url && (
+                        <a
+                          href={mod.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                        >
+                          <ExternalLink size={14} /> Open
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleDeleteModule(mod.id)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                        title="Delete Module"
+                      >
+                        <Trash2 size={17} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <ActivitySkeletonList themeColor={themeColor} />
           ) : displayedActivities.length === 0 ? (
@@ -626,8 +861,8 @@ const TeacherActivities = () => {
             </div>
           ) : (
             <div className="flex flex-col gap-10 pb-10">
-              {viewCategories.filter(c => c.key !== 'performance').map(category => {
-                const items = displayedActivities.filter(act => act.category === category.key);
+              {viewCategories.map(category => {
+                const items = displayedActivities.filter(act => matchesCategory(act.category, category.key));
                 if (items.length === 0) return null;
                 const isCollapsed = collapsedGroups[category.key];
 
@@ -656,7 +891,21 @@ const TeacherActivities = () => {
                           >
                             <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm shrink-0" style={{ backgroundColor: themeColor }}><FileText size={20} /></div>
                             <div className="flex-1">
-                              <h3 className="font-semibold text-slate-800 text-[15px]">{act.title}</h3>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold text-slate-800 text-[15px]">{act.title}</h3>
+                                {act.category === 'seatwork' && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">Seatwork</span>
+                                )}
+                                {act.category === 'quiz' && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700">Class Quiz</span>
+                                )}
+                                {act.category === 'activity' && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700">Activity</span>
+                                )}
+                                {act.category === 'performance' && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700">Performance Task</span>
+                                )}
+                              </div>
                               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-1">{act.max_score} pts {act.quarter && ` • Q${act.quarter}`}</p>
                             </div>
                             <div className="text-right flex items-center gap-4 relative">
@@ -674,6 +923,15 @@ const TeacherActivities = () => {
                                     <button
                                       className="w-full text-left px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-100 transition-colors flex items-center gap-2.5"
                                       onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenEditModal(act);
+                                      }}
+                                    >
+                                      <Edit3 size={16} style={{ color: themeColor }} /> Edit Activity
+                                    </button>
+                                    <button
+                                      className="w-full text-left px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-100 transition-colors flex items-center gap-2.5"
+                                      onClick={(e) => {
                                         e.stopPropagation(); setOpenMenuId(null);
                                         const shareLink = `${window.location.origin}/lms/exam/${act.id}`;
                                         navigator.clipboard.writeText(shareLink).then(() => { alert('Link copied to clipboard!\n\n' + shareLink); });
@@ -686,6 +944,17 @@ const TeacherActivities = () => {
                                       onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); handleShareActivity(act); }}
                                     >
                                       <Share size={16} style={{ color: themeColor }} /> Share to Students
+                                    </button>
+                                    <div className="my-1 border-t border-slate-100" />
+                                    <button
+                                      className="w-full text-left px-4 py-2.5 text-[13px] font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2.5"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenMenuId(null);
+                                        handleDeleteActivity(act);
+                                      }}
+                                    >
+                                      <Trash2 size={16} /> Delete Activity
                                     </button>
                                   </div>
                                 )}
@@ -703,8 +972,43 @@ const TeacherActivities = () => {
         </div>
       )}
 
-      <TypeSelectorModal isOpen={showTypeSelector} onClose={() => setShowTypeSelector(false)} onSelectBasic={handleOpenModal} onSelectExam={() => { setShowTypeSelector(false); navigate('/teacher/activities/create-exam', { state: { classId: viewClassId } }); }} themeColor={themeColor} />
-      <CreateActivityModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} formData={formData} setFormData={setFormData} onSubmit={handleSubmit} isSubmitting={isSubmitting} selectedClass={selectedClassForView} modalCategories={viewCategories} isModalKto12={isModalKto12} themeColor={themeColor} />
+      <TypeSelectorModal
+        isOpen={showTypeSelector}
+        onClose={() => setShowTypeSelector(false)}
+        onSelectBasic={handleOpenModal}
+        onSelectExam={() => {
+          setShowTypeSelector(false);
+          navigate('/teacher/activities/create-exam', { state: { classId: viewClassId } });
+        }}
+        onSelectModule={handleOpenModuleModal}
+        themeColor={themeColor}
+      />
+      <CreateActivityModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingActivityId(null);
+        }}
+        formData={formData}
+        setFormData={setFormData}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        selectedClass={selectedClassForView}
+        modalCategories={viewCategories}
+        isModalKto12={isModalKto12}
+        themeColor={themeColor}
+        isEditing={Boolean(editingActivityId)}
+      />
+      <CreateModuleModal
+        isOpen={isModuleModalOpen}
+        onClose={() => setIsModuleModalOpen(false)}
+        moduleForm={moduleForm}
+        setModuleForm={setModuleForm}
+        onSubmit={handleCreateModule}
+        isSubmitting={isSubmitting}
+        selectedClass={selectedClassForView}
+        themeColor={themeColor}
+      />
     </div>
   );
 };

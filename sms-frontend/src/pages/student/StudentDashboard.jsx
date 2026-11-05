@@ -65,7 +65,8 @@ const StudentDashboard = () => {
 
         // 3. FETCH REAL SCHEDULE & TASKS
         try {
-          const acadRes = await axios.get(`${API_BASE_URL}/student/get_student_dashboard_data.php?student_id=${myData.student_id}`);
+          const studentIdentifier = myData?.student_id || user?.student_id || user?.username || user?.id;
+          const acadRes = await axios.get(`${API_BASE_URL}/student/get_student_dashboard_data.php?student_id=${studentIdentifier}`);
           if (acadRes.data && acadRes.data.success) {
             setScheduleToday(acadRes.data.scheduleToday || []);
             setPendingTasks(acadRes.data.pendingTasks || []);
@@ -113,7 +114,10 @@ const StudentDashboard = () => {
           </h1>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm">
+          <button
+            onClick={() => navigate('/lms/profile/overview')}
+            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm cursor-pointer"
+          >
             <User size={14} /> My Profile
           </button>
         </div>
@@ -268,7 +272,11 @@ const StudentDashboard = () => {
                 </div>
               ) : (
                 scheduleToday.map((sched, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-[1.5rem] bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-100">
+                  <div
+                    key={idx}
+                    onClick={() => sched.class_id && studentData?.isLmsActive && navigate(`/lms/course/${sched.class_id}`)}
+                    className={`flex items-center justify-between p-4 rounded-[1.5rem] bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-100 ${sched.class_id && studentData?.isLmsActive ? 'cursor-pointer' : ''}`}
+                  >
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 bg-indigo-100 text-indigo-600">
                          <span className="text-[10px] font-black uppercase tracking-wider">{sched.subject.substring(0,4)}</span>
@@ -303,12 +311,12 @@ const StudentDashboard = () => {
                 {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d} className="text-[10px] font-black text-slate-400">{d}</div>)}
              </div>
              <div className="grid grid-cols-7 gap-1 text-center">
-                <div className="p-2 text-transparent">0</div>
-                <div className="p-2 text-transparent">0</div>
-                <div className="p-2 text-transparent">0</div>
-                {Array.from({length: 28}, (_, i) => i + 1).map(day => (
+                {Array.from({ length: new Date(today.getFullYear(), today.getMonth(), 1).getDay() }).map((_, i) => (
+                  <div key={`empty_${i}`} className="p-2 text-transparent">0</div>
+                ))}
+                {Array.from({ length: new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() }, (_, i) => i + 1).map(day => (
                   <div key={day} className={`p-2 text-xs font-bold rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
-                     day === today.getDate() ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+                     day === today.getDate() ? 'bg-indigo-600 text-white shadow-md font-black' : 'text-slate-600 hover:bg-slate-100'
                   }`}>
                     {day}
                   </div>
@@ -323,14 +331,18 @@ const StudentDashboard = () => {
             </h3>
             <div className="space-y-3">
                {pendingTasks.length > 0 ? pendingTasks.map((task, i) => (
-                 <div key={i} className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
+                 <div
+                   key={i}
+                   onClick={() => task.id && studentData?.isLmsActive && navigate(`/lms/exam/${task.id}`)}
+                   className={`flex items-center justify-between p-3 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-colors ${task.id && studentData?.isLmsActive ? 'cursor-pointer' : ''}`}
+                 >
                     <div>
                        <h4 className="text-xs font-black text-slate-800">{task.title}</h4>
                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">{task.subject}</p>
                     </div>
                     <div className="text-right">
                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
-                          {task.due}
+                          {task.due || 'No Due Date'}
                        </span>
                     </div>
                  </div>

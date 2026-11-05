@@ -1,5 +1,8 @@
 import React from 'react';
-import { Layers, Edit3, Target as TargetIcon, X, CheckCircle, School, BookOpen, Hash, Calendar, AlignLeft } from 'lucide-react';
+import {
+  Layers, Edit3, Target as TargetIcon, X, CheckCircle, School, BookOpen,
+  Hash, Calendar, AlignLeft, Video, FileText, Link as LinkIcon
+} from 'lucide-react';
 
 // ─── 1. GLOBAL GLASSMORPHISM STYLES ────────────────────────────────────────
 export const gcGlassStyles = (themeColor) => `
@@ -11,7 +14,7 @@ export const gcGlassStyles = (themeColor) => `
 
   /* OVERLAYS & MODALS */
   .glass-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15, 23, 42, 0.4); display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeInOverlay 0.3s ease-out forwards; }
-  .glass-modal { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border-radius: 1.5rem; width: 100%; animation: popInModal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; overflow: hidden; }
+  .glass-modal { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.7); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border-radius: 1.5rem; width: 100%; animation: popInModal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; overflow: hidden; }
 
   /* TABS */
   .gc-tabs { display: flex; gap: 2rem; border-bottom: 1px solid rgba(0,0,0,0.08); padding: 0 1rem; margin-bottom: 1.5rem; }
@@ -26,17 +29,17 @@ export const gcGlassStyles = (themeColor) => `
   .gc-hero::after { content: ''; position: absolute; right: -10%; top: -20%; width: 350px; height: 350px; background: rgba(255,255,255,0.1); border-radius: 50%; filter: blur(40px); z-index: 1; }
 
   /* TYPE SELECTOR CARDS */
-  .type-card { display: flex; flex-direction: column; text-align: left; padding: 1.5rem; border-radius: 1.25rem; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); cursor: pointer; transition: all 0.25s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
-  .type-card:hover { background: rgba(255, 255, 255, 0.9); transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08); border-color: ${themeColor}40; }
-  .type-icon-wrapper { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
+  .type-card { display: flex; flex-direction: column; text-align: left; padding: 1.25rem; border-radius: 1.25rem; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); cursor: pointer; transition: all 0.25s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+  .type-card:hover { background: rgba(255, 255, 255, 0.95); transform: translateY(-3px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08); border-color: ${themeColor}40; }
+  .type-icon-wrapper { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.75rem; }
 
   /* INPUT FIELDS (GLASS) */
   .glass-input-group { display: flex; flex-direction: column; gap: 0.4rem; }
   .glass-label { font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; }
   .input-with-icon { position: relative; display: flex; align-items: center; }
   .input-icon { position: absolute; left: 1rem; color: #94a3b8; pointer-events: none; }
-  .glass-input-modern { width: 100%; padding: 0.85rem 1rem 0.85rem 2.75rem; background: rgba(255,255,255,0.6); backdrop-filter: blur(8px); border: 1.5px solid rgba(255,255,255,0.6); border-radius: 0.75rem; font-family: inherit; font-size: 0.95rem; color: #1e293b; outline: none; transition: all 0.2s ease; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
-  .glass-input-modern:focus { background: rgba(255,255,255,0.95); border-color: ${themeColor}; box-shadow: 0 0 0 4px ${themeColor}20; }
+  .glass-input-modern { width: 100%; padding: 0.85rem 1rem 0.85rem 2.75rem; background: rgba(255,255,255,0.75); backdrop-filter: blur(8px); border: 1.5px solid rgba(203,213,225,0.6); border-radius: 0.75rem; font-family: inherit; font-size: 0.95rem; color: #1e293b; outline: none; transition: all 0.2s ease; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+  .glass-input-modern:focus { background: rgba(255,255,255,0.98); border-color: ${themeColor}; box-shadow: 0 0 0 4px ${themeColor}20; }
 `;
 
 // ─── 2. SKELETON LOADER (Glassmorphism Shimmer) ──────────────────────────────
@@ -79,29 +82,38 @@ export const ActivitySkeletonList = ({ themeColor }) => (
 );
 
 // ─── 3. TYPE SELECTOR MODAL ──────────────────────────────────────────────────
-export const TypeSelectorModal = ({ isOpen, onClose, onSelectBasic, onSelectExam, themeColor }) => {
+export const TypeSelectorModal = ({ isOpen, onClose, onSelectBasic, onSelectExam, onSelectModule, themeColor }) => {
   if (!isOpen) return null;
   return (
     <div className="glass-overlay" onClick={onClose}>
-      <div className="glass-modal" style={{ maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '2.5rem 2rem', textAlign: 'center' }}>
-          <div style={{ width: '64px', height: '64px', background: `linear-gradient(135deg, ${themeColor}15, ${themeColor}30)`, color: themeColor, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto', border: '1px solid rgba(255,255,255,0.8)' }}>
-            <Layers size={32} />
+      <div className="glass-modal" style={{ maxWidth: '460px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '2rem 1.75rem', textAlign: 'center' }}>
+          <div style={{ width: '60px', height: '60px', background: `linear-gradient(135deg, ${themeColor}15, ${themeColor}30)`, color: themeColor, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem auto', border: '1px solid rgba(255,255,255,0.8)' }}>
+            <Layers size={28} />
           </div>
-          <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', tracking: 'tight' }}>What to create?</h2>
-          <p style={{ color: '#64748b', fontSize: '0.95rem', marginTop: '0.5rem', marginBottom: '2rem' }}>Select the type of activity you want to assign.</p>
+          <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#1e293b' }}>What to create?</h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.4rem', marginBottom: '1.5rem' }}>Select the type of classwork or material you want to post.</p>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <button className="type-card" onClick={onSelectBasic}>
-              <div className="type-icon-wrapper" style={{ background: 'rgba(255,255,255,0.9)', color: '#475569', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}><Edit3 size={22} /></div>
-              <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1.1rem' }}>Written Work / Task</div>
-              <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.4rem', lineHeight: 1.4 }}>Standard assignment. Students submit offline or you manually encode their scores.</div>
+              <div className="type-icon-wrapper" style={{ background: 'rgba(255,255,255,0.9)', color: '#475569', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}><Edit3 size={20} /></div>
+              <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1.05rem' }}>Written Work / Performance Task</div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.3rem', lineHeight: 1.4 }}>Assign written essays, paper photos (handwritten works), dance/video links, or performance tasks for students to submit.</div>
             </button>
-            <button className="type-card" style={{ background: `linear-gradient(to right, rgba(255,255,255,0.6), ${themeColor}15)` }} onClick={onSelectExam}>
-              <div className="type-icon-wrapper" style={{ background: themeColor, color: 'white', boxShadow: `0 4px 15px ${themeColor}40` }}><TargetIcon size={22} /></div>
-              <div style={{ fontWeight: 800, color: themeColor, fontSize: '1.1rem' }}>Interactive Examination</div>
-              <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.4rem', lineHeight: 1.4 }}>Create a dynamic quiz with multiple choices. The system grades it automatically.</div>
+
+            <button className="type-card" style={{ background: `linear-gradient(to right, rgba(255,255,255,0.7), ${themeColor}15)` }} onClick={onSelectExam}>
+              <div className="type-icon-wrapper" style={{ background: themeColor, color: 'white', boxShadow: `0 4px 15px ${themeColor}40` }}><TargetIcon size={20} /></div>
+              <div style={{ fontWeight: 800, color: themeColor, fontSize: '1.05rem' }}>Interactive Examination / Quiz</div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.3rem', lineHeight: 1.4 }}>Create an online quiz or quarterly exam with automatic grading in the LMS.</div>
             </button>
+
+            {onSelectModule && (
+              <button className="type-card" style={{ background: 'linear-gradient(to right, rgba(255,255,255,0.7), rgba(16, 185, 129, 0.12))' }} onClick={onSelectModule}>
+                <div className="type-icon-wrapper" style={{ background: '#10b981', color: 'white', boxShadow: '0 4px 15px rgba(16,185,129,0.35)' }}><BookOpen size={20} /></div>
+                <div style={{ fontWeight: 800, color: '#059669', fontSize: '1.05rem' }}>Learning Module / Video Lecture</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.3rem', lineHeight: 1.4 }}>Share PDF handouts, Google Drive materials, or YouTube/video lecture links with students.</div>
+              </button>
+            )}
           </div>
         </div>
         <div style={{ background: 'rgba(248,250,252,0.5)', padding: '1rem', borderTop: '1px solid rgba(255,255,255,0.4)', textAlign: 'center' }}>
@@ -112,8 +124,20 @@ export const TypeSelectorModal = ({ isOpen, onClose, onSelectBasic, onSelectExam
   );
 };
 
-// ─── 4. CREATE ACTIVITY MODAL ────────────────────────────────────────────────
-export const CreateActivityModal = ({ isOpen, onClose, formData, setFormData, onSubmit, isSubmitting, selectedClass, modalCategories, isModalKto12, themeColor }) => {
+// ─── 4. CREATE / EDIT ACTIVITY MODAL ─────────────────────────────────────────
+export const CreateActivityModal = ({
+  isOpen,
+  onClose,
+  formData,
+  setFormData,
+  onSubmit,
+  isSubmitting,
+  selectedClass,
+  modalCategories,
+  isModalKto12,
+  themeColor,
+  isEditing = false
+}) => {
   if (!isOpen) return null;
   const quarterColors = { 1: '#1e40af', 2: '#065f46', 3: '#92400e', 4: '#5b21b6' };
   const quarterBgs = { 1: '#dbeafe', 2: '#d1fae5', 3: '#fef3c7', 4: '#ede9fe' };
@@ -126,7 +150,14 @@ export const CreateActivityModal = ({ isOpen, onClose, formData, setFormData, on
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', background: `linear-gradient(to right, rgba(255,255,255,0.7), ${themeColor}15)`, borderBottom: '1px solid rgba(255,255,255,0.6)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ background: themeColor, color: 'white', padding: '0.6rem', borderRadius: '0.75rem', boxShadow: `0 4px 10px ${themeColor}40` }}><Edit3 size={22} /></div>
-            <div><h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>New Basic Activity</h2><p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Encode a written work or standard task</p></div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>
+                {isEditing ? 'Edit Task / Activity' : 'New Written Work / Performance Task'}
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                {isEditing ? 'Update task details, instructions, or due date' : 'Create an assignment where students can submit paper photos, video links, or text'}
+              </p>
+            </div>
           </div>
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.9)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}><X size={18} /></button>
         </div>
@@ -172,7 +203,10 @@ export const CreateActivityModal = ({ isOpen, onClose, formData, setFormData, on
               <label className="glass-label">Grading Category</label>
               <select required className="glass-input-modern" style={{ paddingLeft: '1rem' }} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
                 <option value="" disabled>Select...</option>
-                {modalCategories.filter(cat => cat.key !== 'performance').map(cat => <option key={cat.key} value={cat.key}>{cat.label}</option>)}
+                {modalCategories.map(cat => <option key={cat.key} value={cat.key}>{cat.label}</option>)}
+                {!modalCategories.some(cat => cat.key === formData.category) && formData.category && (
+                  <option value={formData.category}>{formData.category.charAt(0).toUpperCase() + formData.category.slice(1)}</option>
+                )}
               </select>
             </div>
           </div>
@@ -188,7 +222,7 @@ export const CreateActivityModal = ({ isOpen, onClose, formData, setFormData, on
             <div className="glass-input-group">
               <label className="glass-label">Due Date <span style={{fontWeight: 400, textTransform: 'none', color: '#94a3b8'}}>(Optional)</span></label>
               <div className="input-with-icon"><Calendar size={18} className="input-icon" />
-                <input type="date" className="glass-input-modern" value={formData.due_date} onChange={e => setFormData({ ...formData, due_date: e.target.value })} />
+                <input type="date" className="glass-input-modern" value={formData.due_date || ''} onChange={e => setFormData({ ...formData, due_date: e.target.value })} />
               </div>
             </div>
           </div>
@@ -198,7 +232,7 @@ export const CreateActivityModal = ({ isOpen, onClose, formData, setFormData, on
             <label className="glass-label">Instructions <span style={{fontWeight: 400, textTransform: 'none', color: '#94a3b8'}}>(Optional)</span></label>
             <div className="input-with-icon align-top">
               <AlignLeft size={18} className="input-icon" style={{ top: '1rem' }} />
-              <textarea className="glass-input-modern" placeholder="Enter specific instructions for the students..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} style={{ minHeight: '90px', resize: 'vertical' }} />
+              <textarea className="glass-input-modern" placeholder="Enter specific instructions for the students..." value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} style={{ minHeight: '90px', resize: 'vertical' }} />
             </div>
           </div>
 
@@ -206,10 +240,135 @@ export const CreateActivityModal = ({ isOpen, onClose, formData, setFormData, on
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
             <button type="button" onClick={onClose} style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.9)', color: '#64748b', fontWeight: 700, padding: '0.75rem 1.5rem', borderRadius: '0.75rem', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.02)', transition: 'all 0.2s' }}>Cancel</button>
             <button type="submit" disabled={isSubmitting} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: themeColor, color: 'white', border: 'none', fontWeight: 700, padding: '0.75rem 2rem', borderRadius: '0.75rem', cursor: isSubmitting ? 'not-allowed' : 'pointer', boxShadow: `0 4px 15px ${themeColor}40`, transition: 'all 0.2s' }}>
-              {isSubmitting ? 'Saving...' : <><CheckCircle size={18}/> Save Activity</>}
+              {isSubmitting ? 'Saving...' : <><CheckCircle size={18}/> {isEditing ? 'Update Activity' : 'Save Activity'}</>}
             </button>
           </div>
 
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ─── 5. CREATE MODULE / VIDEO LECTURE MODAL ──────────────────────────────────
+export const CreateModuleModal = ({
+  isOpen,
+  onClose,
+  moduleForm,
+  setModuleForm,
+  onSubmit,
+  isSubmitting,
+  selectedClass,
+  themeColor
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="glass-overlay" onClick={onClose}>
+      <div className="glass-modal" style={{ maxWidth: '580px', padding: 0 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', background: 'linear-gradient(to right, rgba(255,255,255,0.75), rgba(16,185,129,0.15))', borderBottom: '1px solid rgba(255,255,255,0.6)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ background: '#10b981', color: 'white', padding: '0.6rem', borderRadius: '0.75rem', boxShadow: '0 4px 10px rgba(16,185,129,0.35)' }}>
+              <BookOpen size={22} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>Post Learning Module</h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Share a handout, PDF link, or video lecture with your class</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.9)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.35rem', background: 'rgba(248,250,252,0.4)' }}>
+          <div>
+            <label className="glass-label"><School size={12} style={{ display: 'inline', marginRight: '4px' }}/> Target Class</label>
+            <div style={{ padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.8)', borderRadius: '0.75rem', fontSize: '0.9rem', color: '#1e293b', fontWeight: 700, marginTop: '0.35rem' }}>
+              {selectedClass ? `${selectedClass.subject_description} - ${selectedClass.section_name || selectedClass.section}` : 'Selected Class'}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <button
+              type="button"
+              onClick={() => setModuleForm(prev => ({ ...prev, module_type: 'lecture' }))}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                padding: '0.85rem', borderRadius: '0.85rem', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem',
+                border: moduleForm.module_type === 'lecture' ? '2px solid #10b981' : '1px solid rgba(203,213,225,0.7)',
+                background: moduleForm.module_type === 'lecture' ? '#ecfdf5' : 'rgba(255,255,255,0.7)',
+                color: moduleForm.module_type === 'lecture' ? '#047857' : '#64748b'
+              }}
+            >
+              <FileText size={18} /> Written Handout / PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => setModuleForm(prev => ({ ...prev, module_type: 'video' }))}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                padding: '0.85rem', borderRadius: '0.85rem', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem',
+                border: moduleForm.module_type === 'video' ? '2px solid #ef4444' : '1px solid rgba(203,213,225,0.7)',
+                background: moduleForm.module_type === 'video' ? '#fef2f2' : 'rgba(255,255,255,0.7)',
+                color: moduleForm.module_type === 'video' ? '#b91c1c' : '#64748b'
+              }}
+            >
+              <Video size={18} /> Video Lecture
+            </button>
+          </div>
+
+          <div className="glass-input-group">
+            <label className="glass-label">Module / Lecture Title <span style={{ color: '#ef4444' }}>*</span></label>
+            <div className="input-with-icon">
+              <BookOpen size={18} className="input-icon" />
+              <input
+                required
+                type="text"
+                className="glass-input-modern"
+                placeholder="e.g. Module 1: Introduction to Philippine Literature"
+                value={moduleForm.title}
+                onChange={e => setModuleForm(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="glass-input-group">
+            <label className="glass-label">Resource / Video URL <span style={{ fontWeight: 400, textTransform: 'none', color: '#94a3b8' }}>(Google Drive, PDF Link, or YouTube URL)</span></label>
+            <div className="input-with-icon">
+              <LinkIcon size={18} className="input-icon" />
+              <input
+                type="url"
+                className="glass-input-modern"
+                placeholder="https://drive.google.com/... or https://youtube.com/..."
+                value={moduleForm.file_url}
+                onChange={e => setModuleForm(prev => ({ ...prev, file_url: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="glass-input-group">
+            <label className="glass-label">Lecture Notes / Description <span style={{ fontWeight: 400, textTransform: 'none', color: '#94a3b8' }}>(Optional)</span></label>
+            <div className="input-with-icon align-top">
+              <AlignLeft size={18} className="input-icon" style={{ top: '1rem' }} />
+              <textarea
+                className="glass-input-modern"
+                placeholder="Write a summary, key points, or reading instructions for your students..."
+                value={moduleForm.description}
+                onChange={e => setModuleForm(prev => ({ ...prev, description: e.target.value }))}
+                style={{ minHeight: '95px', resize: 'vertical' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+            <button type="button" onClick={onClose} style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.9)', color: '#64748b', fontWeight: 700, padding: '0.75rem 1.5rem', borderRadius: '0.75rem', cursor: 'pointer' }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={isSubmitting} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#10b981', color: 'white', border: 'none', fontWeight: 700, padding: '0.75rem 2rem', borderRadius: '0.75rem', cursor: isSubmitting ? 'not-allowed' : 'pointer', boxShadow: '0 4px 15px rgba(16,185,129,0.35)' }}>
+              {isSubmitting ? 'Posting...' : <><CheckCircle size={18} /> Post Module</>}
+            </button>
+          </div>
         </form>
       </div>
     </div>

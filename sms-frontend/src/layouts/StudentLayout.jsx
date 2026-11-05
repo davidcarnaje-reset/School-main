@@ -29,6 +29,13 @@ const StudentLayout = () => {
   const [previewUrl, setPreviewUrl] = useState(null);
 
   useEffect(() => {
+    try {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('studentSidebarCollapsed', JSON.stringify(isCollapsed));
   }, [isCollapsed]);
 

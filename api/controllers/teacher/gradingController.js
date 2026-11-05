@@ -1,5 +1,6 @@
 import pool from '../../config/db.js';
 import { logAuditTrail } from '../../utils/auditLogger.js';
+import { ensureExamSchema, getNextId } from './activityController.js';
 
 // GET ACTIVITY SCORES & SUBMISSIONS FOR CLASS
 export const getActivityScores = async (req, res) => {
@@ -7,10 +8,12 @@ export const getActivityScores = async (req, res) => {
   const classIdParam = req.query.class_id ? parseInt(req.query.class_id, 10) : null;
   const quarterParam = req.query.quarter ? parseInt(req.query.quarter, 10) : null;
 
+  await ensureExamSchema(pool);
+
   if (!activityId && classIdParam) {
     try {
       let sql = `
-        SELECT sas.activity_id, sas.student_id, sas.score, sas.status, a.category, a.max_score, a.title
+        SELECT sas.activity_id, sas.student_id, sas.score, sas.status, sas.violation_count, sas.auto_submit_reason, a.category, a.max_score, a.title
         FROM student_activity_scores sas
         JOIN activities a ON sas.activity_id = a.id
         WHERE a.class_id = ?
@@ -56,27 +59,58 @@ export const getActivityScores = async (req, res) => {
     const activity = actRows[0];
     const classId = activity.class_id;
 
-    // 2. Get Student details, scores, and submissions
-    const studentsQuery = `
-      SELECT 
-        s.student_id, 
-        CONCAT(s.last_name, ', ', s.first_name) AS name,
-        COALESCE(sas.score, '') AS score,
-        COALESCE(sas.status, 'Pending') AS status,
-        sub.submission_type,
-        sub.submission_content
-      FROM enrolled_classes ec
-      JOIN students s ON ec.student_id = s.student_id
-      LEFT JOIN student_activity_scores sas 
-        ON sas.student_id = s.student_id AND sas.activity_id = ?
-      LEFT JOIN student_submissions sub 
-        ON sub.student_id = s.student_id AND sub.activity_id = ?
-      WHERE ec.class_assignment_id = ? 
-        AND ec.status = 'Enrolled'
-      ORDER BY s.last_name ASC, s.first_name ASC
-    `;
-
-    const [scores] = await pool.query(studentsQuery, [activityId, activityId, classId]);
+    // 2. Get Student details, scores, submissions, and anti-cheat logs (matching both string student_id and numeric id)
+    let scores;
+    try {
+      const studentsQuery = `
+        SELECT DISTINCT
+          s.last_name, s.first_name, s.student_id, 
+          CONCAT(s.last_name, ', ', s.first_name) AS name,
+          COALESCE(sas.score, '') AS score,
+          COALESCE(sas.status, 'Pending') AS status,
+          COALESCE(sas.violation_count, 0) AS violation_count,
+          sas.auto_submit_reason,
+          sas.violation_log,
+          sub.submission_type,
+          sub.submission_content,
+          sub.submission_url,
+          sub.file_url,
+          sub.submitted_at,
+          sub.submission_url,
+          sub.file_url,
+          sub.submitted_at
+        FROM enrolled_classes ec
+        JOIN students s ON (ec.student_id = s.student_id OR ec.student_id = s.id)
+        LEFT JOIN student_activity_scores sas 
+          ON (sas.student_id = s.student_id OR sas.student_id = s.id) AND sas.activity_id = ?
+        LEFT JOIN student_submissions sub 
+          ON (sub.student_id = s.student_id OR sub.student_id = s.id) AND sub.activity_id = ?
+        WHERE ec.class_assignment_id = ? 
+          AND ec.status = 'Enrolled'
+        ORDER BY s.last_name ASC, s.first_name ASC
+      `;
+      [scores] = await pool.query(studentsQuery, [activityId, activityId, classId]);
+    } catch (_) {
+      const fallbackQuery = `
+        SELECT DISTINCT
+          s.last_name, s.first_name, s.student_id, 
+          CONCAT(s.last_name, ', ', s.first_name) AS name,
+          COALESCE(sas.score, '') AS score,
+          COALESCE(sas.status, 'Pending') AS status,
+          sub.submission_type,
+          sub.submission_content
+        FROM enrolled_classes ec
+        JOIN students s ON (ec.student_id = s.student_id OR ec.student_id = s.id)
+        LEFT JOIN student_activity_scores sas 
+          ON (sas.student_id = s.student_id OR sas.student_id = s.id) AND sas.activity_id = ?
+        LEFT JOIN student_submissions sub 
+          ON (sub.student_id = s.student_id OR sub.student_id = s.id) AND sub.activity_id = ?
+        WHERE ec.class_assignment_id = ? 
+          AND ec.status = 'Enrolled'
+        ORDER BY s.last_name ASC, s.first_name ASC
+      `;
+      [scores] = await pool.query(fallbackQuery, [activityId, activityId, classId]);
+    }
 
     return res.json({
       status: "success",
@@ -99,6 +133,29 @@ export const getExamQuestions = async (req, res) => {
   }
 
   try {
+    await ensureExamSchema(pool);
+
+    // Resolve both string and numeric student_id
+    const [stuRows] = await pool.query(
+      "SELECT id, student_id FROM students WHERE student_id = ? OR id = ? LIMIT 1",
+      [studentId, studentId]
+    );
+    const idCandidates = Array.from(new Set([
+      String(studentId),
+      ...(stuRows[0]?.id ? [String(stuRows[0].id)] : []),
+      ...(stuRows[0]?.student_id ? [String(stuRows[0].student_id)] : [])
+    ]));
+
+    // Fetch anti-cheat summary from student_activity_scores
+    let proctoringInfo = { violation_count: 0, auto_submit_reason: null, violation_log: null };
+    try {
+      const [sasRows] = await pool.query(
+        "SELECT violation_count, auto_submit_reason, violation_log FROM student_activity_scores WHERE activity_id = ? AND student_id IN (?) LIMIT 1",
+        [activityId, idCandidates]
+      );
+      if (sasRows.length > 0) proctoringInfo = sasRows[0];
+    } catch (_) {}
+
     // 1. Get all questions
     const [questions] = await pool.query(
       `SELECT id, question_text, question_type, points as max_points, order_num
@@ -117,9 +174,9 @@ export const getExamQuestions = async (req, res) => {
       const [answers] = await pool.query(
         `SELECT selected_choice_id, essay_answer, points_earned
          FROM student_exam_answers
-         WHERE activity_id = ? AND student_id = ? AND question_id = ?
+         WHERE activity_id = ? AND student_id IN (?) AND question_id = ?
          LIMIT 1`,
-        [activityId, studentId, questionId]
+        [activityId, idCandidates, questionId]
       );
 
       const answer = answers[0] || null;
@@ -127,29 +184,35 @@ export const getExamQuestions = async (req, res) => {
       let isCorrect = false;
       let pointsEarned = answer ? parseFloat(answer.points_earned || 0) : 0;
 
-      let choices = [];
+      const [cRows] = await pool.query(
+        "SELECT id, choice_text, is_correct FROM exam_choices WHERE question_id = ? ORDER BY id ASC",
+        [questionId]
+      );
+      const choices = cRows;
       let correctChoiceId = null;
+      const correctTexts = cRows.filter(c => Number(c.is_correct) === 1).map(c => c.choice_text);
 
-      // 3. Logic for choice items
       if (q.question_type === 'multiple_choice' || q.question_type === 'true_false') {
-        const [cRows] = await pool.query(
-          "SELECT id, choice_text, is_correct FROM exam_choices WHERE question_id = ? ORDER BY id ASC",
-          [questionId]
-        );
-        choices = cRows;
-
         choices.forEach(c => {
-          if (c.is_correct === 1) {
+          if (Number(c.is_correct) === 1) {
             correctChoiceId = c.id;
           }
           if (answer && String(c.id) === String(answer.selected_choice_id)) {
             studentAnswerText = c.choice_text;
-            if (c.is_correct === 1) {
+            if (Number(c.is_correct) === 1) {
               isCorrect = true;
               pointsEarned = parseFloat(q.max_points || 0);
             }
           }
         });
+      } else if (
+        q.question_type === 'checkboxes' ||
+        q.question_type === 'identification' ||
+        q.question_type === 'fill_blank' ||
+        q.question_type === 'enumeration'
+      ) {
+        studentAnswerText = answer ? answer.essay_answer : null;
+        isCorrect = pointsEarned >= parseFloat(q.max_points || 0) && parseFloat(q.max_points || 0) > 0;
       } else {
         studentAnswerText = answer ? answer.essay_answer : null;
       }
@@ -165,13 +228,15 @@ export const getExamQuestions = async (req, res) => {
         is_correct: isCorrect,
         choices: choices,
         correct_choice_id: correctChoiceId,
+        correct_answer_text: correctTexts.join(', '),
         essay_answer: answer ? answer.essay_answer : null
       });
     }
 
     return res.json({
       status: "success",
-      questions: result
+      questions: result,
+      proctoring: proctoringInfo
     });
 
   } catch (error) {
@@ -198,6 +263,18 @@ export const saveActivityScores = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Resolve both string and numeric student_id
+    const [stuRows] = await connection.query(
+      "SELECT id, student_id FROM students WHERE student_id = ? OR id = ? LIMIT 1",
+      [studentId, studentId]
+    );
+    const canonicalStudentId = stuRows[0]?.student_id || studentId;
+    const idCandidates = Array.from(new Set([
+      String(studentId),
+      String(canonicalStudentId),
+      ...(stuRows[0]?.id ? [String(stuRows[0].id)] : [])
+    ]));
+
     // 1. Get Activity Info
     const [activities] = await connection.query(
       "SELECT class_id, quarter, category, max_score FROM activities WHERE id = ?",
@@ -210,45 +287,48 @@ export const saveActivityScores = async (req, res) => {
 
     const activity = activities[0];
 
-    // 2. If Essay scores are provided, save them first
+    // 2. If Essay / manual question scores are provided, save them first
     if (essays.length > 0) {
       for (let essay of essays) {
         await connection.query(
-          "UPDATE student_exam_answers SET points_earned = ? WHERE student_id = ? AND activity_id = ? AND question_id = ?",
-          [parseFloat(essay.score), studentId, activityId, parseInt(essay.question_id, 10)]
+          "UPDATE student_exam_answers SET points_earned = ? WHERE student_id IN (?) AND activity_id = ? AND question_id = ?",
+          [parseFloat(essay.score), idCandidates, activityId, parseInt(essay.question_id, 10)]
         );
       }
     }
 
-    // Recalculate Exam total points earned (MC + Essays)
+    // Recalculate Exam total points earned
     const [totals] = await connection.query(
-      "SELECT SUM(points_earned) as total FROM student_exam_answers WHERE student_id = ? AND activity_id = ?",
-      [studentId, activityId]
+      "SELECT SUM(points_earned) as total FROM student_exam_answers WHERE student_id IN (?) AND activity_id = ?",
+      [idCandidates, activityId]
     );
 
     if (totals[0] && totals[0].total !== null) {
       score = parseFloat(totals[0].total);
     }
 
-    // 3. Save into student_activity_scores
+    // 3. Save into student_activity_scores with explicit ID if inserting
     const [existingScores] = await connection.query(
-      "SELECT id FROM student_activity_scores WHERE activity_id = ? AND student_id = ?",
-      [activityId, studentId]
+      "SELECT id FROM student_activity_scores WHERE activity_id = ? AND student_id IN (?)",
+      [activityId, idCandidates]
     );
 
     if (existingScores.length > 0) {
-      await connection.query(
-        "UPDATE student_activity_scores SET score = ?, status = 'Graded', date_graded = NOW() WHERE id = ?",
-        [score, existingScores[0].id]
-      );
+      for (const row of existingScores) {
+        await connection.query(
+          "UPDATE student_activity_scores SET score = ?, status = 'Graded', date_graded = NOW() WHERE id = ?",
+          [score, row.id]
+        );
+      }
     } else {
+      const nextSasId = await getNextId(connection, 'student_activity_scores');
       await connection.query(
-        "INSERT INTO student_activity_scores (activity_id, student_id, score, status, date_graded) VALUES (?, ?, ?, 'Graded', NOW())",
-        [activityId, studentId, score]
+        "INSERT INTO student_activity_scores (id, activity_id, student_id, score, status, date_graded) VALUES (?, ?, ?, ?, 'Graded', NOW())",
+        [nextSasId, activityId, String(canonicalStudentId), score]
       );
     }
 
-    // 4. Map and save into student_grades
+    // 4. Map and save into student_grades with explicit ID if inserting
     const category = (activity.category || '').toLowerCase();
     const maxScore = parseFloat(activity.max_score || 100);
     const quarter = activity.quarter;
@@ -266,15 +346,15 @@ export const saveActivityScores = async (req, res) => {
     } else if (collegeMap[category]) {
       gradeColumn = collegeMap[category];
     } else {
-      gradeColumn = 'written'; // fallback
+      gradeColumn = 'written';
     }
 
     if (gradeColumn) {
       const gradePercentage = maxScore > 0 ? Math.min(100, (score / maxScore) * 100) : 0;
 
       const [existingGrades] = await connection.query(
-        `SELECT id FROM student_grades WHERE class_id = ? AND student_id = ? AND ${quarter ? "quarter = ?" : "quarter IS NULL"}`,
-        quarter ? [classId, studentId, quarter] : [classId, studentId]
+        `SELECT id FROM student_grades WHERE class_id = ? AND student_id IN (?) AND ${quarter ? "quarter = ?" : "quarter IS NULL"}`,
+        quarter ? [classId, idCandidates, quarter] : [classId, idCandidates]
       );
 
       if (existingGrades.length > 0) {
@@ -283,8 +363,9 @@ export const saveActivityScores = async (req, res) => {
           [gradePercentage, existingGrades[0].id]
         );
       } else {
-        const sql = `INSERT INTO student_grades (class_id, student_id, quarter, ${gradeColumn}) VALUES (?, ?, ?, ?)`;
-        await connection.query(sql, [classId, studentId, quarter || null, gradePercentage]);
+        const nextGradeId = await getNextId(connection, 'student_grades');
+        const sql = `INSERT INTO student_grades (id, class_id, student_id, quarter, ${gradeColumn}) VALUES (?, ?, ?, ?, ?)`;
+        await connection.query(sql, [nextGradeId, classId, String(canonicalStudentId), quarter || null, gradePercentage]);
       }
     }
 
@@ -293,7 +374,7 @@ export const saveActivityScores = async (req, res) => {
       req.user?.id || 1,
       req.user?.role || 'Teacher',
       "SAVE_ACTIVITY_SCORE",
-      `Saved score for Student: ${studentId} on Activity ID: ${activityId} (Score: ${score})`,
+      `Saved score for Student: ${canonicalStudentId} on Activity ID: ${activityId} (Score: ${score})`,
       req
     );
 

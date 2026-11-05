@@ -212,13 +212,14 @@ export const createClassAnnouncement = async (req, res) => {
     const cleanTitle = (title && String(title).trim()) ? String(title).trim() : `${subjectLabel} Announcement`;
     const cleanMessage = String(message).trim();
 
-    // 1. Insert into class_announcements
-    const [insertRes] = await connection.query(
-      `INSERT INTO class_announcements (class_id, teacher_id, title, message, type, attachment_url)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [class_id, effectiveTeacherId, cleanTitle, cleanMessage, type, attachment_url]
+    // 1. Insert into class_announcements with explicit ID
+    const [maxAnnRows] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM class_announcements");
+    const announcementId = parseInt(maxAnnRows[0]?.nextId || 1, 10);
+    await connection.query(
+      `INSERT INTO class_announcements (id, class_id, teacher_id, title, message, type, attachment_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [announcementId, class_id, effectiveTeacherId, cleanTitle, cleanMessage, type, attachment_url]
     );
-    const announcementId = insertRes.insertId;
 
     // 2. Find all students enrolled in this class (from enrolled_classes OR enrollments for the section)
     const studentIdsSet = new Set();
@@ -251,24 +252,29 @@ export const createClassAnnouncement = async (req, res) => {
 
     // 3. Also create a notification record so students see it in Notification Bell & Student Dashboard Bulletin
     const notifTitle = cleanTitle.includes(subjectLabel) ? cleanTitle : `[${subjectLabel}] ${cleanTitle}`;
-    const [notifRes] = await connection.query(
-      `INSERT INTO notifications (sender_id, sender_role, type, title, message, attachment, created_at)
-       VALUES (?, 'teacher', ?, ?, ?, ?, NOW())`,
-      [effectiveTeacherId, type || 'Announcement', notifTitle, cleanMessage, attachment_url]
+    const [maxNotifRows] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM notifications");
+    const notificationId = parseInt(maxNotifRows[0]?.nextId || 1, 10);
+    await connection.query(
+      `INSERT INTO notifications (id, sender_id, sender_role, type, title, message, attachment, created_at)
+       VALUES (?, ?, 'teacher', ?, ?, ?, ?, NOW())`,
+      [notificationId, effectiveTeacherId, type || 'Announcement', notifTitle, cleanMessage, attachment_url]
     );
-    const notificationId = notifRes.insertId;
+
+    const [maxRecipRows] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM notification_recipients");
+    let nextRecipId = parseInt(maxRecipRows[0]?.nextId || 1, 10);
 
     if (studentIdsSet.size > 0) {
-      const recipientValues = Array.from(studentIdsSet).map(sid => [notificationId, sid, 'student', 0]);
-      await connection.query(
-        `INSERT INTO notification_recipients (notification_id, recipient_id, recipient_role, is_read) VALUES ?`,
-        [recipientValues]
-      );
+      for (const sid of studentIdsSet) {
+        await connection.query(
+          `INSERT INTO notification_recipients (id, notification_id, recipient_id, recipient_role, is_read) VALUES (?, ?, ?, 'student', 0)`,
+          [nextRecipId++, notificationId, sid]
+        );
+      }
     } else {
       // Fallback if section has no linked student rows yet so students still see it
       await connection.query(
-        `INSERT INTO notification_recipients (notification_id, recipient_id, recipient_role, is_read) VALUES (?, 'all', 'student', 0)`,
-        [notificationId]
+        `INSERT INTO notification_recipients (id, notification_id, recipient_id, recipient_role, is_read) VALUES (?, ?, 'all', 'student', 0)`,
+        [nextRecipId, notificationId]
       );
     }
 

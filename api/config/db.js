@@ -70,6 +70,7 @@ if (host.includes('tidbcloud.com') || process.env.DB_SSL_CA) {
 }
 
 const pool = mysql.createPool(poolConfig);
+pool.on('connection', (c) => { c.query("SET time_zone = '+08:00'"); });
 
 // Catch fatal database connection errors to prevent process crashes
 pool.on('error', (err) => {

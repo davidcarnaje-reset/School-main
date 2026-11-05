@@ -3,7 +3,17 @@ import express from 'express';
 import { getTeacherProfile } from '../controllers/teacher/profileController.js';
 import { getMySchedule } from '../controllers/teacher/scheduleController.js';
 import { getSections } from '../controllers/teacher/sectionsController.js';
-import { createActivity, createExam, getActivities, shareActivity } from '../controllers/teacher/activityController.js';
+import {
+  createActivity,
+  updateActivity,
+  deleteActivity,
+  createExam,
+  getActivities,
+  shareActivity,
+  getModules,
+  createModule,
+  deleteModule
+} from '../controllers/teacher/activityController.js';
 import { getActivityScores, getExamQuestions, saveActivityScores } from '../controllers/teacher/gradingController.js';
 import { 
   getClassGrades, 
@@ -41,6 +51,14 @@ router.post('/create-activity', createActivity);
 router.post('/create_activity', createActivity);
 router.post('/create_activity.php', createActivity);
 
+router.post('/update-activity', updateActivity);
+router.post('/update_activity', updateActivity);
+router.post('/update_activity.php', updateActivity);
+
+router.post('/delete-activity', deleteActivity);
+router.post('/delete_activity', deleteActivity);
+router.post('/delete_activity.php', deleteActivity);
+
 router.post('/create-exam', createExam);
 router.post('/create_exam', createExam);
 router.post('/create_exam.php', createExam);
@@ -52,6 +70,19 @@ router.get('/get_activities.php', getActivities);
 router.post('/share-activity', shareActivity);
 router.post('/share_activity', shareActivity);
 router.post('/share_activity.php', shareActivity);
+
+// --- Learning Modules & Video Lectures ---
+router.get('/modules', getModules);
+router.get('/get_modules', getModules);
+router.get('/get_modules.php', getModules);
+
+router.post('/create-module', createModule);
+router.post('/create_module', createModule);
+router.post('/create_module.php', createModule);
+
+router.post('/delete-module', deleteModule);
+router.post('/delete_module', deleteModule);
+router.post('/delete_module.php', deleteModule);
 
 // --- Grading & Exam Submissions ---
 router.get('/activity-scores', getActivityScores);

@@ -66,11 +66,19 @@ const getDashboard = async (req, res) => {
     });
 
     // 3. KUNIN ANG MGA PENDING ACTIVITIES/TASKS
+    const idCandidates = Array.from(new Set([
+      String(rawStudentId),
+      String(studentId)
+    ]));
+
     const taskQuery = `
       SELECT 
+          a.id,
           a.class_id,
           a.title,
+          a.category,
           s.subject_code as \`desc\`,
+          s.subject_description as subject_name,
           COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), 'Teacher') as teacher,
           a.due_date as duration
       FROM activities a
@@ -78,14 +86,13 @@ const getDashboard = async (req, res) => {
       JOIN enrolled_classes ec ON c.id = ec.class_assignment_id
       JOIN subjects s ON c.subject_id = s.id
       LEFT JOIN users u ON a.teacher_id = u.id
-      LEFT JOIN student_activity_scores sas ON a.id = sas.activity_id AND sas.student_id = ec.student_id
-      WHERE ec.student_id = ? AND ec.status = 'Enrolled'
+      LEFT JOIN student_activity_scores sas ON a.id = sas.activity_id AND sas.student_id IN (?)
+      WHERE ec.student_id IN (?) AND ec.status = 'Enrolled'
         AND (sas.status IS NULL OR sas.status = 'Pending')
-        AND a.due_date > NOW()
-      ORDER BY a.due_date ASC 
-      LIMIT 4
+      ORDER BY (a.due_date IS NULL) ASC, a.due_date ASC, a.created_at DESC
+      LIMIT 6
     `;
-    const [tasksResult] = await pool.query(taskQuery, [studentId]);
+    const [tasksResult] = await pool.query(taskQuery, [idCandidates, idCandidates]);
 
     const nextLessons = tasksResult.map(row => {
       let durationStr = "No Due Date";
@@ -106,9 +113,12 @@ const getDashboard = async (req, res) => {
         }
       }
       return {
+        id: row.id,
         class_id: row.class_id,
         title: row.title,
+        category: row.category,
         desc: row.desc,
+        subject: row.subject_name,
         teacher: row.teacher,
         duration: durationStr
       };

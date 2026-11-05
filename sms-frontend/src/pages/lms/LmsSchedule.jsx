@@ -11,6 +11,7 @@ const LmsSchedule = () => {
   const { user, API_BASE_URL } = useAuth();
   
   const [schedule, setSchedule] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'fun'
 
@@ -19,12 +20,13 @@ const LmsSchedule = () => {
     const fetchSchedule = async () => {
       setLoading(true);
       try {
-        const studentId = user?.id || user?.username;
+        const studentId = user?.student_id || user?.id || user?.username;
         if (!studentId) return;
 
         const res = await axios.get(`${API_BASE_URL}/lms/get_student_schedule.php?student_id=${studentId}&_t=${Date.now()}`);
         if (res.data.status === 'success') {
           setSchedule(res.data.schedule || []);
+          setTasks(res.data.tasks || []);
         }
       } catch (err) {
         console.error("Schedule Fetch Error:", err);
@@ -82,9 +84,9 @@ const LmsSchedule = () => {
 
       {/* Render Selected View */}
       {viewMode === 'fun' && isElementaryKid ? (
-        <KidsSchedule scheduleData={schedule} />
+        <KidsSchedule scheduleData={schedule} tasksData={tasks} />
       ) : (
-        <StandardSchedule scheduleData={schedule} />
+        <StandardSchedule scheduleData={schedule} tasksData={tasks} />
       )}
     </div>
   );

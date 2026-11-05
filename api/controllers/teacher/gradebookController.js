@@ -375,11 +375,13 @@ export const saveGrades = async (req, res) => {
           [written, performance, exam, initialGrade, finalGrade, descriptiveGrade, descriptor, remarks, detailsJson, exists[0].id]
         );
       } else {
+        const [maxSg] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM student_grades");
+        const nextSgId = parseInt(maxSg[0]?.nextId || 1, 10);
         await connection.query(
           `INSERT INTO student_grades 
-           (class_id, student_id, quarter, written, performance, exam, initial_grade, final_grade, descriptive_grade, descriptor, remarks, details_json) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [classId, studentId, selectedQuarter, written, performance, exam, initialGrade, finalGrade, descriptiveGrade, descriptor, remarks, detailsJson]
+           (id, class_id, student_id, quarter, written, performance, exam, initial_grade, final_grade, descriptive_grade, descriptor, remarks, details_json) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [nextSgId, classId, studentId, selectedQuarter, written, performance, exam, initialGrade, finalGrade, descriptiveGrade, descriptor, remarks, detailsJson]
         );
       }
     }
@@ -419,9 +421,11 @@ export const submitFinalGrades = async (req, res) => {
     if (lockExists.length > 0) {
       await connection.query("UPDATE class_grade_locks SET is_locked = 1 WHERE id = ?", [lockExists[0].id]);
     } else {
+      const [maxLock] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM class_grade_locks");
+      const nextLockId = parseInt(maxLock[0]?.nextId || 1, 10);
       await connection.query(
-        "INSERT INTO class_grade_locks (class_id, quarter, is_locked) VALUES (?, ?, 1)",
-        [classId, quarter]
+        "INSERT INTO class_grade_locks (id, class_id, quarter, is_locked) VALUES (?, ?, ?, 1)",
+        [nextLockId, classId, quarter]
       );
     }
 
@@ -453,11 +457,13 @@ export const submitFinalGrades = async (req, res) => {
           [written, performance, exam, initialGrade, finalGrade, descriptiveGrade, descriptor, remarks, detailsJson, exists[0].id]
         );
       } else {
+        const [maxSg] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM student_grades");
+        const nextSgId = parseInt(maxSg[0]?.nextId || 1, 10);
         await connection.query(
           `INSERT INTO student_grades 
-           (class_id, student_id, quarter, written, performance, exam, initial_grade, final_grade, descriptive_grade, descriptor, remarks, details_json) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [classId, studentId, quarter, written, performance, exam, initialGrade, finalGrade, descriptiveGrade, descriptor, remarks, detailsJson]
+           (id, class_id, student_id, quarter, written, performance, exam, initial_grade, final_grade, descriptive_grade, descriptor, remarks, details_json) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [nextSgId, classId, studentId, quarter, written, performance, exam, initialGrade, finalGrade, descriptiveGrade, descriptor, remarks, detailsJson]
         );
       }
 
@@ -525,7 +531,7 @@ export const syncGrades = async (req, res) => {
          FROM activities a
          LEFT JOIN student_activity_scores sas ON a.id = sas.activity_id AND sas.student_id = ?
          WHERE a.class_id = ? 
-           AND a.category IN ('written', 'quiz', 'assignment', 'task')
+           AND a.category IN ('written', 'quiz', 'assignment', 'task', 'seatwork')
            AND a.quarter = ?`,
         [studentId, classId, selectedQuarter]
       );
@@ -541,7 +547,7 @@ export const syncGrades = async (req, res) => {
          FROM activities a
          LEFT JOIN student_activity_scores sas ON a.id = sas.activity_id AND sas.student_id = ?
          WHERE a.class_id = ? 
-           AND a.category = 'performance'
+           AND a.category IN ('performance', 'activity', 'pt', 'project')
            AND a.quarter = ?`,
         [studentId, classId, selectedQuarter]
       );
@@ -557,7 +563,7 @@ export const syncGrades = async (req, res) => {
          FROM activities a
          LEFT JOIN student_activity_scores sas ON a.id = sas.activity_id AND sas.student_id = ?
          WHERE a.class_id = ? 
-           AND a.category IN ('exam', 'quarterly_exam', 'prelim', 'midterm', 'finals')
+           AND a.category IN ('exam', 'quarterly_exam', 'quarterly', 'periodical', 'prelim', 'midterm', 'finals')
            AND a.quarter = ?`,
         [studentId, classId, selectedQuarter]
       );
@@ -584,11 +590,13 @@ export const syncGrades = async (req, res) => {
           ]
         );
       } else {
+        const [maxSg] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM student_grades");
+        const nextSgId = parseInt(maxSg[0]?.nextId || 1, 10);
         await connection.query(
           `INSERT INTO student_grades 
-           (class_id, student_id, quarter, written, performance, exam, final_grade, remarks) 
-           VALUES (?, ?, ?, ?, ?, ?, 0, 'N/A')`,
-          [classId, studentId, selectedQuarter, writtenGrade || 0, perfGrade || 0, examGrade || 0]
+           (id, class_id, student_id, quarter, written, performance, exam, final_grade, remarks) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'N/A')`,
+          [nextSgId, classId, studentId, selectedQuarter, writtenGrade || 0, perfGrade || 0, examGrade || 0]
         );
       }
     }
@@ -654,22 +662,24 @@ export const requestGradeUnlock = async (req, res) => {
     const title = "Grade Unlock Request";
     const message = `A teacher is requesting permission to edit the locked grades for ${subjectName} - ${sectionName}${quarterText}. Please review and unlock via Registrar Student Academic Records.`;
 
-    const [notifResult] = await connection.query(
-      "INSERT INTO notifications (sender_id, sender_role, type, title, message, created_at) VALUES (?, 'teacher', 'Task Reminder', ?, ?, NOW())",
-      [teacherId, title, message]
+    const [maxNotif] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM notifications");
+    const notifId = parseInt(maxNotif[0]?.nextId || 1, 10);
+    await connection.query(
+      "INSERT INTO notifications (id, sender_id, sender_role, type, title, message, created_at) VALUES (?, ?, 'teacher', 'Task Reminder', ?, ?, NOW())",
+      [notifId, teacherId, title, message]
     );
-
-    const notifId = notifResult.insertId;
 
     const [registrars] = await connection.query(
       "SELECT id FROM users WHERE role = 'registrar' AND status = 'Active'"
     );
 
     if (registrars.length > 0) {
+      const [maxRecip] = await connection.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM notification_recipients");
+      let nextRecipId = parseInt(maxRecip[0]?.nextId || 1, 10);
       for (let reg of registrars) {
         await connection.query(
-          "INSERT INTO notification_recipients (notification_id, recipient_id, recipient_role, is_read) VALUES (?, ?, 'registrar', 0)",
-          [notifId, reg.id]
+          "INSERT INTO notification_recipients (id, notification_id, recipient_id, recipient_role, is_read) VALUES (?, ?, ?, 'registrar', 0)",
+          [nextRecipId++, notifId, reg.id]
         );
       }
     }

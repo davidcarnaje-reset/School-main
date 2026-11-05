@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Mail, ArrowLeft, Loader2, CheckCircle2, ShieldAlert } from 'lucide-react';
@@ -10,9 +10,16 @@ const ForgotPassword = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isSent, setIsSent] = useState(false);
-  
+
   const navigate = useNavigate();
   const { branding, API_BASE_URL } = useAuth();
+
+  useEffect(() => {
+    try {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+    } catch (e) {}
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,7 +29,7 @@ const ForgotPassword = () => {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/auth/forgot_password.php`, { email });
-      
+
       if (response.data.success) {
         setIsSent(true);
         setMessage(response.data.message);
@@ -37,9 +44,8 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4 font-sans">
-      
-      <button 
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-900 p-4 font-sans">
+      <button
         onClick={() => navigate('/login')}
         className="mb-8 flex items-center space-x-2 text-slate-400 hover:text-slate-600 font-bold text-[10px] uppercase tracking-widest transition-all"
       >
@@ -49,8 +55,10 @@ const ForgotPassword = () => {
 
       <div className="max-w-md w-full">
         <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center text-white mx-auto mb-4 shadow-xl transition-all"
-               style={{ backgroundColor: branding.theme_color || '#2563eb' }}>
+          <div
+            className="w-16 h-16 rounded-[2rem] flex items-center justify-center text-white mx-auto mb-4 shadow-xl transition-all"
+            style={{ backgroundColor: branding.theme_color || '#2563eb' }}
+          >
             <ShieldAlert size={32} />
           </div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">Forgot Password?</h2>
@@ -65,7 +73,7 @@ const ForgotPassword = () => {
               </div>
               <h3 className="text-lg font-bold text-slate-800 mb-2">Check your Inbox</h3>
               <p className="text-slate-500 text-sm mb-6">{message}</p>
-              <button 
+              <button
                 onClick={() => navigate('/login')}
                 className="w-full py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all text-sm"
               >
@@ -77,14 +85,16 @@ const ForgotPassword = () => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Email Address</label>
                 <div className="relative group">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-300 group-focus-within:text-blue-500 transition-colors">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
                     <Mail size={18} />
                   </span>
-                  <input 
-                    type="email" required
+                  <input
+                    type="email"
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-sm font-bold"
+                    style={{ color: '#0f172a', caretColor: '#0f172a' }}
+                    className="block w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
                     placeholder="e.g. juan@school.edu"
                   />
                 </div>
@@ -96,8 +106,9 @@ const ForgotPassword = () => {
                 </div>
               )}
 
-              <button 
-                type="submit" disabled={loading}
+              <button
+                type="submit"
+                disabled={loading}
                 className="shine-effect w-full text-white font-black py-4 rounded-2xl transition-all shadow-xl active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-2 text-sm"
                 style={{ backgroundColor: branding.theme_color || '#2563eb' }}
               >

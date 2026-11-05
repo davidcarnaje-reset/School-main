@@ -1,10 +1,12 @@
+import RichContent from './RichContent';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Save, CheckCircle, Eye, BookOpen, Users, AlignLeft,
   WifiOff, RefreshCw, Edit3, FileText, Download,
-  Check, X as XIcon, ArrowLeft
+  Check, X as XIcon, ArrowLeft, ShieldAlert, ShieldCheck, AlertTriangle, ExternalLink, Video, Image
 } from 'lucide-react';
+
 // ─── 0. SKELETON LOADER ──────────────────────────────────────────────────────
 export const GradingSkeleton = ({ themeColor }) => (
   <div className="tag-root">
@@ -76,6 +78,7 @@ export const GradingSkeleton = ({ themeColor }) => (
 // ─── 1. GRADE EXAM SUBMISSION MODAL ──────────────────────────────────────────
 export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quarter, studentName, onClose, onRefresh, themeColor, API_BASE_URL }) => {
   const [examData, setExamData] = useState([]);
+  const [proctoring, setProctoring] = useState({ violation_count: 0, auto_submit_reason: null, violation_log: null });
   const [isLoadingExam, setIsLoadingExam] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [essayScores, setEssayScores] = useState([]);
@@ -93,6 +96,9 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
         if (res.data.status === 'success') {
           const questions = res.data.questions || [];
           setExamData(questions);
+          if (res.data.proctoring) {
+            setProctoring(res.data.proctoring);
+          }
           const essays = questions.filter(q => q.question_type === 'essay');
           setEssayScores(essays.map(q => ({
             question_id: q.id,
@@ -108,16 +114,25 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
     if (activityId && studentId) loadExamData();
   }, [activityId, studentId, API_BASE_URL]);
 
-  const mcQuestions = examData.filter(q => q.question_type === 'multiple_choice' || q.question_type === 'true_false');
+  const objectiveQuestions = examData.filter(q => q.question_type !== 'essay');
   const essayQuestions = examData.filter(q => q.question_type === 'essay');
 
-  const totalMcScore = mcQuestions.reduce((sum, q) => sum + (parseFloat(q.points_earned) || 0), 0);
-  const maxMcScore = mcQuestions.reduce((sum, q) => sum + (parseFloat(q.max_points) || 0), 0);
+  const totalMcScore = objectiveQuestions.reduce((sum, q) => sum + (parseFloat(q.points_earned) || 0), 0);
+  const maxMcScore = objectiveQuestions.reduce((sum, q) => sum + (parseFloat(q.max_points) || 0), 0);
   const currentEssayTotal = essayScores.reduce((sum, item) => sum + (parseFloat(item.score) || 0), 0);
   const maxEssayScore = essayQuestions.reduce((sum, q) => sum + (parseFloat(q.max_points) || 0), 0);
   
   const overallTotal = totalMcScore + currentEssayTotal;
   const overallMax = maxMcScore + maxEssayScore;
+
+  let parsedViolationLogs = [];
+  if (proctoring?.violation_log) {
+    try {
+      parsedViolationLogs = typeof proctoring.violation_log === 'string'
+        ? JSON.parse(proctoring.violation_log)
+        : proctoring.violation_log;
+    } catch (e) {}
+  }
 
   const handleScoreChange = (questionId, value) => {
     setEssayScores(prev => prev.map(item => {
@@ -176,10 +191,23 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
 
   return (
     <div className="glass-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
-      <div style={{ width: '100%', maxWidth: '900px', background: '#f8fafc', borderRadius: '1.25rem', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '95vh', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+      <div style={{ width: '100%', maxWidth: '920px', background: '#f8fafc', borderRadius: '1.25rem', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '95vh', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
         <div style={{ padding: '1.5rem 2rem', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div>
-            <span style={{ display: 'inline-block', padding: '0.25rem 0.75rem', background: '#e0e7ff', color: '#1e40af', borderRadius: '2rem', fontSize: '0.7rem', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '0.5px' }}>EXAM REVIEWER</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+              <span style={{ display: 'inline-block', padding: '0.25rem 0.75rem', background: '#e0e7ff', color: '#1e40af', borderRadius: '2rem', fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.5px' }}>
+                EXAM REVIEWER
+              </span>
+              {Number(proctoring?.violation_count || 0) > 0 ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.75rem', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '2rem', fontSize: '0.7rem', fontWeight: 800 }}>
+                  <ShieldAlert size={13} /> {proctoring.violation_count} Anti-Cheat Violation(s)
+                </span>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.75rem', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: '2rem', fontSize: '0.7rem', fontWeight: 800 }}>
+                  <ShieldCheck size={13} /> Clean Attempt (0 Violations)
+                </span>
+              )}
+            </div>
             <h2 style={{ margin: 0, color: '#0f172a', fontWeight: 800, fontSize: '1.4rem' }}>{studentName}'s Paper</h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
@@ -191,36 +219,72 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
               </div>
             </div>
             <div style={{ width: '1px', height: '40px', background: '#e2e8f0' }}></div>
-            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', padding: '0.6rem', borderRadius: '50%', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }} onMouseOver={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444'; }} onMouseOut={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}>
+            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', padding: '0.6rem', borderRadius: '50%', cursor: 'pointer', color: '#64748b' }}>
               <XIcon size={20} />
             </button>
           </div>
         </div>
+
         <div style={{ padding: '2rem', overflowY: 'auto', flex: 1 }}>
-          {mcQuestions.length > 0 && (
+          {/* ANTI-CHEAT PROCTORING LOG BANNER IF FLAGGED */}
+          {(Number(proctoring?.violation_count || 0) > 0 || proctoring?.auto_submit_reason) && (
+            <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '1rem', padding: '1rem 1.25rem', marginBottom: '1.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#991b1b', fontWeight: 800, fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                <AlertTriangle size={18} />
+                <span>Anti-Cheat Proctoring Report</span>
+                {proctoring?.auto_submit_reason && (
+                  <span style={{ marginLeft: 'auto', background: '#fee2e2', padding: '0.2rem 0.6rem', borderRadius: '0.5rem', fontSize: '0.72rem' }}>
+                    Auto-Submitted: {proctoring.auto_submit_reason}
+                  </span>
+                )}
+              </div>
+              {parsedViolationLogs.length > 0 && (
+                <ul style={{ margin: '0.5rem 0 0 1.2rem', padding: 0, fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 600 }}>
+                  {parsedViolationLogs.map((logItem, idx) => (
+                    <li key={idx} style={{ marginBottom: '0.2rem' }}>{logItem}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {objectiveQuestions.length > 0 && (
             <div style={{ marginBottom: '3rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.75rem' }}>
                 <BookOpen size={20} color="#64748b" />
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#334155' }}>Part I: Objective Type <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600, marginLeft: '0.5rem' }}>(Auto-Graded)</span></h3>
-                <span style={{ marginLeft: 'auto', background: '#e2e8f0', padding: '0.3rem 0.8rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>{totalMcScore} / {maxMcScore} Pts</span>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#334155' }}>
+                  Part I: Objective Items <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600, marginLeft: '0.5rem' }}>(Auto-Graded)</span>
+                </h3>
+                <span style={{ marginLeft: 'auto', background: '#e2e8f0', padding: '0.3rem 0.8rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
+                  {totalMcScore} / {maxMcScore} Pts
+                </span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1rem' }}>
-                {mcQuestions.map((q, idx) => {
-                  const correctChoice = q.choices?.find(c => c.is_correct == 1);
-                  const correctAnswerText = correctChoice ? correctChoice.choice_text : 'N/A';
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1rem' }}>
+                {objectiveQuestions.map((q, idx) => {
+                  const correctAnswerText = q.correct_answer_text || q.choices?.filter(c => c.is_correct == 1).map(c => c.choice_text).join(', ') || 'N/A';
                   return (
                     <div key={q.id} style={{ background: 'white', border: `1px solid ${q.is_correct ? '#a7f3d0' : '#fecaca'}`, borderRadius: '0.75rem', padding: '1.25rem', position: 'relative', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: q.is_correct ? '#10b981' : '#ef4444' }}></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                        <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.9rem' }}>Q{idx + 1}.</span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{q.max_points} pts</span>
+                        <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.85rem' }}>
+                          Q{idx + 1}. <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: '#94a3b8' }}>({q.question_type.replace('_', ' ')})</span>
+                        </span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: q.is_correct ? '#059669' : '#dc2626' }}>
+                          {q.points_earned} / {q.max_points} pts
+                        </span>
                       </div>
-                      <p style={{ margin: '0 0 1rem 0', fontWeight: 600, color: '#1e293b', fontSize: '0.95rem', lineHeight: 1.5 }}>{q.question_text}</p>
+                      <RichContent as="div" html={q.question_text} style={{ margin: '0 0 1rem 0', fontWeight: 600, color: '#1e293b', fontSize: '0.95rem', lineHeight: 1.5 }} />
                       <div style={{ background: q.is_correct ? '#f0fdf4' : '#fef2f2', padding: '0.75rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                         {q.is_correct ? <Check size={16} color="#10b981" style={{ marginTop: '0.1rem' }} /> : <XIcon size={16} color="#ef4444" style={{ marginTop: '0.1rem' }} />}
                         <div>
-                          <p style={{ margin: 0, color: q.is_correct ? '#065f46' : '#991b1b', fontSize: '0.85rem', fontWeight: 700 }}>Answer: {q.student_answer || <span style={{ fontStyle: 'italic', opacity: 0.7 }}>No Answer</span>}</p>
-                          {!q.is_correct && <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.8rem', fontWeight: 500 }}>Correct: <span style={{ color: '#10b981', fontWeight: 700 }}>{correctAnswerText}</span></p>}
+                          <p style={{ margin: 0, color: q.is_correct ? '#065f46' : '#991b1b', fontSize: '0.85rem', fontWeight: 700 }}>
+                            Student Answer: {q.student_answer || <span style={{ fontStyle: 'italic', opacity: 0.7 }}>No Answer</span>}
+                          </p>
+                          {!q.is_correct && (
+                            <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>
+                              Answer Key: <span style={{ color: '#059669', fontWeight: 800 }}>{correctAnswerText}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -229,12 +293,17 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
               </div>
             </div>
           )}
+
           {essayQuestions.length > 0 ? (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.75rem' }}>
                 <Edit3 size={20} color={themeColor} />
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Part II: Essay Responses <span style={{ fontSize: '0.85rem', color: themeColor, fontWeight: 600, marginLeft: '0.5rem' }}>(Needs Grading)</span></h3>
-                <span style={{ marginLeft: 'auto', background: `${themeColor}20`, padding: '0.3rem 0.8rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 700, color: themeColor }}>{currentEssayTotal} / {maxEssayScore} Pts</span>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                  Part II: Essay Responses <span style={{ fontSize: '0.85rem', color: themeColor, fontWeight: 600, marginLeft: '0.5rem' }}>(Needs Grading)</span>
+                </h3>
+                <span style={{ marginLeft: 'auto', background: `${themeColor}20`, padding: '0.3rem 0.8rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 700, color: themeColor }}>
+                  {currentEssayTotal} / {maxEssayScore} Pts
+                </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 {essayQuestions.map((essay, index) => {
@@ -245,7 +314,7 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
                       <div style={{ padding: '1.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
                           <div style={{ background: themeColor, color: 'white', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem', flexShrink: 0 }}>{index + 1}</div>
-                          <div style={{ flex: 1 }}><p style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '1.05rem', lineHeight: '1.5' }}>{essay.question_text}</p></div>
+                          <div style={{ flex: 1 }}><RichContent html={essay.question_text} style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '1.05rem', lineHeight: '1.5' }} /></div>
                         </div>
                       </div>
                       <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -266,19 +335,24 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
                 })}
               </div>
             </div>
-          ) : mcQuestions.length > 0 ? (
-            <div style={{ textAlign: 'center', padding: '4rem 2rem', background: 'white', borderRadius: '1rem', border: '1px dashed #cbd5e1' }}>
-              <div style={{ display: 'inline-flex', padding: '1.5rem', background: '#d1fae5', borderRadius: '50%', marginBottom: '1.5rem' }}><CheckCircle size={48} color="#059669" /></div>
-              <h3 style={{ color: '#0f172a', fontWeight: 800, fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>Exam is Fully Graded!</h3>
-              <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: '450px', margin: '0 auto', lineHeight: 1.5 }}>This exam only contains objective questions and has been automatically scored by the system.</p>
+          ) : objectiveQuestions.length > 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'white', borderRadius: '1rem', border: '1px dashed #cbd5e1' }}>
+              <div style={{ display: 'inline-flex', padding: '1.25rem', background: '#d1fae5', borderRadius: '50%', marginBottom: '1rem' }}><CheckCircle size={42} color="#059669" /></div>
+              <h3 style={{ color: '#0f172a', fontWeight: 800, fontSize: '1.35rem', margin: '0 0 0.4rem 0' }}>Exam is Fully Auto-Graded!</h3>
+              <p style={{ color: '#64748b', fontSize: '0.9rem', maxWidth: '450px', margin: '0 auto', lineHeight: 1.5 }}>
+                All objective items (Multiple Choice, Checkboxes, True/False, Identification, Fill in the Blank, Enumeration) have been scored automatically.
+              </p>
             </div>
           ) : null}
         </div>
+
         <div style={{ padding: '1.5rem 2rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Please double-check essay scores before saving.</p>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Click Save Exam & Sync to push scores to the Class Gradebook.</p>
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', color: '#475569', padding: '0.8rem 1.5rem', borderRadius: '0.75rem', fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'} onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}>Cancel</button>
-            <button onClick={handleSaveGrades} disabled={isSaving} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: themeColor, color: 'white', border: 'none', padding: '0.8rem 2rem', borderRadius: '0.75rem', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, boxShadow: `0 4px 15px ${themeColor}40`, transition: 'transform 0.1s' }} onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}><Save size={18} /> {isSaving ? 'Processing...' : 'Save Exam & Sync'}</button>
+            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', color: '#475569', padding: '0.8rem 1.5rem', borderRadius: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={handleSaveGrades} disabled={isSaving} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: themeColor, color: 'white', border: 'none', padding: '0.8rem 2rem', borderRadius: '0.75rem', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, boxShadow: `0 4px 15px ${themeColor}40` }}>
+              <Save size={18} /> {isSaving ? 'Processing...' : 'Save Exam & Sync'}
+            </button>
           </div>
         </div>
       </div>
@@ -327,18 +401,110 @@ export const ViewSubmissionModal = ({ studentId, activityId, classId, quarter, s
           </div>
           <button onClick={onClose} style={{ border: '1px solid #e2e8f0', background: 'white', padding: '0.5rem', borderRadius: '50%', cursor: 'pointer', color: '#64748b' }}><XIcon size={20} /></button>
         </div>
-        <div style={{ padding: '2rem', background: '#ffffff' }}>
-          {submission?.type === 'file' ? (
-            <div style={{ textAlign: 'center', padding: '2rem', border: '1px solid #e2e8f0', borderRadius: '0.75rem', background: 'white' }}>
-              <FileText size={48} color={themeColor} style={{ margin: '0 auto 1rem auto', opacity: 0.8 }} />
-              <p style={{ fontWeight: 800, color: '#1e293b', fontSize: '1.1rem', margin: '0 0 0.5rem 0' }}>File Attached</p>
-              <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{submission.content}</p>
-              <a href={`${API_BASE_URL}/uploads/submissions/${submission.content}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: themeColor, color: 'white', padding: '0.75rem 1.5rem', borderRadius: '0.75rem', textDecoration: 'none', fontWeight: 700 }}><Download size={18} /> Download / View File</a>
-            </div>
-          ) : (
+        <div style={{ padding: '2rem', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '68vh', overflowY: 'auto' }}>
+          
+          {/* 1. UPLOADED PHOTO OF PAPER WORK / FILE */}
+          {(submission?.file_url || (submission?.type === 'file' && submission?.content)) && (() => {
+            const fileName = submission.file_url || submission.content;
+            const fileUrl = `${API_BASE_URL}/api/uploads/submissions/${fileName}`;
+            const isImage = /\.(jpe?g|png|webp|gif)$/i.test(fileName);
+
+            return (
+              <div style={{ padding: '1.25rem', border: '1.5px solid #cbd5e1', borderRadius: '0.85rem', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: 800, fontSize: '0.9rem' }}>
+                    {isImage ? <Image size={18} color={themeColor} /> : <FileText size={18} color={themeColor} />}
+                    <span>{isImage ? 'Uploaded Paper Work / Photo' : 'Uploaded File / Document'}</span>
+                  </div>
+                  <a 
+                    href={fileUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    style={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem', 
+                      background: 'white', border: '1px solid #cbd5e1', color: '#334155', 
+                      padding: '0.45rem 0.9rem', borderRadius: '0.5rem', textDecoration: 'none', 
+                      fontWeight: 700, fontSize: '0.78rem' 
+                    }}
+                  >
+                    <ExternalLink size={13} /> Open Full File ↗
+                  </a>
+                </div>
+
+                {isImage ? (
+                  <div style={{ textAlign: 'center', background: '#ffffff', padding: '0.75rem', borderRadius: '0.65rem', border: '1px solid #e2e8f0' }}>
+                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" title="Click to open full size">
+                      <img 
+                        src={fileUrl} 
+                        alt="Student Paper Work" 
+                        style={{ maxWidth: '100%', maxHeight: '380px', borderRadius: '0.5rem', objectFit: 'contain', margin: '0 auto', cursor: 'zoom-in' }} 
+                      />
+                    </a>
+                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Click photo to open high resolution in new tab</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'white', padding: '0.85rem', borderRadius: '0.65rem', border: '1px solid #e2e8f0' }}>
+                    <FileText size={28} color={themeColor} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '0.85rem', wordBreak: 'break-all' }}>{fileName}</p>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>Student Document</p>
+                    </div>
+                    <a href={fileUrl} download style={{ background: themeColor, color: 'white', padding: '0.5rem 1rem', borderRadius: '0.5rem', fontWeight: 700, fontSize: '0.8rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Download size={14} /> Download
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 2. VIDEO LINK / GOOGLE DOCS LINK */}
+          {(submission?.url || (submission?.content && String(submission.content).startsWith('http'))) && (() => {
+            const linkUrl = submission.url || submission.content;
+            const isVideo = /(youtube\.com|youtu\.be|tiktok\.com|vimeo\.com|drive\.google\.com.*\/(file|view)|video)/i.test(linkUrl);
+
+            return (
+              <div style={{ padding: '1.25rem', border: '1.5px solid #c7d2fe', borderRadius: '0.85rem', background: '#f5f7ff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: isVideo ? '#b91c1c' : '#3730a3', fontWeight: 800, fontSize: '0.88rem' }}>
+                  {isVideo ? <Video size={18} color="#dc2626" /> : <ExternalLink size={18} color={themeColor} />}
+                  <span>{isVideo ? 'Performance Video Link (Dance / Presentation)' : 'Google Docs / Online Link'}</span>
+                </div>
+                <p style={{ margin: '0 0 0.85rem 0', color: '#4b5563', fontSize: '0.85rem', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                  {linkUrl}
+                </p>
+                <a 
+                  href={linkUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  style={{ 
+                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem', 
+                    background: isVideo ? '#dc2626' : themeColor, color: 'white', 
+                    padding: '0.65rem 1.25rem', borderRadius: '0.6rem', textDecoration: 'none', 
+                    fontWeight: 800, fontSize: '0.85rem', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' 
+                  }}
+                >
+                  <ExternalLink size={15} /> {isVideo ? 'Watch Performance Video ↗' : 'Open Link in New Tab ↗'}
+                </a>
+              </div>
+            );
+          })()}
+
+          {/* 3. WRITTEN TEXT / ESSAY */}
+          {submission?.content && !String(submission.content).startsWith('http') && (
             <div style={{ background: 'white', padding: '1.5rem', borderRadius: '0.75rem', borderLeft: `4px solid ${themeColor}`, borderTop: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', marginBottom: '1rem' }}><AlignLeft size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase' }}>Text Submission:</span></div>
-              <p style={{ margin: 0, color: '#334155', fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{submission?.content || <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>No content provided.</span>}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', marginBottom: '0.85rem' }}>
+                <AlignLeft size={16} />
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase' }}>Written Work / Notes:</span>
+              </div>
+              <p style={{ margin: 0, color: '#334155', fontSize: '0.95rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                {submission.content}
+              </p>
+            </div>
+          )}
+
+          {!submission?.file_url && !submission?.url && (!submission?.content || submission?.content.trim() === '') && (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontStyle: 'italic', fontSize: '0.95rem' }}>
+              No submission content provided by the student.
             </div>
           )}
         </div>
@@ -414,6 +580,7 @@ export const GradingTable = ({ scores, themeColor, activity, isActivityAnExam, s
         <tr>
           <th className="tag-th">STUDENT NAME</th>
           <th className="tag-th" style={{ textAlign: 'center' }}>SUBMISSION</th>
+          {isActivityAnExam && <th className="tag-th" style={{ textAlign: 'center' }}>PROCTORING</th>}
           <th className="tag-th" style={{ textAlign: 'center' }}>
             SCORE
             {activity?.max_score && <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: '0.3rem' }}>/ {Math.round(activity.max_score)}</span>}
@@ -424,7 +591,7 @@ export const GradingTable = ({ scores, themeColor, activity, isActivityAnExam, s
       <tbody>
         {scores.length === 0 ? (
           <tr>
-            <td colSpan="4" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+            <td colSpan={isActivityAnExam ? 5 : 4} style={{ textAlign: 'center', padding: '4rem 2rem' }}>
               <Users size={48} color="#cbd5e1" style={{ margin: '0 auto 1rem auto' }} />
               <p style={{ color: '#475569', fontWeight: 700, fontSize: '1rem', margin: '0 0 0.5rem 0' }}>No Students Found</p>
               <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0 }}>There are no students enrolled in this class yet.</p>
@@ -435,6 +602,8 @@ export const GradingTable = ({ scores, themeColor, activity, isActivityAnExam, s
           let badgeBg = '#f1f5f9', badgeColor = '#475569';
           if (status === 'Graded') { badgeBg = '#d1fae5'; badgeColor = '#065f46'; }
           else if (status === 'Submitted') { badgeBg = '#dbeafe'; badgeColor = '#1e40af'; }
+
+          const vCount = parseInt(s.violation_count || 0, 10);
 
           return (
             <tr key={s.student_id}>
@@ -463,6 +632,21 @@ export const GradingTable = ({ scores, themeColor, activity, isActivityAnExam, s
                   <span style={{ fontSize: '0.7rem', color: '#cbd5e1', fontWeight: 600 }}>No Submission</span>
                 )}
               </td>
+              {isActivityAnExam && (
+                <td className="tag-td" style={{ textAlign: 'center' }}>
+                  {status === 'Pending' ? (
+                    <span style={{ fontSize: '0.7rem', color: '#cbd5e1', fontWeight: 600 }}>—</span>
+                  ) : vCount > 0 ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.65rem', borderRadius: '2rem', fontSize: '0.68rem', fontWeight: 800, background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>
+                      <ShieldAlert size={12} /> {vCount} {vCount === 1 ? 'Strike' : 'Strikes'}
+                    </span>
+                  ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.65rem', borderRadius: '2rem', fontSize: '0.68rem', fontWeight: 800, background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
+                      <ShieldCheck size={12} /> Clean
+                    </span>
+                  )}
+                </td>
+              )}
               <td className="tag-td" style={{ textAlign: 'center' }}>
                 <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.95rem' }}>{s.score !== '' ? s.score : '-'}</span>
               </td>

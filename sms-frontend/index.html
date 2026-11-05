@@ -8,10 +8,14 @@
     <script>
       (function() {
         try {
-          const isDark = localStorage.getItem('lms_dark_mode') === '1';
+          const isLmsRoute = window.location.pathname.startsWith('/lms');
+          const isDark = isLmsRoute && localStorage.getItem('lms_dark_mode') === '1';
           if (isDark) {
             document.documentElement.classList.add('dark');
             document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.style.colorScheme = 'light';
           }
           const themeColor = localStorage.getItem('lms_theme_color');
           if (themeColor) {

@@ -1,2 +1,34 @@
 @import "tailwindcss";
 @custom-variant dark (&:is(.dark *));
+
+@layer base {
+  html {
+    color-scheme: light;
+    color: #0f172a;
+  }
+
+  /* Ensure form controls on light backgrounds always have visible dark text and caret,
+     even if browser dark color-scheme or html.dark was previously active */
+  input,
+  textarea,
+  select {
+    color-scheme: light;
+    color: #0f172a;
+    caret-color: #0f172a;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #94a3b8;
+    opacity: 1;
+  }
+
+  /* Keep dark inputs readable when inside explicit dark containers in LMS */
+  html.dark input[class*="dark:bg-"],
+  html.dark textarea[class*="dark:bg-"],
+  html.dark select[class*="dark:bg-"] {
+    color-scheme: dark;
+    color: #f8fafc;
+    caret-color: #f8fafc;
+  }
+}

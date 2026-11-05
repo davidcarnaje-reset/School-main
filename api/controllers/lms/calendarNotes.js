@@ -37,8 +37,10 @@ export const saveCalendarNote = async (req, res) => {
   }
 
   try {
-    const query = "INSERT INTO student_calendar_notes (student_id, note_date, note_text) VALUES (?, ?, ?)";
-    const [result] = await pool.query(query, [studentId, noteDate, noteText]);
+    const [maxRows] = await pool.query("SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM student_calendar_notes");
+    const nextId = parseInt(maxRows[0]?.nextId || 1, 10);
+    const query = "INSERT INTO student_calendar_notes (id, student_id, note_date, note_text) VALUES (?, ?, ?, ?)";
+    await pool.query(query, [nextId, studentId, noteDate, noteText]);
 
     await logAuditTrail(
       1,
@@ -48,7 +50,7 @@ export const saveCalendarNote = async (req, res) => {
       req
     );
 
-    return res.json({ status: 'success', id: result.insertId });
+    return res.json({ status: 'success', id: nextId });
 
   } catch (error) {
     console.error("Save calendar note error:", error);

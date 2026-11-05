@@ -1,13 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { 
   Calendar as CalendarIcon, Clock, MapPin, User, ChevronLeft, 
-  ChevronRight, AlertCircle, BookOpen, Edit3, StickyNote, Plus, X, Loader2, Trash2
+  ChevronRight, AlertCircle, BookOpen, Edit3, StickyNote, Plus, X, Loader2, Trash2, CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const StandardSchedule = ({ scheduleData = [] }) => {
+const StandardSchedule = ({ scheduleData = [], tasksData = [] }) => {
   const { user, API_BASE_URL } = useAuth();
+  const navigate = useNavigate();
   
   const [viewMode, setViewMode] = useState('calendar');
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
@@ -43,11 +45,10 @@ const StandardSchedule = ({ scheduleData = [] }) => {
   useEffect(() => {
     const fetchNotes = async () => {
       try {
-        const studentId = user?.id || user?.username;
+        const studentId = user?.student_id || user?.id || user?.username;
         const res = await axios.get(`${API_BASE_URL}/lms/get_calendar_notes.php?student_id=${studentId}`);
         
         if (res.data.status === 'success') {
-          // Binago natin para maging object array: { 18: [{id: 1, text: "note"}], ... }
           const notesMap = {};
           res.data.notes.forEach(note => {
             if (!notesMap[note.day]) notesMap[note.day] = [];
@@ -63,7 +64,7 @@ const StandardSchedule = ({ scheduleData = [] }) => {
   }, [user, API_BASE_URL]);
 
   // ==========================================
-  // [ DYNAMIC SCHEDULE MAPPING ]
+  // [ DYNAMIC SCHEDULE & TASKS MAPPING ]
   // ==========================================
   const isClassScheduledOnDay = (classItem, dayOfWeek) => {
     const daysStr = (classItem.days || '').trim().toUpperCase();
@@ -92,18 +93,26 @@ const StandardSchedule = ({ scheduleData = [] }) => {
 
   const monthData = useMemo(() => {
     const dataMap = {};
+    const monthStr = String(currentMonthNumber).padStart(2, '0');
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dayOfWeekForDate = new Date(currentYear, calendarDate.getMonth(), day).getDay();
+      const dateStr = `${currentYear}-${monthStr}-${String(day).padStart(2, '0')}`;
 
       const classesForToday = scheduleData.filter(c => isClassScheduledOnDay(c, dayOfWeekForDate));
+      const deadlinesForToday = tasksData.filter(t => t.due_date === dateStr);
+      const assignedForToday = tasksData.filter(t => t.assigned_date === dateStr && t.due_date !== dateStr);
 
-      if (classesForToday.length > 0) {
-        dataMap[day] = { classes: classesForToday, deadlines: [], assigned: [] };
+      if (classesForToday.length > 0 || deadlinesForToday.length > 0 || assignedForToday.length > 0) {
+        dataMap[day] = {
+          classes: classesForToday,
+          deadlines: deadlinesForToday,
+          assigned: assignedForToday
+        };
       }
     }
     return dataMap;
-  }, [scheduleData, currentYear, calendarDate, daysInMonth]);
+  }, [scheduleData, tasksData, currentYear, currentMonthNumber, calendarDate, daysInMonth]);
 
   // ==========================================
   // [ HANDLERS ]
@@ -118,7 +127,7 @@ const StandardSchedule = ({ scheduleData = [] }) => {
     setIsSavingNote(true);
 
     try {
-      const studentId = user?.id || user?.username;
+      const studentId = user?.student_id || user?.id || user?.username;
       const formattedDate = `${currentYear}-${String(currentMonthNumber).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
 
       const res = await axios.post(`${API_BASE_URL}/lms/save_calendar_note.php`, {
@@ -128,7 +137,6 @@ const StandardSchedule = ({ scheduleData = [] }) => {
       });
 
       if (res.data.status === 'success') {
-        // Isama na ang ID galing sa DB para pwede agad i-delete kung gusto
         const newNote = { id: res.data.id, text: newReminderText };
         
         setReminders(prev => ({ 
@@ -148,19 +156,17 @@ const StandardSchedule = ({ scheduleData = [] }) => {
     }
   };
 
-  // ARCHITECT FEATURE: DELETE NOTE HANDLER
   const handleDeleteNote = async (noteId, day) => {
     if (!window.confirm("Are you sure you want to delete this note?")) return;
 
     try {
-      const studentId = user?.id || user?.username;
+      const studentId = user?.student_id || user?.id || user?.username;
       const res = await axios.post(`${API_BASE_URL}/lms/delete_calendar_note.php`, {
         id: noteId,
         student_id: studentId
       });
 
       if (res.data.status === 'success') {
-        // Alisin natin sa React state para instant mawala sa UI
         setReminders(prev => {
           const updatedDayNotes = prev[day].filter(note => note.id !== noteId);
           return { ...prev, [day]: updatedDayNotes };
@@ -176,7 +182,6 @@ const StandardSchedule = ({ scheduleData = [] }) => {
   if (viewMode === 'calendar') {
     return (
       <div className="animate-in zoom-in-95 fade-in duration-500 pb-10">
-        {/* DARK MODE FIX: Container Background */}
         <div className="flex justify-between items-center mb-6 md:mb-8 bg-white dark:bg-slate-800 p-4 md:p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm transition-colors">
            <div className="flex items-center gap-3 md:gap-4">
               <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-50 dark:bg-slate-700 text-[var(--primary-color)] dark:text-blue-400 rounded-xl flex items-center justify-center"><CalendarIcon size={20} className="md:w-6 md:h-6" /></div>
@@ -185,7 +190,16 @@ const StandardSchedule = ({ scheduleData = [] }) => {
                  <p className="text-[10px] md:text-xs font-bold text-slate-400 dark:text-slate-500">Academic Overview</p>
               </div>
            </div>
-           <div className="flex gap-1 md:gap-2">
+           <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setSelectedDay(new Date().getDate());
+                  setViewMode('timeline');
+                }}
+                className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 bg-indigo-50 dark:bg-slate-700 text-[var(--primary-color)] dark:text-blue-300 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-[var(--primary-color)] hover:text-white dark:hover:bg-[var(--primary-color)] transition-all shadow-sm"
+              >
+                <Clock size={14} /> Today's Schedule
+              </button>
               <button onClick={prevMonth} title="Previous Month" className="p-2 md:p-3 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-[var(--primary-color)] hover:text-white dark:hover:bg-[var(--primary-color)] transition-colors"><ChevronLeft size={18}/></button>
               <button onClick={nextMonth} title="Next Month" className="p-2 md:p-3 bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-xl hover:bg-[var(--primary-color)] hover:text-white dark:hover:bg-[var(--primary-color)] transition-colors"><ChevronRight size={18}/></button>
            </div>
@@ -197,7 +211,6 @@ const StandardSchedule = ({ scheduleData = [] }) => {
            <span className="flex items-center gap-1.5 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"><div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-orange-500"></div> Assigned</span>
         </div>
 
-        {/* DARK MODE FIX: Main Calendar Grid */}
         <div className="bg-white dark:bg-slate-800 rounded-[2rem] md:rounded-[2.5rem] p-4 md:p-8 border border-slate-100 dark:border-slate-700 shadow-sm relative z-10 transition-colors">
            <div className="grid grid-cols-7 gap-1 md:gap-4 mb-2 md:mb-4">
              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
@@ -225,22 +238,46 @@ const StandardSchedule = ({ scheduleData = [] }) => {
                  >
                    {day && (
                      <>
-                        <span className={`text-[10px] md:text-sm font-black ${isToday ? 'text-[var(--primary-color)] dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>{day}</span>
+                        <div className="flex items-center justify-between w-full">
+                          <span className={`text-[10px] md:text-sm font-black ${isToday ? "text-[var(--primary-color)] dark:text-blue-400" : "text-slate-700 dark:text-slate-300"}`}>{day}</span>
+                          {isToday && (
+                            <span className="hidden md:inline-block px-1.5 py-0.5 rounded-full bg-[var(--primary-color)] text-white text-[8px] font-black uppercase tracking-wider">Today</span>
+                          )}
+                        </div>
                         
-                        <div className="mt-auto md:absolute md:bottom-2 md:left-2 md:right-2 flex flex-wrap gap-1 justify-center md:justify-start w-full">
+                        <div className="mt-auto md:mt-2 w-full flex flex-col gap-1 z-10">
                            {(dayData?.classes?.length > 0) && (
-                              <div className="w-1.5 h-1.5 md:w-6 md:h-6 rounded-full md:rounded-lg bg-[var(--primary-color)] md:bg-blue-100 md:text-[var(--primary-color)] flex items-center justify-center"><BookOpen size={12} className="hidden md:block"/></div>
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-[var(--primary-color)] dark:text-blue-300 text-[9px] md:text-[10px] font-black truncate border border-blue-100 dark:border-blue-900/40" title={`${dayData.classes.length} Classes scheduled`}>
+                                <BookOpen size={10} className="shrink-0 hidden md:block" />
+                                <span className="truncate">{dayData.classes.length} {dayData.classes.length === 1 ? "Class" : "Classes"}</span>
+                              </div>
+                           )}
+                           {(dayData?.deadlines?.length > 0) && (
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-[9px] md:text-[10px] font-black truncate border border-red-100 dark:border-red-900/40" title={`${dayData.deadlines.length} Deadlines due`}>
+                                <AlertCircle size={10} className="shrink-0 hidden md:block" />
+                                <span className="truncate">{dayData.deadlines.length} Due</span>
+                              </div>
+                           )}
+                           {(dayData?.assigned?.length > 0) && (
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-[9px] md:text-[10px] font-black truncate border border-amber-100 dark:border-amber-900/40" title={`${dayData.assigned.length} Tasks posted`}>
+                                <Edit3 size={10} className="shrink-0 hidden md:block" />
+                                <span className="truncate">{dayData.assigned.length} Posted</span>
+                              </div>
                            )}
                            {dayReminders?.length > 0 && (
-                              <div className="w-1.5 h-1.5 md:w-6 md:h-6 rounded-full md:rounded-lg bg-purple-500 md:bg-purple-100 md:text-purple-600 flex items-center justify-center"><StickyNote size={12} className="hidden md:block"/></div>
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 text-[9px] md:text-[10px] font-black truncate border border-purple-100 dark:border-purple-900/40">
+                                <StickyNote size={10} className="shrink-0 hidden md:block" />
+                                <span className="truncate">{dayReminders.length} Note</span>
+                              </div>
                            )}
                         </div>
-
                         {hasContent && (
                            <div className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 bg-slate-900/95 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 pointer-events-none transform scale-95 group-hover:scale-100 z-[150] border border-slate-700">
                               <p className="text-xs font-black text-blue-300 border-b border-slate-700 pb-2 mb-2">{currentMonth} {day}, {currentYear}</p>
                               <div className="space-y-2">
                                  {dayData?.classes?.length > 0 && <div className="flex justify-between items-center text-[10px]"><span className="text-slate-300 flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full"></div> Classes:</span> <span className="font-bold">{dayData.classes.length}</span></div>}
+                                 {dayData?.deadlines?.length > 0 && <div className="flex justify-between items-center text-[10px]"><span className="text-slate-300 flex items-center gap-1.5"><div className="w-2 h-2 bg-red-500 rounded-full"></div> Deadlines:</span> <span className="font-bold text-red-400">{dayData.deadlines.length}</span></div>}
+                                 {dayData?.assigned?.length > 0 && <div className="flex justify-between items-center text-[10px]"><span className="text-slate-300 flex items-center gap-1.5"><div className="w-2 h-2 bg-orange-500 rounded-full"></div> Assigned:</span> <span className="font-bold text-orange-400">{dayData.assigned.length}</span></div>}
                                  {dayReminders?.length > 0 && <div className="flex justify-between items-center text-[10px]"><span className="text-slate-300 flex items-center gap-1.5"><div className="w-2 h-2 bg-purple-500 rounded-full"></div> Notes:</span> <span className="font-bold text-purple-400">{dayReminders.length}</span></div>}
                               </div>
                            </div>
@@ -268,7 +305,6 @@ const StandardSchedule = ({ scheduleData = [] }) => {
             </button>
             <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white tracking-tight">{currentMonth} {selectedDay}, {currentYear}</h2>
          </div>
-         {/* DARK MODE FIX: Badge for Timeline View */}
          <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm text-sm font-bold text-[var(--primary-color)] flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[var(--primary-color)] animate-pulse"></span> {selectedDay === new Date().getDate() && calendarDate.getMonth() === new Date().getMonth() && calendarDate.getFullYear() === new Date().getFullYear() ? 'Today' : 'Selected Date'}
          </div>
@@ -288,11 +324,12 @@ const StandardSchedule = ({ scheduleData = [] }) => {
                              <span className="text-xs font-black text-slate-800 dark:text-slate-200">{sched.startTime}</span>
                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{sched.endTime}</span>
                           </div>
-                          {/* Timeline Dot */}
                           <div className={`w-4 h-4 rounded-full bg-white dark:bg-slate-800 border-4 ${sched.color ? sched.color.replace('bg-', 'border-') : 'border-blue-500'} shadow-sm mt-1 shrink-0 group-hover:scale-125 transition-transform`}></div>
                           
-                          {/* Timeline Card */}
-                          <div className="flex-1 bg-slate-50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 p-5 md:p-6 rounded-3xl border border-slate-100 dark:border-slate-700 hover:border-[var(--primary-color)] dark:hover:border-slate-500 hover:shadow-md transition-all cursor-pointer">
+                          <div
+                            onClick={() => sched.class_id && navigate(`/lms/course/${sched.class_id}`)}
+                            className="flex-1 bg-slate-50 dark:bg-slate-700/50 hover:bg-white dark:hover:bg-slate-700 p-5 md:p-6 rounded-3xl border border-slate-100 dark:border-slate-700 hover:border-[var(--primary-color)] dark:hover:border-slate-500 hover:shadow-md transition-all cursor-pointer"
+                          >
                              <div className="flex justify-between items-start mb-2">
                                 <h3 className="text-base md:text-lg font-black text-slate-800 dark:text-white">{sched.subject}</h3>
                                 <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg text-white ${sched.color || 'bg-[var(--primary-color)]'}`}>{sched.code}</span>
@@ -312,12 +349,41 @@ const StandardSchedule = ({ scheduleData = [] }) => {
          <div className="space-y-6">
             <div className="bg-slate-900 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-xl text-white">
                <h3 className="text-lg font-black text-white/90 mb-6 flex items-center gap-2"><AlertCircle className="text-red-400" size={18} /> Due & Assigned</h3>
-               <div className="space-y-4">
-                  {(!currentData.deadlines?.length && !currentData.assigned?.length) && <p className="text-center text-xs text-white/40 font-bold py-4">No tasks due for this day. Relax!</p>}
+               <div className="space-y-3">
+                  {currentData.deadlines?.map(task => (
+                    <div
+                      key={`due_${task.id}`}
+                      onClick={() => navigate(`/lms/exam/${task.id}`)}
+                      className="p-4 rounded-2xl bg-red-500/15 border border-red-500/30 hover:bg-red-500/25 cursor-pointer transition-all"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-red-300">Due Today • {task.code}</span>
+                        <span className="text-[10px] font-bold text-white/70">{task.status}</span>
+                      </div>
+                      <h4 className="text-sm font-black text-white">{task.title}</h4>
+                      <p className="text-[11px] font-medium text-white/70 mt-0.5">{task.subject}</p>
+                    </div>
+                  ))}
+                  {currentData.assigned?.map(task => (
+                    <div
+                      key={`ass_${task.id}`}
+                      onClick={() => navigate(`/lms/exam/${task.id}`)}
+                      className="p-4 rounded-2xl bg-orange-500/15 border border-orange-500/30 hover:bg-orange-500/25 cursor-pointer transition-all"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-orange-300">Assigned • {task.code}</span>
+                        <span className="text-[10px] font-bold text-white/70">{task.status}</span>
+                      </div>
+                      <h4 className="text-sm font-black text-white">{task.title}</h4>
+                      <p className="text-[11px] font-medium text-white/70 mt-0.5">{task.subject}</p>
+                    </div>
+                  ))}
+                  {(!currentData.deadlines?.length && !currentData.assigned?.length) && (
+                    <p className="text-center text-xs text-white/40 font-bold py-4">No tasks due for this day. Relax!</p>
+                  )}
                </div>
             </div>
             
-            {/* DARK MODE FIX: Notes Section */}
             <div className="bg-blue-50 dark:bg-slate-800 rounded-[2.5rem] p-6 md:p-8 border border-blue-100 dark:border-slate-700 transition-colors">
                <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-black text-[var(--primary-color)] dark:text-white flex items-center gap-2"><StickyNote className="text-[var(--primary-color)]" size={18} /> My Notes</h3>
@@ -330,7 +396,6 @@ const StandardSchedule = ({ scheduleData = [] }) => {
                            <div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 shrink-0"></div>
                            <p>{note.text}</p>
                         </div>
-                        {/* ARCHITECT FIX: Delete Button shows on hover! */}
                         <button 
                            onClick={() => handleDeleteNote(note.id, selectedDay)} 
                            className="text-slate-300 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-50 dark:hover:bg-slate-600"

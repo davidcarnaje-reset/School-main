@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Lock, User, Eye, EyeOff, ShieldCheck, Loader2, GraduationCap, Users, ArrowLeft } from 'lucide-react';
@@ -6,8 +6,6 @@ import { useAuth } from '../../context/AuthContext';
 
 const Login = ({ portal }) => {
   const navigate = useNavigate();
-  
-  // ARCHITECT UPDATE 1: Kinuha na natin ang API_BASE_URL mula sa .env config natin
   const { setUser, branding, API_BASE_URL } = useAuth();
 
   const [identifier, setIdentifier] = useState('');
@@ -15,6 +13,13 @@ const Login = ({ portal }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    try {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+    } catch (e) {}
+  }, []);
 
   const portalConfig = {
     admin: {
@@ -48,14 +53,12 @@ const Login = ({ portal }) => {
     setLoading(true);
 
     try {
-      // 🚀 RESTful Node.js handshake execution block
       const response = await axios.post(`${API_BASE_URL}/auth/login`, {
         username: identifier,
         password: password,
         portal: portal
       });
 
-      // ALIGNMENT: Binabasa na natin ang '.status === 'success'' parameter galing sa Node
       if (response.data && response.data.status === 'success') {
         const user = response.data.user;
         const token = response.data.token;
@@ -67,7 +70,6 @@ const Login = ({ portal }) => {
           return;
         }
 
-        // Clear existing session/local storage first to avoid mixed credentials
         localStorage.removeItem('token');
         localStorage.removeItem('sms_token');
         localStorage.removeItem('user');
@@ -76,21 +78,17 @@ const Login = ({ portal }) => {
         sessionStorage.removeItem('user');
 
         if (userRole === 'admin' || userRole === 'super_admin') {
-          // Store only in sessionStorage so closing the tab/browser logs them out!
           sessionStorage.setItem('token', token);
           sessionStorage.setItem('sms_token', token);
           sessionStorage.setItem('user', JSON.stringify(user));
         } else {
-          // Store in localStorage for persistent login
           localStorage.setItem('token', token);
           localStorage.setItem('sms_token', token);
           localStorage.setItem('user', JSON.stringify(user));
         }
-        
-        // 2. Pasabugin ang state trigger sa global context wrapper
-        setUser(user); 
-        
-        // 3. SECURE INTERNALS ROLE REDIRECTION ROUTER
+
+        setUser(user);
+
         if (userRole === 'super_admin') {
           localStorage.removeItem('selected_school_id');
           navigate('/admin/schools');
@@ -112,6 +110,10 @@ const Login = ({ portal }) => {
           navigate('/school-admin/dashboard');
         } else if (userRole === 'custodian') {
           navigate('/custodian/dashboard');
+        } else if (userRole === 'guidance') {
+          navigate('/guidance/dashboard');
+        } else if (userRole === 'nurse') {
+          navigate('/nurse/dashboard');
         } else {
           setError("Access denied: Invalid application role mapping configuration.");
           setUser(null);
@@ -123,7 +125,7 @@ const Login = ({ portal }) => {
           sessionStorage.removeItem('user');
         }
       } else {
-        setError(response.data.message || "Invalid authentication check mapping payload."); 
+        setError(response.data.message || "Invalid authentication check mapping payload.");
         setUser(null);
         localStorage.removeItem('token');
         localStorage.removeItem('sms_token');
@@ -148,9 +150,8 @@ const Login = ({ portal }) => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
-      
-      <button 
+    <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-4 font-sans">
+      <button
         onClick={() => navigate('/')}
         className="mb-8 flex items-center space-x-2 text-slate-400 hover:text-slate-600 font-bold text-[10px] uppercase tracking-widest transition-all"
       >
@@ -159,10 +160,9 @@ const Login = ({ portal }) => {
       </button>
 
       <div className="max-w-md w-full">
-        
         <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="inline-flex items-center justify-center mb-4">
-            <div 
+            <div
               className="w-20 h-20 rounded-[2rem] flex items-center justify-center text-white shadow-2xl transition-all duration-500"
               style={{ backgroundColor: portal === 'admin' ? '#1e293b' : (portal === 'student' ? '#059669' : (branding.theme_color || '#2563eb')) }}
             >
@@ -179,20 +179,22 @@ const Login = ({ portal }) => {
 
         <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200 border border-slate-100 p-8 md:p-10 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1.5" style={{ backgroundColor: portal === 'admin' ? '#1e293b' : (portal === 'student' ? '#059669' : (branding.theme_color || '#2563eb')) }}></div>
-          
+
           <form className="space-y-6" onSubmit={handleLogin}>
-            
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">{current.label}</label>
               <div className="relative group">
-                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-300 group-focus-within:text-blue-500 transition-colors">
+                <span className="pointer-events-none absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
                   <User size={18} />
                 </span>
-                <input 
-                  type="text" required
+                <input
+                  type="text"
+                  required
+                  autoComplete="username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white outline-none transition-all text-sm font-bold"
+                  style={{ color: '#0f172a', caretColor: '#0f172a' }}
+                  className="block w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
                   placeholder={portal === 'student' ? "e.g. 2026-0001" : "Enter username"}
                 />
               </div>
@@ -201,20 +203,23 @@ const Login = ({ portal }) => {
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Password</label>
               <div className="relative group">
-                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-300 group-focus-within:text-blue-500 transition-colors">
+                <span className="pointer-events-none absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
                   <Lock size={18} />
                 </span>
-                <input 
-                  type={showPassword ? "text" : "password"} required
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-11 pr-11 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 focus:bg-white outline-none transition-all text-sm font-bold"
+                  style={{ color: '#0f172a', caretColor: '#0f172a' }}
+                  className="block w-full pl-11 pr-11 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white outline-none transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
                   placeholder="••••••••"
                 />
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-300 hover:text-blue-500 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-blue-500 transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -224,16 +229,16 @@ const Login = ({ portal }) => {
             {error && (
               <div className="bg-red-50 border border-red-100 p-4 rounded-2xl animate-in fade-in zoom-in duration-300">
                 <p className="text-xs text-red-600 font-bold flex items-center justify-center italic text-center leading-relaxed">
-                    ⚠️ {error}
+                  ⚠️ {error}
                 </p>
               </div>
             )}
 
-            <button 
+            <button
               type="submit"
               disabled={loading}
               className="shine-effect w-full text-white font-black py-4 rounded-2xl transition-all shadow-xl active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-2 uppercase tracking-widest text-xs"
-              style={{ 
+              style={{
                 backgroundColor: portal === 'admin' ? '#1e293b' : (portal === 'student' ? '#059669' : (branding.theme_color || '#2563eb')),
               }}
             >
@@ -249,8 +254,8 @@ const Login = ({ portal }) => {
           </form>
 
           <div className="mt-6 text-center animate-in fade-in duration-500">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => navigate('/forgot-password')}
               className="text-[10px] font-bold text-slate-400 hover:text-blue-600 transition-colors uppercase tracking-widest relative group inline-flex flex-col items-center"
             >
@@ -258,7 +263,6 @@ const Login = ({ portal }) => {
               <span className="w-0 h-[1px] bg-blue-600 group-hover:w-full transition-all duration-300 mt-0.5"></span>
             </button>
           </div>
-
         </div>
 
         <p className="text-center mt-10 text-slate-400 text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">

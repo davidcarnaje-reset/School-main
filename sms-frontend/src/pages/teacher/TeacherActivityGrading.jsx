@@ -104,7 +104,13 @@ const TeacherActivityGrading = () => {
         <ViewSubmissionModal 
           studentId={viewingWrittenWork.student_id} activityId={activityId} classId={activity?.class_id}
           quarter={activeQuarter} studentName={viewingWrittenWork.name} maxScore={activity?.max_score}
-          submission={{ type: viewingWrittenWork.submission_type || 'text', content: viewingWrittenWork.submission_content }}
+          submission={{ 
+            type: viewingWrittenWork.submission_type || 'text', 
+            content: viewingWrittenWork.submission_content,
+            url: viewingWrittenWork.submission_url,
+            file_url: viewingWrittenWork.file_url,
+            submitted_at: viewingWrittenWork.submitted_at
+          }}
           currentScore={viewingWrittenWork.score} onRefresh={() => fetchData(false)} onClose={() => setViewingWrittenWork(null)}
           themeColor={themeColor} API_BASE_URL={API_BASE_URL}
         />
