@@ -278,6 +278,44 @@ const LmsTakeExam = () => {
     setHasStarted(true);
   };
 
+  // Retake Assessment
+  const handleStartRetake = async () => {
+    if (examData?.is_closed) {
+      showAlert('error', 'Assessment Closed', 'This assessment is already past its due date and cannot be retaken.');
+      return;
+    }
+    if (attemptsInfo.current >= attemptsInfo.max && attemptsInfo.max > 1) {
+      showAlert('warning', 'Max Attempts Reached', `You have already completed all ${attemptsInfo.max} allowed attempt(s).`);
+      return;
+    }
+
+    setAnswers({});
+    setResult(null);
+    setViolationCount(0);
+    setViolationLog([]);
+    violationCountRef.current = 0;
+    violationLogRef.current = [];
+    lastViolationTimeRef.current = 0;
+
+    if (examData?.time_limit_minutes || examData?.seconds_until_due != null) {
+      const limitSecs = examData?.time_limit_minutes ? examData.time_limit_minutes * 60 : Infinity;
+      const dueSecs = examData?.seconds_until_due != null ? examData.seconds_until_due : Infinity;
+      setTimeLeft(Math.min(limitSecs, dueSecs));
+    }
+
+    if (antiCheat.enabled && antiCheat.require_fullscreen) {
+      try {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+          setIsFullscreen(true);
+        }
+      } catch (e) {
+        console.warn("Fullscreen request declined or unsupported:", e);
+      }
+    }
+    setHasStarted(true);
+  };
+
   const requestFullscreenAgain = async () => {
     try {
       if (document.documentElement.requestFullscreen) {
