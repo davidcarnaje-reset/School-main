@@ -491,7 +491,9 @@ const AdminLayout = () => {
                 </button>
 
                 {isNotifOpen && (
-                  <div className="absolute top-full right-0 mt-3 w-72 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50">
+                  <>
+                    <div className="fixed inset-0 z-40 bg-black/10 sm:bg-transparent" onClick={() => setIsNotifOpen(false)} />
+                    <div className="fixed sm:absolute top-20 sm:top-full left-3 right-3 sm:left-auto sm:right-0 sm:mt-3 w-auto sm:w-96 max-w-sm sm:max-w-none mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
                     <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                       <h3 className="font-bold text-slate-800">Notifications</h3>
                       <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-bold">{unreadCount} New</span>
@@ -532,11 +534,12 @@ const AdminLayout = () => {
                           </div>
                         ))
                       )}
-                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+                </>
+              )}
             </div>
+          </div>
 
             {/* USER PROFILE */}
             <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer shrink-0" onClick={() => setIsProfileOpen(true)} title="Account Settings & Profile">

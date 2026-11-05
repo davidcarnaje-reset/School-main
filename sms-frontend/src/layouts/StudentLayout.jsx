@@ -45,6 +45,15 @@ const StudentLayout = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState(null);
 
+  useEffect(() => {
+    if (!isNotifOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsNotifOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isNotifOpen]);
+
   // FETCH STUDENT DATA
   const fetchData = useCallback(async () => {
     try {
@@ -311,53 +320,59 @@ const StudentLayout = () => {
 
       {/* 3. MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-30 shrink-0 shadow-sm">
-          <div className="flex items-center space-x-4">
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-10 sticky top-0 z-30 shrink-0 shadow-sm">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <button className="p-2 lg:hidden text-slate-600" onClick={() => setIsSidebarOpen(true)}><Menu size={20} /></button>
-            <h2 className="text-slate-800 font-black text-lg lg:text-xl capitalize">
+            <h2 className="text-slate-800 font-black text-lg lg:text-xl capitalize truncate max-w-[150px] sm:max-w-none">
               {location.pathname.split('/').pop()?.replace('-', ' ')}
             </h2>
           </div>
 
           <div className="flex items-center">
             {/* NOTIFICATION BELL */}
-            <div className="flex items-center space-x-2 mr-6 pr-6 border-r border-slate-200 relative">
+            <div className="flex items-center space-x-2 mr-3 pr-3 sm:mr-6 sm:pr-6 border-r border-slate-200 relative">
               <div className="relative">
-                <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`p-2.5 rounded-full transition-all relative ${isNotifOpen ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`p-2 sm:p-2.5 rounded-full transition-all relative ${isNotifOpen ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-100'}`}>
                   <Bell size={20} />
                   {unreadCount > 0 && (
-                    <span className="absolute top-2 right-2 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                    <span className="absolute top-1.5 right-1.5 w-4 h-4 sm:w-5 sm:h-5 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce">
                       {unreadCount}
                     </span>
                   )}
                 </button>
                 {isNotifOpen && (
-                  <div className="absolute top-full right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50">
-                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                      <h3 className="font-bold text-slate-800 text-sm">Notifications</h3>
-                      <span className="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full font-bold">{unreadCount} New</span>
-                    </div>
-                    <div className="max-h-[60vh] overflow-y-auto p-2">
-                      {notifications.length === 0 ? (
-                        <div className="p-10 text-center text-slate-400">
-                          <Bell className="mx-auto mb-2 opacity-20" size={30} />
-                          <p className="text-[10px] font-bold uppercase">No updates</p>
-                        </div>
-                      ) : (
-                        notifications.map((notif) => (
-                          <div key={notif.id} onClick={() => handleNotifClick(notif)} className={`flex gap-3 p-3 rounded-2xl cursor-pointer transition-all ${notif.is_read === 0 ? 'bg-indigo-50/50' : 'opacity-60'}`}>
-                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                               <Bell size={16} className="text-indigo-500" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-slate-900 truncate">{notif.title}</p>
-                              <p className="text-[10px] text-slate-500 truncate">{notif.message}</p>
-                            </div>
+                  <>
+                    {/* Backdrop to tap outside to dismiss on mobile & desktop */}
+                    <div className="fixed inset-0 z-40 bg-black/10 sm:bg-transparent" onClick={() => setIsNotifOpen(false)} />
+                    
+                    {/* Responsive Dropdown (Safe within mobile margins, aligned under bell on desktop) */}
+                    <div className="fixed sm:absolute top-20 sm:top-full left-3 right-3 sm:left-auto sm:right-0 sm:mt-3 w-auto sm:w-96 max-w-sm sm:max-w-none mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                      <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <h3 className="font-bold text-slate-800 text-sm">Notifications</h3>
+                        <span className="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full font-bold">{unreadCount} New</span>
+                      </div>
+                      <div className="max-h-[60vh] overflow-y-auto p-2">
+                        {notifications.length === 0 ? (
+                          <div className="p-10 text-center text-slate-400">
+                            <Bell className="mx-auto mb-2 opacity-20" size={30} />
+                            <p className="text-[10px] font-bold uppercase">No updates</p>
                           </div>
-                        ))
-                      )}
+                        ) : (
+                          notifications.map((notif) => (
+                            <div key={notif.id} onClick={() => handleNotifClick(notif)} className={`flex gap-3 p-3 rounded-2xl cursor-pointer transition-all ${notif.is_read === 0 ? 'bg-indigo-50/50' : 'opacity-60'}`}>
+                              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                 <Bell size={16} className="text-indigo-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-slate-900 truncate">{notif.title}</p>
+                                <p className="text-[10px] text-slate-500 truncate">{notif.message}</p>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </div>

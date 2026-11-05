@@ -1103,11 +1103,12 @@ const CreateExam = () => {
 
       {/* ─── FLOATING FOOTER ACTIONS ─── */}
       <div style={{
-        position: 'sticky', bottom: '20px', zIndex: 10,
-        display: 'flex', justifyContent: 'center', gap: '1rem',
-        marginTop: '2rem', padding: '1rem',
-        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
-        borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.9)',
+        position: 'sticky', bottom: '16px', zIndex: 20,
+        display: 'flex', justifyContent: 'center', gap: '0.75rem',
+        flexWrap: 'wrap',
+        marginTop: '2rem', padding: '0.85rem 1.25rem',
+        background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)',
+        borderRadius: '1.25rem', border: '1px solid rgba(255,255,255,0.9)',
         boxShadow: '0 15px 40px rgba(0,0,0,0.12)'
       }}>
         <button type="button" className="btn-glass btn-add" onClick={addQuestion}>

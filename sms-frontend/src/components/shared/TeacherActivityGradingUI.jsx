@@ -84,6 +84,14 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
   const [essayScores, setEssayScores] = useState([]);
 
   useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     const loadExamData = async () => {
       setIsLoadingExam(true);
       try {
@@ -190,8 +198,8 @@ export const GradeExamSubmissionModal = ({ studentId, activityId, classId, quart
   }
 
   return (
-    <div className="glass-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
-      <div style={{ width: '100%', maxWidth: '920px', background: '#f8fafc', borderRadius: '1.25rem', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '95vh', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+    <div className="glass-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem', overflowY: 'auto' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: '920px', background: '#f8fafc', borderRadius: '1.25rem', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 2rem)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '1.5rem 2rem', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
@@ -365,6 +373,14 @@ export const ViewSubmissionModal = ({ studentId, activityId, classId, quarter, s
   const [scoreInput, setScoreInput] = useState(currentScore || '');
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -392,16 +408,16 @@ export const ViewSubmissionModal = ({ studentId, activityId, classId, quarter, s
   };
 
   return (
-    <div className="glass-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div className="glass-modal" style={{ width: '100%', maxWidth: '600px', background: '#f8fafc', borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
-        <div style={{ padding: '1.5rem 2rem', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="glass-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem', overflowY: 'auto' }} onClick={onClose}>
+      <div className="glass-modal" style={{ width: '100%', maxWidth: '620px', maxHeight: 'calc(100vh - 2rem)', display: 'flex', flexDirection: 'column', background: '#f8fafc', borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ flexShrink: 0, padding: '1.25rem 1.75rem', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 style={{ margin: 0, color: '#1e293b', fontWeight: 800, fontSize: '1.3rem' }}>Review Submission</h2>
+            <h2 style={{ margin: 0, color: '#1e293b', fontWeight: 800, fontSize: '1.25rem' }}>Review Submission</h2>
             <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>{studentName}</p>
           </div>
-          <button onClick={onClose} style={{ border: '1px solid #e2e8f0', background: 'white', padding: '0.5rem', borderRadius: '50%', cursor: 'pointer', color: '#64748b' }}><XIcon size={20} /></button>
+          <button onClick={onClose} title="Close" style={{ border: '1.5px solid #cbd5e1', background: 'white', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><XIcon size={18} /></button>
         </div>
-        <div style={{ padding: '2rem', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '68vh', overflowY: 'auto' }}>
+        <div style={{ padding: '1.5rem', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '1.25rem', overflowY: 'auto', flex: 1 }}>
           
           {/* 1. UPLOADED PHOTO OF PAPER WORK / FILE */}
           {(submission?.file_url || (submission?.type === 'file' && submission?.content)) && (() => {
@@ -508,7 +524,7 @@ export const ViewSubmissionModal = ({ studentId, activityId, classId, quarter, s
             </div>
           )}
         </div>
-        <div style={{ padding: '1.5rem 2rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ flexShrink: 0, padding: '1.25rem 1.75rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <label style={{ fontSize: '0.9rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Score Given:</label>
           <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', borderRadius: '0.5rem', padding: '0.3rem', border: `1px solid ${themeColor}`, width: '130px' }}>
             <input type="number" min="0" max={maxScore} placeholder="0" value={scoreInput} onChange={(e) => setScoreInput(e.target.value)} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', textAlign: 'center', fontWeight: 800, color: '#1e293b', fontSize: '1.1rem' }} />

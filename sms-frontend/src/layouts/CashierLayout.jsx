@@ -441,7 +441,9 @@ const CashierLayout = () => {
                   )}
                 </button>
                 {isNotifOpen && (
-                  <div className="absolute right-0 mt-3 w-72 bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden z-[100] animate-in fade-in zoom-in duration-200">
+                  <>
+                    <div className="fixed inset-0 z-40 bg-black/10 sm:bg-transparent" onClick={() => setIsNotifOpen(false)} />
+                    <div className="fixed sm:absolute top-20 sm:top-full left-3 right-3 sm:left-auto sm:right-0 sm:mt-3 w-auto sm:w-80 max-w-sm sm:max-w-none mx-auto sm:mx-0 bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden z-[100] animate-in fade-in zoom-in duration-200">
                     <div className="p-5 border-b flex justify-between items-center bg-slate-50/50">
                       <h3 className="font-black italic text-slate-800 uppercase text-[9px] tracking-[0.2em]">
                         Notifications
@@ -477,10 +479,11 @@ const CashierLayout = () => {
                           No updates
                         </div>
                       )}
-                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+                </>
+              )}
+            </div>
             </div>
 
             <div className="flex items-center gap-3 pl-3 border-l-2 border-slate-200/50">

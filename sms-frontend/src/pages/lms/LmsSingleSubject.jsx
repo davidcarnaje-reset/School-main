@@ -64,6 +64,15 @@ const LmsSingleSubject = () => {
     if (id && user) fetchClassroomData();
   }, [id, user, API_BASE_URL]);
 
+  useEffect(() => {
+    if (!submittingWork) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setSubmittingWork(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [submittingWork]);
+
   const handleOpenSubmitModal = (post) => {
     setSubmittingWork(post);
     setSelectedFile(null);
@@ -593,10 +602,10 @@ const LmsSingleSubject = () => {
 
       {/* ─── MODAL: SUBMIT WRITTEN WORK / TASK / GOOGLE DOCS LINK ─── */}
       {submittingWork && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in overflow-y-auto" onClick={() => setSubmittingWork(null)}>
+          <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-xl w-full max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="p-6 bg-gradient-to-r from-[var(--primary-color)] to-slate-900 text-white flex justify-between items-start">
+            <div className="p-6 bg-gradient-to-r from-[var(--primary-color)] to-slate-900 text-white flex justify-between items-start flex-shrink-0">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md mb-2 inline-block">
                   {submittingWork.category ? submittingWork.category.toUpperCase() : 'WRITTEN WORK'} • {submittingWork.total || 100} PTS
@@ -617,7 +626,7 @@ const LmsSingleSubject = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-5 flex-1 overflow-y-auto">
               {/* Instructions */}
               {submittingWork.desc && (
                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/40 border border-slate-100 dark:border-slate-700">
@@ -750,7 +759,7 @@ const LmsSingleSubject = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+            <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setSubmittingWork(null)}
