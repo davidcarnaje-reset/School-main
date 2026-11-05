@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlayCircle, Rocket, Star, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { PlayCircle, Rocket, Star, AlertCircle, ArrowRight, Sparkles, Lock, Clock } from 'lucide-react';
 
 const KidsDashboard = ({ courses = [], nextLessons = [] }) => {
   const navigate = useNavigate();
@@ -32,41 +32,77 @@ const KidsDashboard = ({ courses = [], nextLessons = [] }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {nextLessons.map((task, i) => (
-              <div
-                key={task.id || i}
-                onClick={() => task.id ? navigate(`/lms/exam/${task.id}`) : navigate(`/lms/course/${task.class_id}`)}
-                className="bg-white p-5 rounded-[2.5rem] shadow-lg border-b-6 border-rose-300 hover:border-rose-500 hover:shadow-xl transition-all cursor-pointer group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-600 font-black text-[10px] uppercase tracking-wider">
-                      {task.desc || task.subject || 'Task'}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {task.duration || 'No Due'}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-black text-slate-800 group-hover:text-rose-500 transition-colors line-clamp-2">
-                    {task.title}
-                  </h3>
-                  {task.teacher && (
-                    <p className="text-xs font-bold text-slate-400 mt-1">Teacher: {task.teacher}</p>
-                  )}
-                </div>
+            {nextLessons.map((task, i) => {
+              const isClosed = Boolean(task.is_closed);
+              const isNotOpen = Boolean(task.is_not_open_yet);
+              const isClickable = !isClosed && !isNotOpen;
 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
+              return (
+                <div
+                  key={task.id || i}
+                  onClick={() => {
+                    if (!isClickable) return;
                     if (task.id) navigate(`/lms/exam/${task.id}`);
                     else navigate(`/lms/course/${task.class_id}`);
                   }}
-                  className="mt-4 bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-full font-black text-xs w-full shadow-md transition-all flex items-center justify-center gap-1.5"
+                  className={`bg-white p-5 rounded-[2.5rem] shadow-lg border-b-6 transition-all flex flex-col justify-between ${
+                    isClosed
+                      ? 'border-slate-300 opacity-80 cursor-not-allowed'
+                      : isNotOpen
+                      ? 'border-amber-300 opacity-90 cursor-not-allowed'
+                      : 'border-rose-300 hover:border-rose-500 hover:shadow-xl cursor-pointer group'
+                  }`}
                 >
-                  Start Activity Now! <ArrowRight size={14} />
-                </button>
-              </div>
-            ))}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`px-2.5 py-1 rounded-lg font-black text-[10px] uppercase tracking-wider ${
+                        isClosed ? 'bg-slate-100 text-slate-500' : isNotOpen ? 'bg-amber-100 text-amber-700' : 'bg-rose-50 text-rose-600'
+                      }`}>
+                        {task.desc || task.subject || 'Task'}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {isNotOpen ? `Opens: ${task.open_date_formatted || 'Soon'}` : (task.duration || 'No Due')}
+                      </span>
+                    </div>
+                    <h3 className={`text-lg font-black transition-colors line-clamp-2 ${
+                      isClosed ? 'text-slate-500' : isNotOpen ? 'text-slate-700' : 'text-slate-800 group-hover:text-rose-500'
+                    }`}>
+                      {task.title}
+                    </h3>
+                    {task.teacher && (
+                      <p className="text-xs font-bold text-slate-400 mt-1">Teacher: {task.teacher}</p>
+                    )}
+                  </div>
+
+                  {isClosed ? (
+                    <button
+                      disabled
+                      className="mt-4 bg-slate-100 dark:bg-slate-700 text-slate-400 cursor-not-allowed px-5 py-2.5 rounded-full font-black text-xs w-full shadow-none flex items-center justify-center gap-1.5"
+                    >
+                      <Lock size={14} /> Closed • Deadline Expired
+                    </button>
+                  ) : isNotOpen ? (
+                    <button
+                      disabled
+                      className="mt-4 bg-amber-50 text-amber-800 cursor-not-allowed px-5 py-2.5 rounded-full font-black text-xs w-full shadow-none flex items-center justify-center gap-1.5 border border-amber-200"
+                    >
+                      <Clock size={14} /> Opens {task.open_date_formatted || 'Soon'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (task.id) navigate(`/lms/exam/${task.id}`);
+                        else navigate(`/lms/course/${task.class_id}`);
+                      }}
+                      className="mt-4 bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-full font-black text-xs w-full shadow-md transition-all flex items-center justify-center gap-1.5"
+                    >
+                      Start Activity Now! <ArrowRight size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

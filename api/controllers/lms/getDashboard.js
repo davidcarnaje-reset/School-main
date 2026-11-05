@@ -80,7 +80,13 @@ const getDashboard = async (req, res) => {
           s.subject_code as \`desc\`,
           s.subject_description as subject_name,
           COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), 'Teacher') as teacher,
-          a.due_date as duration
+          a.open_date,
+          a.due_date,
+          a.due_date as duration,
+          DATE_FORMAT(a.open_date, '%b %d, %Y • %h:%i %p') as open_date_formatted,
+          DATE_FORMAT(a.due_date, '%b %d, %Y • %h:%i %p') as due_date_formatted,
+          CASE WHEN a.due_date IS NOT NULL AND NOW() > a.due_date THEN 1 ELSE 0 END as is_closed_db,
+          CASE WHEN a.open_date IS NOT NULL AND NOW() < a.open_date THEN 1 ELSE 0 END as is_not_open_yet_db
       FROM activities a
       JOIN class_assignments c ON a.class_id = c.id
       JOIN enrolled_classes ec ON c.id = ec.class_assignment_id
@@ -89,29 +95,63 @@ const getDashboard = async (req, res) => {
       LEFT JOIN student_activity_scores sas ON a.id = sas.activity_id AND sas.student_id IN (?)
       WHERE ec.student_id IN (?) AND ec.status = 'Enrolled'
         AND (sas.status IS NULL OR sas.status = 'Pending')
+        AND NOT EXISTS (
+          SELECT 1 FROM student_submissions sub 
+          WHERE sub.activity_id = a.id AND sub.student_id IN (?)
+        )
       ORDER BY (a.due_date IS NULL) ASC, a.due_date ASC, a.created_at DESC
       LIMIT 6
     `;
-    const [tasksResult] = await pool.query(taskQuery, [idCandidates, idCandidates]);
+    const [tasksResult] = await pool.query(taskQuery, [idCandidates, idCandidates, idCandidates]);
 
     const nextLessons = tasksResult.map(row => {
-      let durationStr = "No Due Date";
-      if (row.duration) {
-        const date = new Date(row.duration);
-        if (!isNaN(date.getTime())) {
-          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-          const m = months[date.getMonth()];
-          const d = date.getDate();
-          
-          let hours = date.getHours();
-          const minutes = date.getMinutes().toString().padStart(2, '0');
-          const ampm = hours >= 12 ? 'PM' : 'AM';
-          hours = hours % 12;
-          hours = hours ? hours : 12;
-          
-          durationStr = `${m} ${d}, ${hours}:${minutes} ${ampm}`;
+      const now = new Date();
+      let isClosed = Boolean(row.is_closed_db);
+      let isNotOpenYet = Boolean(row.is_not_open_yet_db);
+
+      if (row.due_date) {
+        const dueDate = new Date(row.due_date);
+        if (!isNaN(dueDate.getTime()) && now > dueDate) {
+          isClosed = true;
         }
       }
+      if (row.open_date) {
+        const openDate = new Date(row.open_date);
+        if (!isNaN(openDate.getTime()) && now < openDate) {
+          isNotOpenYet = true;
+        }
+      }
+
+      let durationStr = "No Due Date";
+      if (row.due_date) {
+        const date = new Date(row.due_date);
+        if (!isNaN(date.getTime())) {
+          durationStr = date.toLocaleString('en-US', {
+            timeZone: 'Asia/Manila',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+        }
+      }
+
+      let openDateStr = row.open_date_formatted || null;
+      if (row.open_date) {
+        const date = new Date(row.open_date);
+        if (!isNaN(date.getTime())) {
+          openDateStr = date.toLocaleString('en-US', {
+            timeZone: 'Asia/Manila',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+        }
+      }
+
       return {
         id: row.id,
         class_id: row.class_id,
@@ -120,7 +160,12 @@ const getDashboard = async (req, res) => {
         desc: row.desc,
         subject: row.subject_name,
         teacher: row.teacher,
-        duration: durationStr
+        open_date: row.open_date,
+        due_date: row.due_date,
+        duration: durationStr,
+        open_date_formatted: openDateStr,
+        is_closed: isClosed,
+        is_not_open_yet: isNotOpenYet
       };
     });
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookMarked, User, Clock, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { BookMarked, User, Clock, CheckCircle, ArrowRight, Sparkles, Lock } from 'lucide-react';
 
 const StandardDashboard = ({ courses, nextLessons }) => {
   const navigate = useNavigate(); // 2. INITIALIZE NAVIGATE
@@ -106,34 +106,70 @@ const StandardDashboard = ({ courses, nextLessons }) => {
                <h3 className="text-xl font-black text-slate-800 dark:text-white">Upcoming Tasks & Lessons</h3>
             </div>
             <div className="space-y-2">
-               {nextLessons.map((lesson, idx) => (
-                 <div 
-                    key={idx} 
-                    onClick={() => navigate(`/lms/course/${lesson.class_id}`)}
-                    // DARK MODE FIX: Hover states and border adaptations
-                    className="flex items-center justify-between p-4 rounded-[1.5rem] hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-600"
-                 >
-                    <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-[1.2rem] flex items-center justify-center text-slate-400 group-hover:bg-[var(--primary-color)] group-hover:text-white transition-colors">
-                          <CheckCircle size={20} />
-                       </div>
-                       <div>
-                          <h4 className="font-black text-slate-800 dark:text-slate-200 text-sm group-hover:text-[var(--primary-color)] dark:group-hover:text-white transition-colors">{lesson.title}</h4>
-                          <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">{lesson.desc || lesson.subject}</p>
-                       </div>
-                    </div>
-                    <div className="flex items-center gap-12 text-sm font-bold">
-                       <div className="hidden sm:flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                          {/* FIX: Ginamit ang var(--primary-color) sa avatar text */}
-                          <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 text-[var(--primary-color)] dark:text-slate-300 flex items-center justify-center text-[10px]">{lesson.teacher ? lesson.teacher.charAt(0) : 'T'}</div>
-                          {lesson.teacher || 'TBA'}
-                       </div>
-                       <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 w-24">
-                          <Clock size={14} /> {lesson.duration || lesson.due || 'No Due'}
-                       </div>
-                    </div>
-                 </div>
-               ))}
+               {nextLessons.map((lesson, idx) => {
+                 const isClosed = Boolean(lesson.is_closed);
+                 const isNotOpen = Boolean(lesson.is_not_open_yet);
+                 const isClickable = !isClosed && !isNotOpen;
+
+                 return (
+                   <div 
+                      key={idx} 
+                      onClick={() => {
+                         if (!isClickable) return;
+                         if (lesson.id) navigate(`/lms/exam/${lesson.id}`);
+                         else navigate(`/lms/course/${lesson.class_id}`);
+                      }}
+                      className={`flex items-center justify-between p-4 rounded-[1.5rem] transition-colors group border ${
+                         isClosed 
+                           ? 'opacity-60 cursor-not-allowed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40' 
+                           : isNotOpen
+                           ? 'opacity-80 cursor-not-allowed border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-900/10'
+                           : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer border-transparent hover:border-slate-100 dark:hover:border-slate-600'
+                      }`}
+                   >
+                      <div className="flex items-center gap-4">
+                         <div className={`w-12 h-12 rounded-[1.2rem] flex items-center justify-center transition-colors ${
+                           isClosed
+                             ? 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                             : isNotOpen
+                             ? 'bg-amber-100 text-amber-600'
+                             : 'bg-slate-100 dark:bg-slate-700 text-slate-400 group-hover:bg-[var(--primary-color)] group-hover:text-white'
+                         }`}>
+                            {isClosed ? <Lock size={20} /> : isNotOpen ? <Clock size={20} /> : <CheckCircle size={20} />}
+                         </div>
+                         <div>
+                            <h4 className={`font-black text-sm transition-colors ${
+                              isClosed ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-slate-200 group-hover:text-[var(--primary-color)] dark:group-hover:text-white'
+                            }`}>
+                              {lesson.title}
+                            </h4>
+                            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">{lesson.desc || lesson.subject}</p>
+                         </div>
+                      </div>
+                      <div className="flex items-center gap-6 sm:gap-12 text-sm font-bold">
+                         {isClosed ? (
+                           <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-black">
+                             Closed • Due Expired
+                           </span>
+                         ) : isNotOpen ? (
+                           <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-black flex items-center gap-1">
+                             <Clock size={12} /> Opens {lesson.open_date_formatted || 'Soon'}
+                           </span>
+                         ) : (
+                           <>
+                             <div className="hidden sm:flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 text-[var(--primary-color)] dark:text-slate-300 flex items-center justify-center text-[10px]">{lesson.teacher ? lesson.teacher.charAt(0) : 'T'}</div>
+                                {lesson.teacher || 'TBA'}
+                             </div>
+                             <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                <Clock size={14} /> {lesson.duration || lesson.due || 'No Due'}
+                             </div>
+                           </>
+                         )}
+                      </div>
+                   </div>
+                 );
+               })}
                
                {nextLessons.length === 0 && (
                  <div className="text-center py-8">
